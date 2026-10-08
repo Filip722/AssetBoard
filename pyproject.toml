@@ -6,7 +6,16 @@ readme = "README.md"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.116,<1",
+    "pydantic-settings>=2.10,<3",
+    "typer>=0.16,<1",
+    "uvicorn>=0.35,<1",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.22,<0.9"]
+build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
@@ -19,10 +28,14 @@ test = [
     "pytest-cov>=6,<7",
     "pyyaml>=6,<7",
     "types-pyyaml>=6,<7",
+    "httpx>=0.28,<1",
 ]
 
 [tool.uv]
 default-groups = ["dev", "test"]
+
+[project.scripts]
+assetboard = "assetboard.cli:app"
 
 [tool.ruff]
 line-length = 100
@@ -42,7 +55,6 @@ strict = ["src/assetboard/domain", "src/assetboard/services"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=src/assetboard --cov-report=term-missing --cov-report=xml"
-pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.coverage.run]

@@ -35,7 +35,7 @@ A self-hosted web app that replaces a personal finance spreadsheet (monthly inco
 
 ### 3.2 Money, quantities, currency
 - Money columns are `(amount_minor BIGINT, currency CHAR(3))`. Domain type `Money`. Amounts stored positive; direction comes from the entity (income/expense, asset/liability).
-- Workspace has a `base_currency` (default PLN). Reports and totals are in base currency. v1 ledger entries are entered in base currency; the schema carries `currency` everywhere so multi-currency can be added without migrations of meaning.
+- Workspace has a `base_currency` (default EUR). Reports and totals are in base currency. v1 ledger entries are entered in base currency; the schema carries `currency` everywhere so multi-currency can be added without migrations of meaning.
 - Quantities and unit prices use `DecimalType`: TEXT on SQLite, `NUMERIC(38,18)` on PostgreSQL. Because SQL aggregates on TEXT are unreliable, **aggregate quantities/prices in Python (domain layer)**, not in SQL.
 - Rates in integer basis points.
 

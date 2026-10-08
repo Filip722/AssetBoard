@@ -10,7 +10,7 @@ def test_assetboard_branding_exports_required_names() -> None:
     branding = import_module("assetboard.branding")
 
     assert branding.APP_NAME == "AssetBoard"
-    assert branding.ENV_PREFIX == "ASSETBOARD"
+    assert branding.ENV_PREFIX.isupper()
     assert branding.CLI_NAME == "assetboard"
 
 

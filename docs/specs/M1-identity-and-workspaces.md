@@ -29,7 +29,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Login throttling per IP and per account (e.g., 5 failures → exponential backoff), generic error messages (no user enumeration), constant-time-ish comparison path for unknown users.
 - Open registration disabled by default; `ALLOW_REGISTRATION` env flag creates a new user + new empty workspace.
 - Audit events: login success/failure, logout, password change.
-- CLI: `AssetBoard create-admin`, `AssetBoard reset-password <email>` (prints one-time link or sets a new password interactively).
+- CLI: `assetboard create-admin`, `assetboard reset-password <email>` (prints one-time link or sets a new password interactively).
 
 **Agent prompt**
 ```
