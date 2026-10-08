@@ -1,0 +1,53 @@
+[project]
+name = "assetboard"
+version = "0.0.0"
+description = "A self-hosted personal finance web app"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12,<1",
+    "pre-commit>=4,<5",
+    "pyright>=1.1,<2",
+]
+test = [
+    "pytest>=8,<9",
+    "pytest-cov>=6,<7",
+    "pyyaml>=6,<7",
+    "types-pyyaml>=6,<7",
+]
+
+[tool.uv]
+default-groups = ["dev", "test"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.13"
+strict = ["src/assetboard/domain", "src/assetboard/services"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=src/assetboard --cov-report=term-missing --cov-report=xml"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = false
+source = ["src/assetboard"]
+
+[tool.coverage.report]
+show_missing = true

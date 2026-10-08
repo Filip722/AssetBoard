@@ -1,0 +1,39 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        pass_filenames: true
+        types: [python]
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --check
+        language: system
+        pass_filenames: true
+        types: [python]
+
+      - id: block-database-and-spreadsheet-files
+        name: Block unsupported data files
+        entry: Do not commit database or spreadsheet files
+        language: fail
+        files: '(?i)\.(xlsx|xlsm|xls|db|sqlite|sqlite3|db-wal|db-shm)$'
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: forbid-new-submodules
+      - id: check-symlinks
+      - id: check-executables-have-shebangs
+      - id: detect-private-key
+      - id: check-json
+      - id: mixed-line-ending

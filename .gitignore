@@ -205,6 +205,25 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Project data
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.xls
+*.xlsm
+*.xlsx
+
+# macOS
+.DS_Store
+
+# Environment and local tooling
+.env
+.venv/
+.uv-cache/
+
 # Ruff stuff:
 .ruff_cache/
 
