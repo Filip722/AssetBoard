@@ -7,8 +7,10 @@ license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.14,<2",
     "fastapi>=0.116,<1",
     "pydantic-settings>=2.10,<3",
+    "sqlalchemy>=2.0,<2.1",
     "typer>=0.16,<1",
     "uvicorn>=0.35,<1",
 ]
@@ -26,6 +28,7 @@ dev = [
 test = [
     "pytest>=8,<9",
     "pytest-cov>=6,<7",
+    "hypothesis>=6,<7",
     "pyyaml>=6,<7",
     "types-pyyaml>=6,<7",
     "httpx>=0.28,<1",

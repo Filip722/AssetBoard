@@ -1,3 +1,5 @@
-"""Domain package."""
+"""Pure domain value objects and calculations."""
 
-__all__ = []
+from assetboard.domain.money import Money
+
+__all__ = ["Money"]

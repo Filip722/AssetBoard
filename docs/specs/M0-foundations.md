@@ -76,6 +76,7 @@ Implement F0.3 from docs/specs/M0-foundations.md: DB engine with SQLite pragmas,
 mixins, Money value object, DecimalType (TEXT on SQLite / NUMERIC(38,18) on PostgreSQL), Alembic setup, pytest DB fixtures.
 Hard rules: no floats anywhere; Money is integer minor units + ISO currency code; DecimalType must reject float input.
 Write property-based tests (hypothesis) for Decimal round-tripping and Money arithmetic/rounding (half up).
+Wire /readyz to a real DB check, and make the check synchronous but run in a threadpool so it doesn’t block the event loop.
 ```
 
 ---

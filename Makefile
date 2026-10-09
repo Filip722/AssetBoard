@@ -11,6 +11,10 @@ check:
 	$(UV) run ruff format --check .
 	$(UV) run pyright
 	$(UV) run pytest
+	@temp_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$temp_dir"' EXIT; \
+	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run assetboard migrate && \
+	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run assetboard check-migrations
 	$(UV) run pre-commit run --all-files
 
 test:
@@ -20,10 +24,10 @@ css:
 	@echo "not yet implemented"
 
 migrate:
-	@echo "not yet implemented"
+	$(UV) run assetboard migrate
 
 revision:
-	@echo "not yet implemented"
+	$(UV) run assetboard revision --message "$(m)"
 
 i18n-extract:
 	@echo "not yet implemented"

@@ -4,6 +4,8 @@ import typer
 
 from assetboard.app import create_app
 from assetboard.branding import APP_NAME, CLI_NAME
+from assetboard.config import Settings
+from assetboard.db.migrate import check_database_migrations, create_revision, upgrade_database
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
 
@@ -22,8 +24,21 @@ def serve(
 @app.command()
 def migrate() -> None:
     """Run database migrations."""
-    typer.echo("Migrations are not implemented until F0.3", err=True)
-    raise typer.Exit(code=1)
+    settings = Settings()
+    upgrade_database(settings)
+    typer.echo("Database migrations applied.")
+
+
+@app.command("check-migrations")
+def check_migrations() -> None:
+    """Check for model changes that need a migration."""
+    check_database_migrations(Settings())
+
+
+@app.command(hidden=True)
+def revision(message: str = typer.Option(..., "--message", "-m")) -> None:
+    """Create an autogenerate migration after validating the current schema."""
+    create_revision(Settings(), message)
 
 
 if __name__ == "__main__":

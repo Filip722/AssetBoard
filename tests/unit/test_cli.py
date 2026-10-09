@@ -6,6 +6,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from assetboard.branding import ENV_PREFIX
 from assetboard.cli import app as cli_app
 
 
@@ -23,6 +24,7 @@ def test_assetboard_console_script_help_runs() -> None:
     assert result.returncode == 0
     assert "serve" in result.stdout
     assert "migrate" in result.stdout
+    assert "revision" not in result.stdout
 
 
 def test_assetboard_module_help_runs() -> None:
@@ -36,10 +38,17 @@ def test_assetboard_module_help_runs() -> None:
     assert result.returncode == 0
     assert "serve" in result.stdout
     assert "migrate" in result.stdout
+    assert "revision" not in result.stdout
 
 
-def test_migrate_reports_not_implemented_until_f03() -> None:
-    result = CliRunner().invoke(cli_app, ["migrate"])
+def test_migrate_runs_upgrade_in_configured_data_directory(tmp_path: Path) -> None:
+    data_dir = tmp_path / "migrations"
+    result = CliRunner().invoke(
+        cli_app,
+        ["migrate"],
+        env={f"{ENV_PREFIX}_DATA_DIR": str(data_dir)},
+    )
 
-    assert result.exit_code == 1
-    assert "not implemented until F0.3" in result.output
+    assert result.exit_code == 0
+    assert "Database migrations applied" in result.output
+    assert (data_dir / "assetboard.db").exists()
