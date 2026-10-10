@@ -1,4 +1,41 @@
-# Container deployment notes
+# Deployment guide
+
+## Environment variables
+
+Application settings use the `ASSETBOARD_` prefix in the environment. Values shown as Compose
+defaults are set or interpolated by `compose.example.yaml`; application defaults apply when the app
+is run directly. `ASSETBOARD_BIND_ADDRESS`, `ASSETBOARD_HOST_PORT`, and `ASSETBOARD_IMAGE` are
+Compose inputs only and are not application settings.
+
+| Variable | Default | Scope | Description |
+| --- | --- | --- | --- |
+| `ASSETBOARD_ENV` | `dev` (Compose: `prod`) | App | Runtime mode: `dev` or `prod`. |
+| `ASSETBOARD_DATA_DIR` | `./data` (Compose: `/data`) | App | Directory for SQLite data and generated secret key; must be writable. |
+| `ASSETBOARD_DATABASE_URL` | `<DATA_DIR>/assetboard.db` | App | SQLite URL; this foundation supports SQLite only. |
+| `ASSETBOARD_SECRET_KEY` | unset | App | Optional explicit secret. If absent, a key is generated once and persisted under `DATA_DIR`. |
+| `ASSETBOARD_BASE_URL` | `http://localhost:8000` | App | Public base URL. Set to the external URL when using a reverse proxy. |
+| `ASSETBOARD_LOG_LEVEL` | `INFO` | App | Minimum log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
+| `ASSETBOARD_LOG_FORMAT` | `text` (Compose: `json`) | App | Log output format: `text` or `json`. |
+| `ASSETBOARD_TRUSTED_PROXIES` | empty | App | Comma-separated proxy IPs/CIDRs allowed to supply forwarded headers. Empty trusts loopback only (`127.0.0.1`). |
+| `ASSETBOARD_DEFAULT_LOCALE` | `en` | App | Two-letter lowercase default locale. |
+| `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | App | Three-letter ISO currency used as the default. |
+| `ASSETBOARD_AUTO_MIGRATE` | `true` | App | Apply pending database migrations at startup when enabled. Only one instance/worker may use a data volume with automatic migrations enabled. |
+| `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
+| `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
+| `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
+
+The Compose file intentionally binds to loopback by default. Publishing on all interfaces exposes
+the service to the LAN; there is no authentication until M1, so restrict access accordingly.
+
+## Run a published image
+
+After the first release has been published and the GHCR package has been made public, set
+`ASSETBOARD_IMAGE` to a published version tag and start Compose without building locally:
+
+```bash
+ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.1.0 \
+  docker compose -f compose.example.yaml up -d --no-build
+```
 
 ## Release automation credentials
 

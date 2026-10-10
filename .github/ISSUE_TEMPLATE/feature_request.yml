@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a feature tied to the project specifications
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: spec_id
+    attributes:
+      label: Spec ID
+      description: Feature ID and specification section, or explain why a new spec is needed.
+      placeholder: F1.2 — docs/specs/M1-identity.md
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user need
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checklist
+      description: List observable outcomes that can be checked.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context

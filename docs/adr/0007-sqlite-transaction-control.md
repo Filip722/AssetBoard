@@ -1,4 +1,7 @@
-# ADR 0007: SQLite Transaction Control
+# ADR-0007: SQLite transaction control
+
+**Status:** Accepted
+**Date:** 2026-10-10
 
 ## Context
 
