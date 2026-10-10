@@ -18,13 +18,18 @@ def serve(
     """Start the web server."""
     import uvicorn
 
-    settings = Settings()
-    forwarded_allow_ips = ",".join(settings.trusted_proxies) or "127.0.0.1"
+    try:
+        settings = Settings()
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
     try:
         application = create_app(settings)
     except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
+    forwarded_allow_ips = ",".join(settings.trusted_proxies) or "127.0.0.1"
     uvicorn.run(application, host=host, port=port, forwarded_allow_ips=forwarded_allow_ips)
 
 

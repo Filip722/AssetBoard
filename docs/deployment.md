@@ -37,12 +37,13 @@ headers only from that peer range.
 
 ## Image tags
 
-For a stable `v0.1.0` release, the published tags are `0.1.0`, `0.1`, and `latest`. The `0` tag is
-omitted because it is not a useful moving tag during the 0.x development series. Prerelease tags
-publish their version-specific tag only and do not move `latest`.
+For stable `v0.1.0`, the published tags are `0.1.0`, `0.1`, and `latest`. Stable `v1.2.3` publishes
+`1.2.3`, `1.2`, `1`, and `latest`. The major-only tag is omitted for 0.x releases. Prerelease
+`v1.0.0-rc.1` publishes only `1.0.0-rc.1`; prereleases do not move `latest`.
 
 ## Rehearsing a release image
 
-To rehearse publishing from a throwaway tag, push that tag, then run the Docker workflow with
-**Actions → Docker → Run workflow** and enter the same tag. The manual run builds, smoke-tests, and
-publishes the tag using the regular release path; remove the throwaway GHCR tags after reviewing it.
+To rehearse a release image, open **Actions → Docker → Run workflow**, enter the existing release
+tag, and leave **Publish the image to GHCR** unchecked. The workflow builds and tests both
+architectures without logging in to GHCR or publishing. Check **Publish the image to GHCR** only
+when you intend to upload the image and its release tags.

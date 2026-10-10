@@ -8,8 +8,6 @@ FROM ghcr.io/astral-sh/uv:0.8.22@sha256:9874eb7afe5ca16c363fe80b294fe700e460df29
 
 FROM --platform=$BUILDPLATFORM python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641 AS assets
 
-RUN uname -m
-
 COPY --from=uv-build /uv /uvx /bin/
 
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
@@ -44,7 +42,6 @@ WORKDIR /build
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-default-groups --no-install-project
 
-COPY README.md LICENSE ./
 COPY . .
 COPY --from=assets /build/src/assetboard/static/css/app.css src/assetboard/static/css/app.css
 COPY --from=assets /build/src/assetboard/locales/en/LC_MESSAGES/messages.mo src/assetboard/locales/en/LC_MESSAGES/messages.mo

@@ -79,7 +79,7 @@ def test_serve_passes_trusted_proxies_to_uvicorn(
     assert calls["forwarded_allow_ips"] == "127.0.0.1,10.20.0.0/16"
 
 
-def test_serve_reports_unwritable_data_directory(
+def test_serve_reports_create_app_runtime_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -99,3 +99,20 @@ def test_serve_reports_unwritable_data_directory(
     assert result.exit_code == 1
     assert "DATA_DIR is not writable" in result.output
     assert "chown 10001:10001" in result.output
+
+
+def test_serve_reports_settings_value_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    def fail_settings() -> object:
+        raise ValueError("Invalid configuration")
+
+    monkeypatch.setattr(cli, "Settings", fail_settings)
+    result = CliRunner().invoke(cli_app, ["serve"])
+
+    assert result.exit_code == 1
+    assert "Invalid configuration" in result.output
+    assert "Traceback" not in result.output

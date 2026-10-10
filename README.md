@@ -44,8 +44,9 @@ ASSETBOARD_IMAGE=ghcr.io/your-github-owner/your-repository:latest \
   docker compose -f compose.example.yaml up -d --no-build
 ```
 
-To expose the app on your LAN, change the port binding to `8000:8000` or publish it through a
-reverse proxy; there is no authentication until M1, so restrict access to trusted users.
+To expose the app on your LAN, set `ASSETBOARD_BIND_ADDRESS=0.0.0.0` (and optionally
+`ASSETBOARD_HOST_PORT` to choose the host port), or publish it through a reverse proxy. There is
+no authentication until M1, so restrict access to trusted users.
 
 The example runs as UID 10001 with a read-only root filesystem and all Linux capabilities dropped.
 `/data` is persistent and `/tmp` is writable. See the environment section in

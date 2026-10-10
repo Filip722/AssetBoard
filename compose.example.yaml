@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     ports:
       # Bind to loopback when a local reverse proxy publishes the public endpoint.
-      - "${ASSETBOARD_BIND_ADDRESS:-127.0.0.1}:${ASSETBOARD_PORT:-8000}:8000"
+      - "${ASSETBOARD_BIND_ADDRESS:-127.0.0.1}:${ASSETBOARD_HOST_PORT:-8000}:8000"
     environment:
       ASSETBOARD_ENV: prod
       ASSETBOARD_DATA_DIR: /data
