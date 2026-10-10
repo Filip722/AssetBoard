@@ -26,3 +26,42 @@ Run the complete local checks with:
 ```bash
 make check
 ```
+
+## Run with Docker Compose
+
+From a checkout, build and start the example deployment with:
+
+```bash
+docker compose -f compose.example.yaml up -d --build
+```
+
+Open <http://localhost:8000>. Compose keeps the database and generated secret key in the named
+`assetboard-data` volume. To use a published image instead, set `ASSETBOARD_IMAGE` to its GHCR
+reference and run Compose with `--no-build`:
+
+```bash
+ASSETBOARD_IMAGE=ghcr.io/your-github-owner/your-repository:latest \
+  docker compose -f compose.example.yaml up -d --no-build
+```
+
+To expose the app on your LAN, change the port binding to `8000:8000` or publish it through a
+reverse proxy; there is no authentication until M1, so restrict access to trusted users.
+
+The example runs as UID 10001 with a read-only root filesystem and all Linux capabilities dropped.
+`/data` is persistent and `/tmp` is writable. See the environment section in
+`compose.example.yaml` to customize the locale, base currency, log format, trusted proxies, and
+public URL. The first start creates a secret key in the data volume and applies database migrations
+automatically.
+
+For a bind mount, create the host directory and give it to the container user before starting:
+
+```bash
+mkdir -p ./assetboard-data
+sudo chown 10001:10001 ./assetboard-data
+```
+
+Then replace `assetboard-data:/data` in the Compose file with `./assetboard-data:/data`. Startup
+checks that `DATA_DIR` is writable and prints this ownership guidance if the mount permissions are
+wrong. The published Compose example binds to `127.0.0.1`; put it behind a reverse proxy for public
+access. See [deployment notes](docs/deployment.md) for Caddy/Traefik, release token behavior, and
+making a GHCR package public.

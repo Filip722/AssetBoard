@@ -38,6 +38,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
+    settings.ensure_data_dir_writable()
     settings.ensure_secret_key()
     database_url = settings.database_url
     if database_url is None:

@@ -14,6 +14,7 @@ dependencies = [
     "pydantic-settings>=2.10,<3",
     "sqlalchemy>=2.0,<2.1",
     "typer>=0.16,<1",
+    "tzdata>=2025.2,<2027",
     "uvicorn>=0.35,<1",
 ]
 
@@ -56,6 +57,9 @@ quote-style = "double"
 
 [tool.pyright]
 include = ["src", "tests"]
+# Point Pyright at the project environment so it resolves the installed runtime and test stubs.
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.13"
 strict = ["src/assetboard/domain", "src/assetboard/services"]
 

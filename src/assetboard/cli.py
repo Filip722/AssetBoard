@@ -15,10 +15,17 @@ def serve(
     host: str = typer.Option("127.0.0.1", help="Host interface to bind."),
     port: int = typer.Option(8000, help="Port to listen on."),
 ) -> None:
-    """Start the development web server."""
+    """Start the web server."""
     import uvicorn
 
-    uvicorn.run(create_app(), host=host, port=port)
+    settings = Settings()
+    forwarded_allow_ips = ",".join(settings.trusted_proxies) or "127.0.0.1"
+    try:
+        application = create_app(settings)
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    uvicorn.run(application, host=host, port=port, forwarded_allow_ips=forwarded_allow_ips)
 
 
 @app.command()

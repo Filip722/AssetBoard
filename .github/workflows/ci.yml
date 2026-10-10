@@ -29,6 +29,25 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
+      - name: Verify locked dependencies
+        run: uv lock --check
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y shellcheck
+
+      - name: Check container smoke script
+        run: shellcheck scripts/smoke_container.sh
+
+      - name: Build and inspect non-editable wheel
+        run: |
+          uv run --locked make css i18n-compile
+          uv build --wheel --out-dir dist
+          python -m zipfile -l dist/assetboard-*.whl
+          uv run --locked python scripts/verify_wheel.py dist/assetboard-*.whl
+          uv venv --python 3.13 /tmp/assetboard-wheel-check
+          uv pip install --python /tmp/assetboard-wheel-check/bin/python --no-deps dist/assetboard-*.whl
+          PYTHONPATH= /tmp/assetboard-wheel-check/bin/python scripts/verify_installed_wheel.py
+
       - name: Install Playwright browser
         run: uv run --locked playwright install --with-deps chromium
 

@@ -146,6 +146,17 @@ class Settings(BaseSettings):
 
         return self
 
+    def ensure_data_dir_writable(self) -> None:
+        try:
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryFile(dir=self.data_dir):
+                pass
+        except OSError as exc:
+            raise RuntimeError(
+                f"DATA_DIR {self.data_dir} is not writable. For a host bind mount, run "
+                "'chown 10001:10001 <host-data-directory>' or use a named Docker volume."
+            ) from exc
+
     def ensure_secret_key(self) -> str:
         if self.secret_key is not None:
             return self.secret_key
