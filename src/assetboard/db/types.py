@@ -48,8 +48,9 @@ class DecimalType(TypeDecorator[Decimal]):
     impl = Text
     cache_ok = True
 
+    # SQLAlchemy 2.1's descriptor typing does not model this supported hook override.
     @property
-    def comparator_factory(self) -> type[DecimalComparator]:
+    def comparator_factory(self) -> type[DecimalComparator]:  # type: ignore[reportIncompatibleVariableOverride]
         return DecimalComparator
 
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
