@@ -1,0 +1,144 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version:  AssetBoard\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-10-09 21:53+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: pl\n"
+"Language-Team: pl <LL@li.org>\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && "
+"(n%100<12 || n%100>14) ? 1 : 2);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgid "Access denied"
+msgstr "Brak dostępu"
+
+msgid "You do not have permission to view this page."
+msgstr "Nie masz uprawnień do wyświetlenia tej strony."
+
+msgid "Page not found"
+msgstr "Nie znaleziono strony"
+
+msgid "The page you requested could not be found."
+msgstr "Nie można znaleźć wskazanej strony."
+
+msgid "Something went wrong"
+msgstr "Coś poszło nie tak"
+
+msgid "An unexpected error occurred. Please try again."
+msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
+
+msgid "Enter a valid amount."
+msgstr "Podaj prawidłową kwotę."
+
+msgid "Home"
+msgstr "Strona główna"
+
+msgid "Main navigation"
+msgstr "Menu główne"
+
+msgid "Month"
+msgstr "Miesiąc"
+
+msgid "Recurring"
+msgstr "Cykliczne"
+
+msgid "Net worth"
+msgstr "Majątek netto"
+
+msgid "Investments"
+msgstr "Inwestycje"
+
+msgid "Loans"
+msgstr "Kredyty"
+
+msgid "FIRE projection"
+msgstr "Prognoza FIRE"
+
+msgid "Unavailable"
+msgstr "Niedostępne"
+
+msgid "Your account"
+msgstr "Twoje konto"
+
+msgid "Personal workspace"
+msgstr "Przestrzeń osobista"
+
+msgid "Account settings"
+msgstr "Ustawienia konta"
+
+msgid "Sign out"
+msgstr "Wyloguj się"
+
+msgid "Toggle dark mode"
+msgstr "Przełącz tryb ciemny"
+
+msgid "Personal finance"
+msgstr "Finanse osobiste"
+
+msgid "Your overview"
+msgstr "Podsumowanie"
+
+msgid "Workspace"
+msgstr "Przestrzeń"
+
+msgid "Personal"
+msgstr "Osobista"
+
+msgid "Are you sure?"
+msgstr "Czy na pewno?"
+
+msgid "This action cannot be undone."
+msgstr "Tej operacji nie można cofnąć."
+
+msgid "Continue"
+msgstr "Kontynuuj"
+
+msgid "Cancel"
+msgstr "Anuluj"
+
+msgid "Overview"
+msgstr "Podsumowanie"
+
+msgid "Monthly summary"
+msgstr "Podsumowanie miesiąca"
+
+msgid "Income"
+msgstr "Przychody"
+
+msgid "Planned and actual amounts will appear here."
+msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
+
+msgid "Expenses"
+msgstr "Wydatki"
+
+msgid "Keep your monthly spending in view."
+msgstr "Śledź miesięczne wydatki."
+
+msgid "Available"
+msgstr "Pozostało"
+
+msgid "Income minus regular expenses."
+msgstr "Przychody pomniejszone o regularne wydatki."
+
+msgid "Nothing to show yet"
+msgstr "Na razie brak danych"
+
+msgid ""
+"Your monthly plan and activity will appear here once you start adding "
+"items."
+msgstr ""
+"Twój plan miesięczny i aktywność pojawią się tutaj, gdy dodasz pierwsze "
+"pozycje."
+
+msgid "Dismiss"
+msgstr "Zamknij"
+
+msgid "Return to overview"
+msgstr "Powrót do podsumowania"
+

@@ -87,8 +87,7 @@ def test_healthz_suppresses_success_and_warns_on_failure() -> None:
     assert "status_code=503" in lines[0]
 
 
-def test_unhandled_exception_logs_500_without_response_request_id() -> None:
-    """Starlette's outer server-error handler emits 500 outside the request-ID wrapper."""
+def test_unhandled_exception_logs_traceback_and_returns_request_id() -> None:
     app = create_app(Settings(_env_file=None, secret_key="test-secret"))
 
     @app.get("/route-that-raises")
@@ -112,6 +111,8 @@ def test_unhandled_exception_logs_500_without_response_request_id() -> None:
         handler.close()
 
     assert response.status_code == 500
-    assert "x-request-id" not in response.headers
+    assert response.headers["x-request-id"] == "failure-trace"
     assert "failure-trace request_complete method=GET path=/route-that-raises " in output.getvalue()
     assert "status_code=500" in output.getvalue()
+    assert "Traceback (most recent call last)" in output.getvalue()
+    assert "synthetic route failure" in output.getvalue()

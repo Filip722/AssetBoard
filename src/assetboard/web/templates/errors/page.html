@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<section class="panel mx-auto max-w-2xl p-7 sm:p-10" role="alert">
+  <p class="text-sm font-semibold text-accent">{{ status_code }}</p>
+  <p class="mt-3 text-muted dark:text-slate-300">{{ message }}</p>
+  <a class="mt-6 inline-flex rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark" href="{{ scoped_url(request, 'home') }}">{{ _("Return to overview") }}</a>
+</section>
+{% endblock %}

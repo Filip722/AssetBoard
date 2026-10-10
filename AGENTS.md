@@ -38,6 +38,7 @@ planned-vs-actual, recurring items, variable income, net worth, investments, loa
 - Validate all input with Pydantic/forms; escape output (Jinja autoescape stays on); no inline scripts (CSP-ready).
 - Never log secrets, tokens, passwords, full request bodies or financial amounts at INFO level or above.
 - Secrets stored in the DB (notification URLs, API tokens) are encrypted or hashed per spec.
+- Any vendored third-party file must have its license (and NOTICE, if upstream has one) beside it, an entry in `vendor/README.md` with version, license and SHA-256, and the license must be compatible with AGPL-3.0-or-later.
 - No telemetry, no external calls at runtime except features the user explicitly configures (price providers, OIDC, notifications).
 - Never commit real personal data. Test fixtures are synthetic.
 

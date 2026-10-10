@@ -29,5 +29,21 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
+      - name: Install Playwright browser
+        run: uv run --locked playwright install --with-deps chromium
+
       - name: Run project checks
         run: uv run --locked make check
+
+      - name: Run Playwright shell smoke
+        run: ASSETBOARD_RUN_BROWSER_TESTS=1 uv run --locked pytest tests/browser/test_f04_smoke.py
+
+      - name: Verify generated assets are fresh
+        run: |
+          uv run --locked make css i18n-compile
+          git diff --exit-code -- src/assetboard/static/css/app.css src/assetboard/locales/en/LC_MESSAGES/messages.mo src/assetboard/locales/pl/LC_MESSAGES/messages.mo
+
+      - name: Verify translation catalogs are fresh
+        run: |
+          uv run --locked make i18n-update
+          git diff --exit-code -- src/assetboard/locales/en/LC_MESSAGES/messages.po src/assetboard/locales/pl/LC_MESSAGES/messages.po

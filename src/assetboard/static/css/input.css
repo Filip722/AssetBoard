@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  :root.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  button,
+  a {
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-line bg-white shadow-card dark:border-slate-800 dark:bg-slate-900;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
+  }
+
+  .nav-link[aria-current="page"] {
+    @apply bg-emerald-50 text-accent dark:bg-emerald-950/60 dark:text-emerald-300;
+  }
+}
