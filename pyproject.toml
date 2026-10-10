@@ -30,7 +30,7 @@ dev = [
 ]
 test = [
     "pytest>=8,<10",
-    "pytest-cov>=6,<7",
+    "pytest-cov>=6,<8",
     "hypothesis>=6,<7",
     "pyyaml>=6,<7",
     "types-pyyaml>=6,<7",
