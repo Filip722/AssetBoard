@@ -118,3 +118,11 @@ document.addEventListener("submit", (event) => {
     form.requestSubmit();
   });
 });
+
+// HTMX requests carry the CSRF token in a header; plain forms use their hidden input.
+document.addEventListener("htmx:configRequest", (event) => {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta instanceof HTMLMetaElement && meta.content) {
+    event.detail.headers["X-CSRF-Token"] = meta.content;
+  }
+});

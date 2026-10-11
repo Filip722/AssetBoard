@@ -12,6 +12,7 @@ from starlette.responses import HTMLResponse
 from assetboard.domain.money import Money
 from assetboard.i18n import translations_for
 from assetboard.i18n.numbers import format_money
+from assetboard.web.security import apply_new_csrf_cookie, csrf_token, web_session
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -23,7 +24,9 @@ def templates_for(locale: str) -> Jinja2Templates:
     translations = translations_for(locale)
     cast(Any, templates.env).install_gettext_translations(translations, newstyle=True)
     templates.env.globals.update(Money=Money, format_money=format_money)
-    templates.env.globals.update(static_url=static_url, scoped_url=scoped_url, uuid4=uuid4)
+    templates.env.globals.update(
+        static_url=static_url, scoped_url=scoped_url, uuid4=uuid4, csrf_token=csrf_token
+    )
     return templates
 
 
@@ -50,12 +53,16 @@ def render_template(
         "locale": locale,
         "app_name": request.app.state.app_name,
         "default_currency": settings.default_currency,
+        "web_session": web_session(request),
     }
     if context:
         template_context.update(context)
-    return templates_for(locale).TemplateResponse(
+    response = templates_for(locale).TemplateResponse(
         request=request,
         name=name,
         context=template_context,
         status_code=status_code,
     )
+    # A form rendered for a signed-out visitor may have created the anonymous CSRF secret.
+    apply_new_csrf_cookie(request, response)
+    return response

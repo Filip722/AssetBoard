@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from assetboard.web.rendering import render_template
+from assetboard.web.security import require_csrf
 
-router = APIRouter()
+# Every router carries the CSRF dependency, so a new state-changing route is covered by default.
+router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
 @router.get("/", name="home")

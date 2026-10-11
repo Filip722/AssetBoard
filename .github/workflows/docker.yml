@@ -77,7 +77,13 @@ jobs:
           }
           trap cleanup EXIT
           ASSETBOARD_IMAGE=assetboard:ci ASSETBOARD_HOST_PORT=18000 docker compose -p assetboard-ci -f compose.example.yaml up -d --no-build --wait --wait-timeout 90
-          curl --fail --silent --show-error http://127.0.0.1:18000/ >/dev/null
+          # First run: every page redirects to setup, which asks for the setup token.
+          result=$(curl --silent --show-error --output /dev/null --write-out '%{http_code} %{redirect_url}' http://127.0.0.1:18000/)
+          test "$result" = "303 http://127.0.0.1:18000/setup"
+          curl --fail --silent --show-error http://127.0.0.1:18000/setup | grep -Fq 'name="setup_token"'
+          curl --fail --silent --show-error http://127.0.0.1:18000/readyz >/dev/null
+          ASSETBOARD_IMAGE=assetboard:ci docker compose -p assetboard-ci -f compose.example.yaml logs --no-color \
+            | grep -c 'Generated first-run setup token' | grep -qx 1
 
   detect-arm64-changes:
     if: github.event_name == 'pull_request'

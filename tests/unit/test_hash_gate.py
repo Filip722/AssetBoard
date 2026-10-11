@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import threading
 from pathlib import Path
 
+import anyio.to_thread
 import httpx
 import pytest
 
 from assetboard.app import create_app
 from assetboard.clock import Clock
 from assetboard.config import Settings
-from assetboard.db.migrate import upgrade_database
 from assetboard.services import auth
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 
@@ -130,10 +131,11 @@ def test_healthz_stays_responsive_while_hashing_is_saturated(tmp_path: Path) -> 
         blocker.release.set()
         assert await asyncio.gather(*hashes) == ["hashed"] * 18
 
-    try:
-        asyncio.run(scenario())
-    finally:
-        app.state.database_engine.dispose()
+    async def with_lifespan() -> None:
+        async with app.router.lifespan_context(app):  # decides the schema state, as at startup
+            await scenario()
+
+    asyncio.run(with_lifespan())
 
 
 def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
@@ -147,7 +149,6 @@ def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
     settings = Settings(
         _env_file=None, data_dir=tmp_path, secret_key="test-secret", auth_max_concurrent_hashes=8
     )
-    upgrade_database(settings)
     app = create_app(settings)
     app.add_api_route("/sync-probe", lambda: {"ok": True})  # a plain def route: runs in a thread
     blocker = Blocker()
@@ -157,8 +158,6 @@ def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
         blocker()
         return real_verify(password_hash, password)
 
-    monkeypatch.setattr(auth, "verify_password", slow_verify)
-    auth.prepare_dummy_hash()
     gate: HashGate = app.state.hash_gate
 
     async def login(index: int) -> object:
@@ -175,14 +174,40 @@ def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
         except HashGateBusy as exc:
             return exc
 
-    async def scenario() -> list[object]:
-        logins = [asyncio.create_task(login(index)) for index in range(40)]
-        busy = lambda: sum(  # noqa: E731
-            1 for task in logins if task.done() and isinstance(task.result(), HashGateBusy)
+    async def sign_in(client: httpx.AsyncClient) -> None:
+        await anyio.to_thread.run_sync(
+            lambda: auth.run_initial_setup(
+                app.state.session_factory,
+                email="admin@example.com",
+                display_name="Admin",
+                password="Correct Horse Battery!",
+                workspace_name="Home",
+                settings=settings,
+                clock=Clock(),
+            )
         )
-        await _until(lambda: blocker.running == 8 and gate.waiting == 16 and busy() == 16, 15)
+        token = re.search(r'name="csrf_token" value="([^"]+)"', (await client.get("/login")).text)
+        assert token is not None
+        signed = await client.post(
+            "/login",
+            data={
+                "email": "admin@example.com",
+                "password": "Correct Horse Battery!",
+                "csrf_token": token.group(1),
+            },
+        )
+        assert signed.status_code == 303
+
+    async def scenario() -> list[object]:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            await sign_in(client)  # the probe route needs a signed-in session
+            monkeypatch.setattr(auth, "verify_password", slow_verify)
+            logins = [asyncio.create_task(login(index)) for index in range(40)]
+            busy = lambda: sum(  # noqa: E731
+                1 for task in logins if task.done() and isinstance(task.result(), HashGateBusy)
+            )
+            await _until(lambda: blocker.running == 8 and gate.waiting == 16 and busy() == 16, 15)
             async with asyncio.timeout(3):
                 responses = [
                     await client.get("/healthz"),
@@ -194,10 +219,11 @@ def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
         async with asyncio.timeout(20):  # every queued request still completes
             return await asyncio.gather(*logins)
 
-    try:
-        results = asyncio.run(scenario())
-    finally:
-        app.state.database_engine.dispose()
+    async def with_lifespan() -> list[object]:
+        async with app.router.lifespan_context(app):  # migrations, schema state, dummy hash
+            return await scenario()
+
+    results = asyncio.run(with_lifespan())
     assert sum(isinstance(result, HashGateBusy) for result in results) == 16
     assert sum(isinstance(result, auth.LoginOutcome) for result in results) == 24
     assert blocker.peak == 8

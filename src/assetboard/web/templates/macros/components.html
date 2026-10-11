@@ -1,12 +1,38 @@
-{% macro field(name, label, type="text", value="", error=None, required=false) -%}
+{% macro field(name, label, type="text", value="", error=None, required=false, autocomplete=None, maxlength=None, help=None) -%}
 <div class="space-y-1.5">
   <label for="{{ name }}" class="block text-sm font-medium text-ink dark:text-slate-200">{{ label }}</label>
   <input id="{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}"
          {% if required %}required{% endif %}
-         {% if error %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}
+         {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+         {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
+         {% if error %}aria-invalid="true" aria-describedby="{{ name }}-error"{% elif help %}aria-describedby="{{ name }}-help"{% endif %}
          class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+  {% if help and not error %}<p id="{{ name }}-help" class="text-xs text-muted dark:text-slate-400">{{ help }}</p>{% endif %}
   {% if error %}<p id="{{ name }}-error" class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>{% endif %}
 </div>
+{%- endmacro %}
+
+{% macro select(name, label, options, selected="", error=None, blank=None) -%}
+<div class="space-y-1.5">
+  <label for="{{ name }}" class="block text-sm font-medium text-ink dark:text-slate-200">{{ label }}</label>
+  <select id="{{ name }}" name="{{ name }}"
+          {% if error %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}
+          class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+    {% if blank is not none %}<option value="">{{ blank }}</option>{% endif %}
+    {% for value, text in options %}
+    <option value="{{ value }}" {% if value == selected %}selected{% endif %}>{{ text }}</option>
+    {% endfor %}
+  </select>
+  {% if error %}<p id="{{ name }}-error" class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro csrf_input() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+{%- endmacro %}
+
+{% macro primary_button(label) -%}
+<button type="submit" class="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark focus:outline-none focus:ring-2 focus:ring-accent/40">{{ label }}</button>
 {%- endmacro %}
 
 {% macro flashes(messages=[]) -%}

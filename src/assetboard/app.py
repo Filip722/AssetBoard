@@ -14,11 +14,11 @@ from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 
-from assetboard.branding import APP_NAME
+from assetboard.branding import APP_NAME, CLI_NAME
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine, database_is_ready
-from assetboard.db.migrate import database_is_at_head, upgrade_database
+from assetboard.db.migrate import schema_state, upgrade_database
 from assetboard.i18n import gettext
 from assetboard.logging import configure_logging
 from assetboard.middleware import (
@@ -33,9 +33,18 @@ from assetboard.services.auth import (
     setup_is_open,
     setup_token_at_startup,
 )
-from assetboard.services.hash_gate import HashGate
+from assetboard.services.hash_gate import RETRY_AFTER_SECONDS, HashGate, HashGateBusy
+from assetboard.web.auth_routes import router as auth_router
+from assetboard.web.errors import add_error_response_headers, error_response
+from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
+from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
+from assetboard.web.security import CsrfFailed
+
+# Short lock wait for the best-effort session activity write; a busy database skips it.
+TOUCH_BUSY_TIMEOUT_MS = 250
+SCHEMA_READINESS = {"behind": "schema_outdated", "ahead": "schema_newer"}
 
 DatabaseChecker = Callable[[], bool]
 
@@ -54,45 +63,91 @@ def create_app(
     database_url = settings.database_url
     if database_url is None:
         raise ValueError("DATABASE_URL was not configured")
+    clock = Clock()
     engine = create_database_engine(database_url)
+    touch_engine = create_database_engine(database_url, busy_timeout_ms=TOUCH_BUSY_TIMEOUT_MS)
     session_factory = sessionmaker(
-        engine, class_=Session, info={"clock": Clock()}, expire_on_commit=False
+        engine, class_=Session, info={"clock": clock}, expire_on_commit=False
+    )
+    touch_factory = sessionmaker(
+        touch_engine, class_=Session, info={"clock": clock}, expire_on_commit=False
     )
     checker = database_checker or (lambda: database_is_ready(engine))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
-            if settings.auto_migrate:
+            # Decided once per process start; a restart picks up an upgraded database.
+            state = schema_state(settings)
+            if state == "behind" and settings.auto_migrate:
                 upgrade_database(settings)
-            if settings.auto_migrate or database_is_at_head(settings):
+                state = "current"
+            app.state.schema_state = state
+            if state == "current":
                 with session_factory() as session:
                     setup_open = setup_is_open(session)
                 app.state.setup_token = setup_token_at_startup(
                     settings, setup_open=setup_open, logger=logger
                 )
+            elif state == "behind":
+                logger.warning(
+                    "database schema is behind this version and AUTO_MIGRATE is off; "
+                    "run '%s migrate', then restart",
+                    CLI_NAME,
+                )
+            else:
+                logger.error("database schema is newer than this version of %s", APP_NAME)
             # Unknown-user logins verify against this; compute it once, before any request.
             await run_in_threadpool(prepare_dummy_hash)
             yield
         finally:
             engine.dispose()
+            touch_engine.dispose()
 
     app = FastAPI(title=APP_NAME, version=version("assetboard"), lifespan=lifespan)
     app.state.settings = settings
     app.state.app_name = APP_NAME
     app.state.logger = logger
     app.state.database_engine = engine
+    app.state.clock = clock
     app.state.session_factory = session_factory
+    app.state.touch_factory = touch_factory
+    app.state.schema_state = None  # decided in the lifespan
     app.state.csrf_key = derive_subkey(secret_key, "csrf")
     app.state.hash_gate = HashGate(settings.auth_max_concurrent_hashes)
     app.state.setup_token = None
     app.state.database_checker = checker
+    # Added innermost first; see ADR-0012 for the resulting order.
+    app.add_middleware(AccessGateMiddleware)
+    app.add_middleware(OriginCheckMiddleware)
     app.add_middleware(RequestIdMiddleware, logger=logger)
     app.add_middleware(LocaleMiddleware, default_locale=settings.default_locale)
     app.add_middleware(SecurityHeadersMiddleware)
     static_directory = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
+    app.include_router(auth_router)
+
+    @app.exception_handler(CsrfFailed)
+    async def handle_csrf_failure(request: Request, _exc: CsrfFailed) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            403,
+            gettext("Form expired", locale),
+            gettext("This form has expired. Reload the page and try again.", locale),
+        )
+
+    @app.exception_handler(HashGateBusy)
+    async def handle_busy(request: Request, _exc: HashGateBusy) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            503,
+            gettext("Busy", locale),
+            gettext("The server is busy. Try again in a few seconds.", locale),
+            headers={"Retry-After": str(RETRY_AFTER_SECONDS)},
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(request: Request, exc: StarletteHTTPException) -> Any:
@@ -105,23 +160,7 @@ def create_app(
         else:
             title = gettext("Page not found", locale)
             message = gettext("The page you requested could not be found.", locale)
-        is_fragment = _is_htmx_fragment_request(request)
-        template_name = "errors/fragment.html" if is_fragment else "errors/page.html"
-        response = render_template(
-            request,
-            template_name,
-            context={
-                "app_name": APP_NAME,
-                "title": title,
-                "message": message,
-                "status_code": exc.status_code,
-            },
-            status_code=exc.status_code,
-        )
-        if exc.headers:
-            response.headers.update(exc.headers)
-        _add_error_response_headers(response, is_fragment=is_fragment)
-        return response
+        return error_response(request, exc.status_code, title, message, headers=exc.headers)
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> Any:
@@ -155,7 +194,7 @@ def create_app(
                 status_code=500,
                 headers={"x-request-id": request_id},
             )
-        _add_error_response_headers(response, is_fragment=is_fragment)
+        add_error_response_headers(response, is_fragment=is_fragment)
         response.headers["x-request-id"] = request_id
         add_security_headers(response)
         return response
@@ -166,6 +205,10 @@ def create_app(
 
     @app.get("/readyz")
     async def readyz() -> JSONResponse:
+        state = app.state.schema_state
+        if state != "current":
+            database = SCHEMA_READINESS.get(state, "starting")
+            return JSONResponse({"status": "unavailable", "database": database}, status_code=503)
         if await run_in_threadpool(checker):
             return JSONResponse({"status": "ok", "database": "ready"})
         return JSONResponse(
@@ -174,20 +217,3 @@ def create_app(
         )
 
     return app
-
-
-def _is_htmx_fragment_request(request: Request) -> bool:
-    headers = request.headers
-    return (
-        headers.get("hx-request", "").lower() == "true"
-        and headers.get("hx-boosted", "").lower() != "true"
-        and headers.get("hx-history-restore-request", "").lower() != "true"
-    )
-
-
-def _add_error_response_headers(response: Response, *, is_fragment: bool) -> None:
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["Vary"] = "Accept-Language, HX-Request"
-    if is_fragment:
-        response.headers["HX-Retarget"] = "#toast-container"
-        response.headers["HX-Reswap"] = "beforeend"

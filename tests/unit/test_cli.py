@@ -267,6 +267,24 @@ def test_serve_passes_trusted_proxies_to_uvicorn(
 
     assert result.exit_code == 0, result.output
     assert calls["forwarded_allow_ips"] == "127.0.0.1,10.20.0.0/16"
+    assert calls["proxy_headers"] is True
+
+
+def test_serve_trusts_no_proxy_when_trusted_proxies_is_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cli, "create_app", lambda settings: "app")
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.update(kwargs))
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        cli_app, ["serve"], env={f"{ENV_PREFIX}_DATA_DIR": str(tmp_path / "data")}
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls["proxy_headers"] is False
+    assert calls["forwarded_allow_ips"] == ""
 
 
 def test_serve_reports_create_app_runtime_error(

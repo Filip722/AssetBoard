@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -11,6 +12,9 @@ from assetboard.app import create_app
 from assetboard.config import Settings
 from assetboard.logging import configure_logging
 from assetboard.middleware import RequestIdMiddleware
+
+if TYPE_CHECKING:
+    from conftest import WebHarness
 
 
 def test_request_id_is_validated_and_returned() -> None:
@@ -88,8 +92,8 @@ def test_healthz_suppresses_success_and_warns_on_failure() -> None:
     assert "status_code=503" in lines[0]
 
 
-def test_unhandled_exception_logs_traceback_and_returns_request_id() -> None:
-    app = create_app(Settings(_env_file=None, secret_key="test-secret"))
+def test_unhandled_exception_logs_traceback_and_returns_request_id(web: WebHarness) -> None:
+    app = web.app()
 
     @app.get("/route-that-raises")
     async def route_that_raises() -> None:
@@ -103,6 +107,8 @@ def test_unhandled_exception_logs_traceback_and_returns_request_id() -> None:
 
     try:
         with TestClient(app, raise_server_exceptions=False) as client:
+            web.complete_setup(app)
+            web.sign_in(client)
             response = client.get(
                 "/route-that-raises",
                 headers={"x-request-id": "failure-trace"},

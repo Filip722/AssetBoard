@@ -14,6 +14,18 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+msgid "Form expired"
+msgstr ""
+
+msgid "This form has expired. Reload the page and try again."
+msgstr ""
+
+msgid "Busy"
+msgstr ""
+
+msgid "The server is busy. Try again in a few seconds."
+msgstr ""
+
 msgid "Access denied"
 msgstr ""
 
@@ -33,6 +45,99 @@ msgid "An unexpected error occurred. Please try again."
 msgstr ""
 
 msgid "Enter a valid amount."
+msgstr ""
+
+msgid "Enter a valid email address."
+msgstr ""
+
+msgid "Use at least 10 characters for the password."
+msgstr ""
+
+msgid "Use at most 1,024 characters for the password."
+msgstr ""
+
+msgid "This password is too common. Choose another one."
+msgstr ""
+
+msgid "The password must differ from your email name and your display name."
+msgstr ""
+
+msgid "Enter a display name of 1 to 120 characters."
+msgstr ""
+
+msgid "Enter a workspace name of 1 to 120 characters."
+msgstr ""
+
+msgid "Choose a supported currency, country, time zone and language."
+msgstr ""
+
+msgid "This value is too long."
+msgstr ""
+
+msgid "The setup token is not correct."
+msgstr ""
+
+msgid "The new passwords do not match."
+msgstr ""
+
+msgid "The current password is not correct."
+msgstr ""
+
+msgid "Check the details and try again."
+msgstr ""
+
+msgid ""
+"The email or password is not correct, or there were too many attempts. "
+"Check your details or try again later."
+msgstr ""
+
+msgid "Setup was already completed, or is being completed. Reload to continue."
+msgstr ""
+
+msgid "Setup in progress"
+msgstr ""
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr ""
+
+msgid "This email address cannot be registered."
+msgstr ""
+
+msgid "Your password was changed. Other devices were signed out."
+msgstr ""
+
+msgid "Too many attempts. Try again later."
+msgstr ""
+
+#, python-format
+msgid "Other sessions signed out: %(count)d."
+msgstr ""
+
+msgid "This request came from another site and was blocked."
+msgstr ""
+
+msgid "Database upgrade required"
+msgstr ""
+
+#, python-format
+msgid ""
+"The database needs an upgrade. Ask the administrator to run %(command)s, "
+"then restart the application."
+msgstr ""
+
+msgid "Newer database"
+msgstr ""
+
+#, python-format
+msgid ""
+"This database was written by a newer version of %(app)s. Install that "
+"version or a later one, then restart the application."
+msgstr ""
+
+msgid "Starting up"
+msgstr ""
+
+msgid "The application is starting. Try again in a moment."
 msgstr ""
 
 msgid "Home"
@@ -68,7 +173,7 @@ msgstr ""
 msgid "Personal workspace"
 msgstr ""
 
-msgid "Account settings"
+msgid "Account security"
 msgstr ""
 
 msgid "Sign out"
@@ -133,6 +238,93 @@ msgid ""
 "items."
 msgstr ""
 
+msgid "Sign in"
+msgstr ""
+
+msgid "Email"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "No account yet?"
+msgstr ""
+
+msgid "Create an account"
+msgstr ""
+
+msgid "Change password"
+msgstr ""
+
+msgid "Current password"
+msgstr ""
+
+msgid "New password"
+msgstr ""
+
+msgid "At least 10 characters. Common passwords are not accepted."
+msgstr ""
+
+msgid "Repeat the new password"
+msgstr ""
+
+msgid "Other devices"
+msgstr ""
+
+msgid "Sign out everywhere except on this device."
+msgstr ""
+
+msgid "Sign out other devices"
+msgstr ""
+
+msgid "Display name"
+msgstr ""
+
+msgid "Workspace name"
+msgstr ""
+
+msgid "Create account"
+msgstr ""
+
+msgid "Already have an account?"
+msgstr ""
+
+msgid "First-run setup"
+msgstr ""
+
+msgid ""
+"Create the administrator account and the first workspace. The setup token"
+" is printed once in the application log at startup, unless you set "
+"ASSETBOARD_SETUP_TOKEN."
+msgstr ""
+
+msgid "Setup token"
+msgstr ""
+
+msgid "Administrator"
+msgstr ""
+
+msgid "Defaults to your display name."
+msgstr ""
+
+msgid "Base currency"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "Not set"
+msgstr ""
+
+msgid "Time zone"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Create administrator"
+msgstr ""
+
 msgid "Dismiss"
 msgstr ""
 
@@ -140,5 +332,8 @@ msgid "Return to overview"
 msgstr ""
 
 #~ msgid "AssetBoard home"
+#~ msgstr ""
+
+#~ msgid "Account settings"
 #~ msgstr ""
 

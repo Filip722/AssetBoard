@@ -6,6 +6,8 @@
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
+**Prerequisite (backlog, from the F1.1 review):** before any upload route exists, add a pure-ASGI middleware that caps the request body size (a small default for forms, a larger, explicit limit only for the upload route), rejects oversized bodies with 413 without buffering them, and works without a reverse proxy. Until then the deployment guide asks operators to cap body size at the proxy.
+
 **Privacy rule:** the real workbook is never committed. The repo contains `scripts/make_sample_workbook.py` that generates a synthetic workbook with the same layout (see F4.1).
 
 **Data model (sketch):** `ImportBatch(id, workspace_id, kind, filename, file_sha256, started_by, started_at, finished_at?, status[dry_run|imported|rolled_back], report JSON)`; `Transaction.import_batch_id`; for dedupe, `Transaction.import_key` (hash of sheet name + row index + normalized values), unique per workspace when not null.

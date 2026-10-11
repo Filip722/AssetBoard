@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" if web_session else "auth_base.html" %}
 {% block title %}{{ title }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ title }}{% endblock %}
 {% block content %}

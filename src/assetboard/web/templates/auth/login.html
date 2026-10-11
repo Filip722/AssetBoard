@@ -1,0 +1,19 @@
+{% extends "auth_base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% block title %}{{ _("Sign in") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Sign in") }}{% endblock %}
+{% block content %}
+{% if error %}
+<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">{{ error }}</p>
+{% endif %}
+<form method="post" action="{{ scoped_url(request, 'login') }}" class="mt-6 space-y-4" novalidate>
+  {{ csrf_input() }}
+  {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
+  {{ field("email", _("Email"), type="email", value=email, required=true, autocomplete="username", maxlength=320) }}
+  {{ field("password", _("Password"), type="password", required=true, autocomplete="current-password", maxlength=1024) }}
+  {{ primary_button(_("Sign in")) }}
+</form>
+{% if registration_enabled %}
+<p class="mt-6 text-center text-sm text-muted dark:text-slate-400">{{ _("No account yet?") }} <a class="font-semibold text-accent" href="{{ scoped_url(request, 'register') }}">{{ _("Create an account") }}</a></p>
+{% endif %}
+{% endblock %}

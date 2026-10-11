@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
+from typing import Any
 
 import typer
 from sqlalchemy.exc import IntegrityError
@@ -42,8 +43,19 @@ def serve(
     except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
-    forwarded_allow_ips = ",".join(settings.trusted_proxies) or "127.0.0.1"
-    uvicorn.run(application, host=host, port=port, forwarded_allow_ips=forwarded_allow_ips)
+    uvicorn.run(application, host=host, port=port, **proxy_header_options(settings))
+
+
+def proxy_header_options(settings: Settings) -> dict[str, Any]:
+    """Uvicorn's forwarded-header handling, driven only by ``TRUSTED_PROXIES``.
+
+    Empty means no proxy is trusted: forwarded headers are ignored entirely. Passing
+    ``forwarded_allow_ips=None`` instead would make uvicorn fall back to the
+    ``FORWARDED_ALLOW_IPS`` environment variable or ``127.0.0.1``.
+    """
+    if not settings.trusted_proxies:
+        return {"proxy_headers": False, "forwarded_allow_ips": ""}
+    return {"proxy_headers": True, "forwarded_allow_ips": ",".join(settings.trusted_proxies)}
 
 
 @app.command()

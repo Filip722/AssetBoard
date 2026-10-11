@@ -611,6 +611,9 @@ def _login_flow(
     verify: Verifier | None,
     hasher: Hasher | None,
 ) -> LoginOutcome:
+    if len(password) > MAX_PASSWORD_LENGTH or len(email) > MAX_EMAIL_LENGTH * 2:
+        # Cannot be a valid credential; refuse before any database work or hashing.
+        return LoginOutcome()
     lookup, account_key = _login_keys(email)
     slots = (
         ThrottleSlot("account", account_key, None, settings.auth_account_free_failures),
@@ -1431,6 +1434,131 @@ def create_admin_cli(
     return user, workspace
 
 
+@dataclass(frozen=True, slots=True)
+class _RegistrationInput:
+    email: str
+    display_name: str
+    options: WorkspaceOptions
+
+
+def _register_flow(
+    run: TransactionRunner,
+    *,
+    email: str,
+    display_name: str,
+    password: str,
+    workspace_name: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None,
+    base_currency: str | None,
+    country_code: str | None,
+    timezone: str | None,
+    workspace_locale: str | None,
+    hasher: Hasher | None,
+) -> RegistrationOutcome:
+    if not settings.allow_registration:
+        raise RegistrationDisabled
+    key = _ip_key(host)
+    window = timedelta(minutes=settings.registration_window_minutes)
+
+    def throttled(session: Session) -> bool:
+        if setup_is_open(session):
+            raise RegistrationDisabled
+        row = _find_throttle(session, "register", key)
+        return _current_count(row, clock.now(), window) >= settings.registration_ip_limit
+
+    def reserve(session: Session) -> tuple[ReservedAttempt, ...] | None:
+        if throttled(session):
+            return None
+        now = clock.now()
+        row = _count_attempt(
+            session, "register", key, now=now, window=window, free=None, settings=settings
+        )
+        prune_auth_throttles(session, clock)
+        return (ReservedAttempt("register", key, row.window_started_at, None),)
+
+    # A deferred read first; ``reserve`` checks again under the write lock.
+    if run.read(throttled):
+        return RegistrationOutcome(status="throttled")
+    reserved = run(reserve)
+    if reserved is None:
+        return RegistrationOutcome(status="throttled")
+
+    try:
+        normalized_email = normalize_email(email)
+        clean_display_name = _clean_name(
+            display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
+        )
+        validate_password(password, normalized_email, clean_display_name)
+        _clean_name(
+            workspace_name or clean_display_name,
+            "invalid_workspace_name",
+            "Workspace name must contain 1 to 120 characters",
+        )
+        details = _RegistrationInput(
+            normalized_email,
+            clean_display_name,
+            _workspace_options(
+                settings,
+                base_currency=base_currency,
+                country_code=country_code,
+                timezone=timezone,
+                workspace_locale=workspace_locale,
+            ),
+        )
+    except (AuthError, InvalidEmail) as exc:
+        # The attempt stays counted; invalid input costs no hashing.
+        error = exc if isinstance(exc, AuthError) else InvalidAccountDetails(exc.code, str(exc))
+        return RegistrationOutcome(status="invalid", error=error)
+
+    try:
+        # Hashed before the duplicate check, so an existing email takes the same time.
+        password_hash = (hasher or argon2_hash)(password)
+    except BaseException:
+        run(lambda session: release_attempts(session, reserved))
+        raise
+
+    def create(session: Session) -> RegistrationOutcome:
+        if session.scalar(select(User.id).where(User.email == details.email)) is not None:
+            return RegistrationOutcome(status="rejected")
+        try:
+            with session.begin_nested():
+                user, workspace = _create_user_records(
+                    session,
+                    email=details.email,
+                    display_name=details.display_name,
+                    password=password,
+                    workspace_name=workspace_name,
+                    options=details.options,
+                    settings=settings,
+                    is_admin=False,
+                    password_hash=password_hash,
+                )
+        except IntegrityError:
+            # Defence in depth: a concurrent registration of the same email won the insert.
+            return RegistrationOutcome(status="rejected")
+        if workspace is None:
+            raise RuntimeError("Registration must create a workspace")
+        _audit(
+            session,
+            clock,
+            action="auth.register",
+            entity_type="user",
+            entity_id=str(user.id),
+            actor_type="user",
+            actor_user_id=user.id,
+            workspace_id=workspace.id,
+            host=host,
+            user_agent=user_agent,
+        )
+        session.flush()
+        return RegistrationOutcome(status="created", user=user, workspace=workspace)
+
+    return run(create)
+
+
 def register_user(
     session: Session,
     *,
@@ -1453,65 +1581,185 @@ def register_user(
     outcome discloses whether an email is already registered (see ``RegistrationOutcome``).
     The caller commits whatever the outcome.
     """
-    if not settings.allow_registration or setup_is_open(session):
-        raise RegistrationDisabled
-    now = clock.now()
-    key = _ip_key(host)
-    window = timedelta(minutes=settings.registration_window_minutes)
-    row = _find_throttle(session, "register", key)
-    if _current_count(row, now, window) >= settings.registration_ip_limit:
-        return RegistrationOutcome(status="throttled")
-    _count_attempt(session, "register", key, now=now, window=window, free=None, settings=settings)
-    prune_auth_throttles(session, clock)
+    return _register_flow(
+        SameSession(session),
+        email=email,
+        display_name=display_name,
+        password=password,
+        workspace_name=workspace_name,
+        settings=settings,
+        clock=clock,
+        host=host,
+        user_agent=user_agent,
+        base_currency=base_currency,
+        country_code=country_code,
+        timezone=timezone,
+        workspace_locale=workspace_locale,
+        hasher=None,
+    )
 
-    try:
-        normalized_email = normalize_email(email)
-        clean_display_name = _clean_name(
-            display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
-        )
-        validate_password(password, normalized_email, clean_display_name)
-        options = _workspace_options(
-            settings,
+
+def register_with_factory(
+    factory: sessionmaker[Session],
+    *,
+    email: str,
+    display_name: str,
+    password: str,
+    workspace_name: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+    base_currency: str | None = None,
+    country_code: str | None = None,
+    timezone: str | None = None,
+    workspace_locale: str | None = None,
+    hasher: Hasher | None = None,
+) -> RegistrationOutcome:
+    return _register_flow(
+        ImmediateTransactions(factory),
+        email=email,
+        display_name=display_name,
+        password=password,
+        workspace_name=workspace_name,
+        settings=settings,
+        clock=clock,
+        host=host,
+        user_agent=user_agent,
+        base_currency=base_currency,
+        country_code=country_code,
+        timezone=timezone,
+        workspace_locale=workspace_locale,
+        hasher=hasher,
+    )
+
+
+async def register_user_async(
+    factory: sessionmaker[Session],
+    gate: HashGate,
+    *,
+    email: str,
+    display_name: str,
+    password: str,
+    workspace_name: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+    base_currency: str | None = None,
+    country_code: str | None = None,
+    timezone: str | None = None,
+    workspace_locale: str | None = None,
+) -> RegistrationOutcome:
+    """Web entry point; raises ``HashGateBusy`` after releasing the counted attempt."""
+    hasher = _gate_hasher(gate)
+    return await anyio.to_thread.run_sync(
+        lambda: register_with_factory(
+            factory,
+            email=email,
+            display_name=display_name,
+            password=password,
+            workspace_name=workspace_name,
+            settings=settings,
+            clock=clock,
+            host=host,
+            user_agent=user_agent,
             base_currency=base_currency,
             country_code=country_code,
             timezone=timezone,
             workspace_locale=workspace_locale,
+            hasher=hasher,
         )
-    except (AuthError, InvalidEmail) as exc:
-        error = exc if isinstance(exc, AuthError) else InvalidAccountDetails(exc.code, str(exc))
-        return RegistrationOutcome(status="invalid", error=error)
-
-    if session.scalar(select(User.id).where(User.email == normalized_email)) is not None:
-        # Spend the same hashing cost as a real registration before rejecting.
-        password_hasher().hash(password)
-        return RegistrationOutcome(status="rejected")
-
-    user, workspace = _create_user_records(
-        session,
-        email=normalized_email,
-        display_name=clean_display_name,
-        password=password,
-        workspace_name=workspace_name,
-        options=options,
-        settings=settings,
-        is_admin=False,
     )
-    if workspace is None:
-        raise RuntimeError("Registration must create a workspace")
-    _audit(
-        session,
-        clock,
-        action="auth.register",
-        entity_type="user",
-        entity_id=str(user.id),
-        actor_type="user",
-        actor_user_id=user.id,
-        workspace_id=workspace.id,
-        host=host,
-        user_agent=user_agent,
+
+
+# Web sessions
+
+
+@dataclass(frozen=True, slots=True)
+class WebSession:
+    """What a request needs to know about its signed-in user (detached from the ORM)."""
+
+    session_hash: str
+    user_id: UUID
+    email: str
+    display_name: str
+    locale: str
+    is_instance_admin: bool
+    expires_at: datetime
+    needs_touch: bool
+
+
+def read_web_session(
+    session: Session, session_id: str, *, settings: Settings, clock: Clock
+) -> WebSession | None:
+    """Validate a session cookie without writing (idle and absolute expiry, active user)."""
+    if not session_id or len(session_id) > 128:
+        return None
+    row = session.get(UserSession, session_id_hash(session_id))
+    if row is None:
+        return None
+    now = clock.now()
+    idle_expiry = row.last_seen_at + timedelta(days=settings.session_idle_timeout_days)
+    user = session.get(User, row.user_id)
+    if row.expires_at <= now or idle_expiry <= now or user is None or not user.is_active:
+        return None
+    return WebSession(
+        session_hash=row.id_hash,
+        user_id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        locale=user.locale,
+        is_instance_admin=user.is_instance_admin,
+        expires_at=row.expires_at,
+        needs_touch=now - row.last_seen_at >= SESSION_TOUCH_INTERVAL,
     )
-    session.flush()
-    return RegistrationOutcome(status="created", user=user, workspace=workspace)
+
+
+def touch_session_best_effort(
+    factory: sessionmaker[Session], session_hash: str, clock: Clock
+) -> bool:
+    """Record activity; never fails the request (a locked database just skips it)."""
+    try:
+        with factory.begin() as session:
+            row = session.get(UserSession, session_hash)
+            if row is not None:
+                touch_session(row, clock)
+    except OperationalError:
+        return False
+    return True
+
+
+def create_session_for(
+    factory: sessionmaker[Session],
+    user_id: UUID,
+    *,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None,
+) -> tuple[str, datetime]:
+    """Sign a user in after setup or registration; returns the session id and its expiry."""
+
+    def create(session: Session) -> tuple[str, datetime]:
+        user = session.get(User, user_id)
+        if user is None:
+            raise UnknownUser
+        session_id = create_user_session(
+            session, user, settings=settings, clock=clock, host=host, user_agent=user_agent
+        )
+        row = session.get(UserSession, session_id_hash(session_id))
+        if row is None:
+            raise RuntimeError("Session was not created")
+        return session_id, row.expires_at
+
+    return run_immediate(factory, create)
+
+
+def session_expiry(factory: sessionmaker[Session], session_id: str) -> datetime | None:
+    with factory() as session:
+        row = session.get(UserSession, session_id_hash(session_id))
+        return row.expires_at if row else None
 
 
 def reset_user_password(

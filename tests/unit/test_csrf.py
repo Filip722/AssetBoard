@@ -8,8 +8,10 @@ from assetboard.services.auth import derive_subkey
 from assetboard.services.csrf import (
     ANONYMOUS_TOKEN_LIFETIME,
     anonymous_token,
+    mask,
     new_anonymous_secret,
     session_token,
+    unmask,
     verify_anonymous_token,
     verify_session_token,
 )
@@ -79,3 +81,28 @@ def test_anonymous_token_issued_at_cannot_be_tampered_with() -> None:
 )
 def test_malformed_anonymous_tokens_are_rejected(token: str) -> None:
     assert not verify_anonymous_token(KEY, new_anonymous_secret(), token, NOW)
+
+
+def test_mask_round_trip_differs_every_time() -> None:
+    token = session_token(KEY, SESSION_HASH)
+    first, second = mask(token), mask(token)
+    assert first != second and token not in first
+    assert unmask(first) == unmask(second) == token
+    anonymous = anonymous_token(KEY, new_anonymous_secret(), NOW)
+    assert unmask(mask(anonymous)) == anonymous
+
+
+@pytest.mark.parametrize(
+    "masked",
+    [None, "", "!!!", "a", "ab" * 300, "zażółć", "AAAA"],
+)
+def test_unmask_rejects_malformed_input(masked: str | None) -> None:
+    result = unmask(masked)
+    assert result is None or not verify_session_token(KEY, SESSION_HASH, result)
+
+
+def test_tampered_mask_does_not_verify() -> None:
+    token = session_token(KEY, SESSION_HASH)
+    masked = mask(token)
+    flipped = masked[:-3] + ("A" if masked[-3] != "A" else "B") + masked[-2:]
+    assert not verify_session_token(KEY, SESSION_HASH, unmask(flipped))

@@ -5,8 +5,8 @@ income and expenses, comparing planned with actual spending, and planning net wo
 loans, and financial independence. It aims to give homelab users a private, user-controlled
 alternative to spreadsheets and hosted finance services.
 
-**Current state:** only the app shell and health endpoints work today; finance features arrive with
-their milestones.
+**Current state:** local accounts, first-run setup and the app shell work today; finance features
+arrive with their milestones.
 
 ## Quick start
 
@@ -17,10 +17,14 @@ foundation:
 docker compose -f compose.example.yaml up -d --build
 ```
 
-Open <http://localhost:8000>. Compose stores the database and generated secret in a named volume.
-**There is no authentication until M1; restrict access to trusted users.** See the
-[deployment guide](docs/deployment.md) for bind mounts, reverse proxies, image publishing, and the
-complete environment-variable reference.
+Open <http://localhost:8000> and complete first-run setup. The setup form asks for a one-time
+setup token, which the container prints once in its log at startup
+(`docker compose -f compose.example.yaml logs assetboard | grep "setup token"`), unless you set
+`ASSETBOARD_SETUP_TOKEN`. You can also create the administrator from the command line with
+`docker compose -f compose.example.yaml exec assetboard assetboard create-admin`. Compose stores the
+database and generated secret in a named volume. See the [deployment guide](docs/deployment.md) for
+reverse proxies (recommended before exposing the app beyond your machine), bind mounts, image
+publishing, and the complete environment-variable reference.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -28,7 +32,7 @@ complete environment-variable reference.
 | `ASSETBOARD_DEFAULT_LOCALE` | `en` | Default UI language |
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | Default currency |
 | `ASSETBOARD_LOG_FORMAT` | `json` in Compose | `text` or `json` logs |
-| `ASSETBOARD_TRUSTED_PROXIES` | empty | Proxy IPs/CIDRs allowed to supply forwarded headers; empty trusts loopback only |
+| `ASSETBOARD_TRUSTED_PROXIES` | empty | Proxy IPs/CIDRs allowed to supply forwarded headers; empty trusts no proxy |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose-only host interface |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose-only host port |
 

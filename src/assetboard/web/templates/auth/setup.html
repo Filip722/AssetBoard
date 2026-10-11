@@ -1,0 +1,27 @@
+{% extends "auth_base.html" %}
+{% from "macros/components.html" import field, select, csrf_input, primary_button with context %}
+{% block title %}{{ _("First-run setup") }} · {{ app_name }}{% endblock %}
+{% block width %}max-w-2xl{% endblock %}
+{% block heading %}{{ _("First-run setup") }}{% endblock %}
+{% block content %}
+<p class="mt-2 text-sm text-muted dark:text-slate-400">{{ _("Create the administrator account and the first workspace. The setup token is printed once in the application log at startup, unless you set ASSETBOARD_SETUP_TOKEN.") }}</p>
+<form method="post" action="{{ scoped_url(request, 'setup') }}" class="mt-6 space-y-6" novalidate>
+  {{ csrf_input() }}
+  {{ field("setup_token", _("Setup token"), type="password", error=errors.get("setup_token"), required=true, autocomplete="off", maxlength=256) }}
+  <fieldset class="space-y-4">
+    <legend class="text-sm font-semibold">{{ _("Administrator") }}</legend>
+    {{ field("email", _("Email"), type="email", value=values.email, error=errors.get("email"), required=true, autocomplete="email", maxlength=320) }}
+    {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
+    {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 10 characters. Common passwords are not accepted.")) }}
+  </fieldset>
+  <fieldset class="grid gap-4 sm:grid-cols-2">
+    <legend class="mb-2 text-sm font-semibold sm:col-span-2">{{ _("Workspace") }}</legend>
+    <div class="sm:col-span-2">{{ field("workspace_name", _("Workspace name"), value=values.workspace_name, error=errors.get("workspace_name"), maxlength=120, help=_("Defaults to your display name.")) }}</div>
+    {{ select("base_currency", _("Base currency"), currency_options, selected=values.base_currency, error=errors.get("base_currency")) }}
+    {{ select("country_code", _("Country"), country_options, selected=values.country_code, blank=_("Not set")) }}
+    {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone) }}
+    {{ select("workspace_locale", _("Language"), locales, selected=values.workspace_locale) }}
+  </fieldset>
+  {{ primary_button(_("Create administrator")) }}
+</form>
+{% endblock %}

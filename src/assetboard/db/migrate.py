@@ -38,24 +38,42 @@ def upgrade_database(settings: Settings) -> None:
     command.upgrade(alembic_config(settings), "head")
 
 
-def database_is_at_head(settings: Settings) -> bool:
-    """Report whether the database is at the Alembic head without creating or changing it."""
+SchemaState = Literal["current", "behind", "ahead"]
+
+
+def schema_state(settings: Settings) -> SchemaState:
+    """Compare the database with the migrations shipped in this code, without changing it.
+
+    ``behind``: a missing or empty database, or older revisions (run ``migrate``).
+    ``ahead``: the database has a revision this code does not know (a newer version wrote it).
+    """
     database_url = configured_database_url(alembic_config(settings))
     url = make_url(database_url)
     if url.get_backend_name() == "sqlite":
         database = url.database
         if not database or database == ":memory:":
-            return False
+            return "behind"
         if not database.startswith("file:") and not Path(database).expanduser().is_file():
-            return False
-    heads = set(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
+            return "behind"
+    script = ScriptDirectory.from_config(alembic_config(settings))
+    heads = set(script.get_heads())
     engine = create_engine(url)
     try:
         with engine.connect() as connection:
             current = set(MigrationContext.configure(connection).get_current_heads())
     finally:
         engine.dispose()
-    return current == heads
+    if current == heads:
+        return "current"
+    known = {revision.revision for revision in script.walk_revisions()}
+    if current - known:
+        return "ahead"
+    return "behind"
+
+
+def database_is_at_head(settings: Settings) -> bool:
+    """Report whether the database is at the Alembic head without creating or changing it."""
+    return schema_state(settings) == "current"
 
 
 def check_database_migrations(settings: Settings) -> None:

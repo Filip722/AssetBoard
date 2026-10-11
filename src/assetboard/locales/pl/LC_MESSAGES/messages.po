@@ -15,6 +15,18 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
+msgid "Form expired"
+msgstr "Formularz wygasł"
+
+msgid "This form has expired. Reload the page and try again."
+msgstr "Ten formularz wygasł. Odśwież stronę i spróbuj ponownie."
+
+msgid "Busy"
+msgstr "Serwer zajęty"
+
+msgid "The server is busy. Try again in a few seconds."
+msgstr "Serwer jest zajęty. Spróbuj ponownie za kilka sekund."
+
 msgid "Access denied"
 msgstr "Brak dostępu"
 
@@ -35,6 +47,107 @@ msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
+
+msgid "Enter a valid email address."
+msgstr "Podaj prawidłowy adres e-mail."
+
+msgid "Use at least 10 characters for the password."
+msgstr "Hasło musi mieć co najmniej 10 znaków."
+
+msgid "Use at most 1,024 characters for the password."
+msgstr "Hasło może mieć najwyżej 1024 znaki."
+
+msgid "This password is too common. Choose another one."
+msgstr "To hasło jest zbyt popularne. Wybierz inne."
+
+msgid "The password must differ from your email name and your display name."
+msgstr "Hasło musi się różnić od nazwy w adresie e-mail i od wyświetlanej nazwy."
+
+msgid "Enter a display name of 1 to 120 characters."
+msgstr "Podaj wyświetlaną nazwę o długości od 1 do 120 znaków."
+
+msgid "Enter a workspace name of 1 to 120 characters."
+msgstr "Podaj nazwę obszaru roboczego o długości od 1 do 120 znaków."
+
+msgid "Choose a supported currency, country, time zone and language."
+msgstr "Wybierz obsługiwaną walutę, kraj, strefę czasową i język."
+
+msgid "This value is too long."
+msgstr "Ta wartość jest za długa."
+
+msgid "The setup token is not correct."
+msgstr "Token konfiguracji jest nieprawidłowy."
+
+msgid "The new passwords do not match."
+msgstr "Nowe hasła nie są takie same."
+
+msgid "The current password is not correct."
+msgstr "Obecne hasło jest nieprawidłowe."
+
+msgid "Check the details and try again."
+msgstr "Sprawdź dane i spróbuj ponownie."
+
+msgid ""
+"The email or password is not correct, or there were too many attempts. "
+"Check your details or try again later."
+msgstr ""
+"Adres e-mail lub hasło są nieprawidłowe albo było zbyt wiele prób. "
+"Sprawdź dane lub spróbuj ponownie później."
+
+msgid "Setup was already completed, or is being completed. Reload to continue."
+msgstr ""
+"Konfiguracja została już zakończona lub właśnie trwa. Odśwież stronę, aby"
+" kontynuować."
+
+msgid "Setup in progress"
+msgstr "Konfiguracja w toku"
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
+
+msgid "This email address cannot be registered."
+msgstr "Nie można zarejestrować tego adresu e-mail."
+
+msgid "Your password was changed. Other devices were signed out."
+msgstr "Hasło zostało zmienione. Inne urządzenia zostały wylogowane."
+
+msgid "Too many attempts. Try again later."
+msgstr "Zbyt wiele prób. Spróbuj ponownie później."
+
+#, python-format
+msgid "Other sessions signed out: %(count)d."
+msgstr "Wylogowane inne sesje: %(count)d."
+
+msgid "This request came from another site and was blocked."
+msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
+
+msgid "Database upgrade required"
+msgstr "Wymagana aktualizacja bazy danych"
+
+#, python-format
+msgid ""
+"The database needs an upgrade. Ask the administrator to run %(command)s, "
+"then restart the application."
+msgstr ""
+"Baza danych wymaga aktualizacji. Poproś administratora o uruchomienie "
+"%(command)s, a następnie o ponowne uruchomienie aplikacji."
+
+msgid "Newer database"
+msgstr "Nowsza baza danych"
+
+#, python-format
+msgid ""
+"This database was written by a newer version of %(app)s. Install that "
+"version or a later one, then restart the application."
+msgstr ""
+"Ta baza danych została zapisana przez nowszą wersję %(app)s. Zainstaluj "
+"tę lub nowszą wersję, a następnie uruchom aplikację ponownie."
+
+msgid "Starting up"
+msgstr "Uruchamianie"
+
+msgid "The application is starting. Try again in a moment."
+msgstr "Aplikacja się uruchamia. Spróbuj ponownie za chwilę."
 
 msgid "Home"
 msgstr "Strona główna"
@@ -69,8 +182,8 @@ msgstr "Twoje konto"
 msgid "Personal workspace"
 msgstr "Przestrzeń osobista"
 
-msgid "Account settings"
-msgstr "Ustawienia konta"
+msgid "Account security"
+msgstr "Bezpieczeństwo konta"
 
 msgid "Sign out"
 msgstr "Wyloguj się"
@@ -135,6 +248,96 @@ msgid ""
 msgstr ""
 "Twój plan miesięczny i aktywność pojawią się tutaj, gdy dodasz pierwsze "
 "pozycje."
+
+msgid "Sign in"
+msgstr "Zaloguj się"
+
+msgid "Email"
+msgstr "E-mail"
+
+msgid "Password"
+msgstr "Hasło"
+
+msgid "No account yet?"
+msgstr "Nie masz jeszcze konta?"
+
+msgid "Create an account"
+msgstr "Utwórz konto"
+
+msgid "Change password"
+msgstr "Zmień hasło"
+
+msgid "Current password"
+msgstr "Obecne hasło"
+
+msgid "New password"
+msgstr "Nowe hasło"
+
+msgid "At least 10 characters. Common passwords are not accepted."
+msgstr "Co najmniej 10 znaków. Popularne hasła nie są akceptowane."
+
+msgid "Repeat the new password"
+msgstr "Powtórz nowe hasło"
+
+msgid "Other devices"
+msgstr "Inne urządzenia"
+
+msgid "Sign out everywhere except on this device."
+msgstr "Wyloguj się wszędzie poza tym urządzeniem."
+
+msgid "Sign out other devices"
+msgstr "Wyloguj inne urządzenia"
+
+msgid "Display name"
+msgstr "Wyświetlana nazwa"
+
+msgid "Workspace name"
+msgstr "Nazwa obszaru roboczego"
+
+msgid "Create account"
+msgstr "Utwórz konto"
+
+msgid "Already have an account?"
+msgstr "Masz już konto?"
+
+msgid "First-run setup"
+msgstr "Konfiguracja początkowa"
+
+msgid ""
+"Create the administrator account and the first workspace. The setup token"
+" is printed once in the application log at startup, unless you set "
+"ASSETBOARD_SETUP_TOKEN."
+msgstr ""
+"Utwórz konto administratora i pierwszy obszar roboczy. Token konfiguracji"
+" jest jednorazowo wypisywany w dzienniku aplikacji podczas uruchamiania, "
+"chyba że ustawiono ASSETBOARD_SETUP_TOKEN."
+
+msgid "Setup token"
+msgstr "Token konfiguracji"
+
+msgid "Administrator"
+msgstr "Administrator"
+
+msgid "Defaults to your display name."
+msgstr "Domyślnie Twoja wyświetlana nazwa."
+
+msgid "Base currency"
+msgstr "Waluta podstawowa"
+
+msgid "Country"
+msgstr "Kraj"
+
+msgid "Not set"
+msgstr "Nie ustawiono"
+
+msgid "Time zone"
+msgstr "Strefa czasowa"
+
+msgid "Language"
+msgstr "Język"
+
+msgid "Create administrator"
+msgstr "Utwórz administratora"
 
 msgid "Dismiss"
 msgstr "Zamknij"

@@ -36,7 +36,6 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
             secret_key="browser-test-key",
-            auto_migrate=False,
         )
     )
 
@@ -86,7 +85,41 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             browser = playwright.chromium.launch()
             context = browser.new_context(color_scheme="light")
             page = context.new_page()
-            page.goto(f"http://127.0.0.1:{port}/", wait_until="networkidle")
+            base = f"http://127.0.0.1:{port}"
+            page.goto(f"{base}/", wait_until="networkidle")
+
+            # First run: every page leads to setup, which signs the administrator in.
+            assert page.url == f"{base}/setup"
+            page.get_by_label("Setup token").fill(app.state.setup_token)
+            page.get_by_label("Email").fill("admin@example.com")
+            page.get_by_label("Display name").fill("Browser Admin")
+            page.get_by_label("Password").fill("Correct Horse Battery!")
+            page.get_by_role("button", name="Create administrator").click()
+            page.wait_for_url(f"{base}/")
+            expect(page.get_by_text("Browser Admin")).to_be_visible()
+
+            # HTMX sends the CSRF token in a header; a bad token becomes an error toast.
+            page.goto(f"{base}/account/password", wait_until="networkidle")
+            page.evaluate(
+                "document.querySelector('meta[name=\"csrf-token\"]').content = 'tampered'"
+            )
+            page.get_by_role("button", name="Sign out other devices").click()
+            csrf_toast = page.locator('#toast-container [data-toast][role="alert"]')
+            expect(csrf_toast).to_contain_text("This form has expired")
+            page.reload(wait_until="networkidle")
+            page.get_by_role("button", name="Sign out other devices").click()
+            expect(page.locator("#sessions-status")).to_contain_text(
+                "Other sessions signed out: 0."
+            )
+
+            # Sign out through the account menu, then sign in again.
+            page.locator("details summary").click()
+            page.get_by_role("button", name="Sign out", exact=True).click()
+            page.wait_for_url(f"{base}/login")
+            page.get_by_label("Email").fill("admin@example.com")
+            page.get_by_label("Password").fill("Correct Horse Battery!")
+            page.get_by_role("button", name="Sign in").click()
+            page.wait_for_url(f"{base}/")
 
             page.get_by_role("button", name="Toggle dark mode").click()
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")

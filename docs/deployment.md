@@ -16,7 +16,7 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_BASE_URL` | `http://localhost:8000` | App | Public base URL. Set to the external URL when using a reverse proxy. |
 | `ASSETBOARD_LOG_LEVEL` | `INFO` | App | Minimum log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`. |
 | `ASSETBOARD_LOG_FORMAT` | `text` (Compose: `json`) | App | Log output format: `text` or `json`. |
-| `ASSETBOARD_TRUSTED_PROXIES` | empty | App | Comma-separated proxy IPs/CIDRs allowed to supply forwarded headers. Empty trusts loopback only (`127.0.0.1`). |
+| `ASSETBOARD_TRUSTED_PROXIES` | empty | App | Comma-separated proxy IPs/CIDRs allowed to supply forwarded headers. Empty trusts no proxy: forwarded headers are ignored and the TCP peer is the client address. |
 | `ASSETBOARD_DEFAULT_LOCALE` | `en` | App | Two-letter lowercase default locale. |
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | App | Three-letter ISO currency used as the default. |
 | `ASSETBOARD_AUTO_MIGRATE` | `true` | App | Apply pending database migrations at startup when enabled. Only one instance/worker may use a data volume with automatic migrations enabled. |
@@ -38,7 +38,32 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
 
 The Compose file intentionally binds to loopback by default. Publishing on all interfaces exposes
-the service to the LAN; there is no authentication until M1, so restrict access accordingly.
+the sign-in page to the LAN; put a reverse proxy with HTTPS in front before exposing it further.
+
+## First run and sign-in
+
+While no user exists, every page redirects to `/setup`. The setup form asks for a setup token:
+`ASSETBOARD_SETUP_TOKEN` if you set it (never logged), otherwise a random token generated at each
+process start and printed once at `WARNING` in the application log. Anyone who can read the log
+can complete setup until it is done, so finish setup promptly or set the token yourself. Setup
+creates the administrator and the first workspace and signs you in; afterwards `/setup` returns
+404 and signed-out visitors are sent to `/login`. `assetboard create-admin` (below) is an
+alternative that needs no token.
+
+Sessions are stored on the server. The session cookie lasts for the absolute session lifetime
+(`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. Run a
+single application process (one Uvicorn worker): the setup token, the password-hashing limit and
+some caches live in the process.
+
+### Database schema state
+
+The schema is checked once at startup. With `ASSETBOARD_AUTO_MIGRATE=true` (the default) an older
+schema is upgraded first. With `ASSETBOARD_AUTO_MIGRATE=false` and an older schema, the process
+still starts but no setup token is created, `/readyz` returns 503 with
+`"database": "schema_outdated"`, and every page shows "The database needs an upgrade" with the
+instruction to run `assetboard migrate` and then restart. If the database was written by a newer
+version of AssetBoard, it is never changed: `/readyz` reports `"schema_newer"` and pages ask you to
+install that version or a later one. `/healthz` stays green in both cases.
 
 ## Administrator commands
 
@@ -98,10 +123,33 @@ Compose. The startup check reports this command when `DATA_DIR` is not writable.
 
 ## Reverse proxies
 
+> **Set `ASSETBOARD_TRUSTED_PROXIES` to your proxy's IP or CIDR.** Sign-in throttling counts
+> failures per client address. The app only reads the TCP peer address that Uvicorn reports; Uvicorn
+> replaces it with the forwarded client address only for requests from `ASSETBOARD_TRUSTED_PROXIES`.
+> Without it, every visitor arriving through the proxy (or through Docker's port publishing, which
+> can present the bridge gateway as the peer) shares one address, so one attacker can exhaust the
+> per-address sign-in budget for everyone. Never list networks that untrusted clients can reach
+> directly: they could then forge their address.
+
 The Compose file binds the service to loopback by default. Configure a reverse proxy on the same
-Docker network and set `ASSETBOARD_BASE_URL` to the public URL. When the proxy forwards client
-addresses, set `ASSETBOARD_TRUSTED_PROXIES` to the proxy's IP or CIDR so Uvicorn accepts forwarded
-headers only from that peer range.
+Docker network and set `ASSETBOARD_BASE_URL` to the public URL.
+
+**HTTPS.** When `ASSETBOARD_BASE_URL` starts with `https://`, cookies are marked `Secure` and use the
+`__Host-` prefix, so the app must then be reached over HTTPS only: browsers do not send those
+cookies over plain HTTP (for example to a LAN address), and sign-in fails there. Use an `http://`
+`BASE_URL` only for local or LAN-only setups.
+
+**Origin check.** Forms are accepted only from the `BASE_URL` origin or from the origin the
+request was addressed to (scheme plus `Host`), and never when the browser reports a cross-site
+request. Make sure the proxy passes the original `Host` header and scheme.
+
+**Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login` and
+`POST /register` at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
+middleware, or a Caddy rate-limit module), such as a few requests per minute per client address.
+This keeps password-guessing floods from reaching the app at all. Also cap the request body size
+at the proxy (for example nginx `client_max_body_size 1m;`, the Traefik `Buffering` middleware's
+`maxRequestBodyBytes`, or Caddy `request_body { max_size 1MB }`): the app does not yet limit body
+sizes itself, and its forms need only a few kilobytes.
 
 ## Image tags
 
@@ -115,3 +163,15 @@ To rehearse a release image, open **Actions → Docker → Run workflow**, enter
 tag, and leave **Publish the image to GHCR** unchecked. The workflow builds and tests both
 architectures without logging in to GHCR or publishing. Check **Publish the image to GHCR** only
 when you intend to upload the image and its release tags.
+
+## Upgrading
+
+### F1.1: local accounts
+
+- **`ASSETBOARD_TRUSTED_PROXIES` empty now trusts no proxy.** Earlier versions trusted forwarded
+  headers from `127.0.0.1` when the setting was empty. If your reverse proxy runs on the same host
+  and connects over loopback, set `ASSETBOARD_TRUSTED_PROXIES=127.0.0.1`; otherwise set it to the
+  proxy's address or network.
+- **First run needs setup.** After upgrading an existing instance, the app redirects to `/setup`
+  until an administrator exists. Use the setup token from the log, or run
+  `assetboard create-admin`.

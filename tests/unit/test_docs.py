@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -62,3 +63,48 @@ def test_every_numbered_adr_is_listed_in_the_index() -> None:
     adr_files = {path.name for path in adr_dir.glob("[0-9][0-9][0-9][0-9]-*.md")}
 
     assert adr_files <= linked_files
+
+
+def _source_files() -> list[Path]:
+    return sorted((DEPLOYMENT.parents[1] / "src/assetboard").rglob("*.py"))
+
+
+def test_no_source_reads_forwarded_headers() -> None:
+    """Only request.client.host is used; forwarded headers are uvicorn's job (TRUSTED_PROXIES)."""
+    offenders: list[str] = []
+    for path in _source_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str | bytes):
+                text = node.value.decode() if isinstance(node.value, bytes) else node.value
+                lowered = text.lower()
+                if "x-forwarded" in lowered or lowered.strip() in {"forwarded", "x-real-ip"}:
+                    offenders.append(f"{path.name}:{node.lineno}")
+            if isinstance(node, ast.keyword) and node.arg == "forwarded_allow_ips":
+                assert path.name == "cli.py", "only serve configures forwarded headers"
+    assert offenders == []
+
+
+def test_no_stale_authentication_statements() -> None:
+    root = DEPLOYMENT.parents[1]
+    for document in ("README.md", "SECURITY.md", "docs/deployment.md", "compose.example.yaml"):
+        text = (root / document).read_text(encoding="utf-8").lower()
+        assert "until m1" not in text, document
+        assert "no authentication" not in text, document
+
+
+def test_deployment_guide_covers_proxy_rate_limits_and_trusted_proxies() -> None:
+    text = DEPLOYMENT.read_text(encoding="utf-8")
+    section = text.split("## Reverse proxies", maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
+    first_paragraphs = section.split("\n\n", maxsplit=3)[:3]
+    assert any("ASSETBOARD_TRUSTED_PROXIES" in part for part in first_paragraphs)
+    assert "/login" in section and "/register" in section and "rate limit" in section.lower()
+    assert "client_max_body_size" in section  # body-size cap at the proxy
+    assert "## Upgrading" in text and "TRUSTED_PROXIES" in text.split("## Upgrading", 1)[1]
+    assert "https" in text and "BASE_URL" in text
+
+
+def test_adr_0012_exists_and_is_indexed() -> None:
+    adr_dir = DEPLOYMENT.parents[0] / "adr"
+    assert (adr_dir / "0012-local-authentication.md").is_file()
+    assert "0012-local-authentication.md" in (adr_dir / "README.md").read_text(encoding="utf-8")

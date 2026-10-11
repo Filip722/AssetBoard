@@ -6,6 +6,7 @@ import logging
 import re
 from importlib.metadata import version
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from alembic.runtime.migration import MigrationContext
@@ -18,6 +19,9 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.migrate import alembic_config
 from assetboard.services.auth import derive_subkey, run_initial_setup
+
+if TYPE_CHECKING:
+    from conftest import WebHarness
 
 
 def test_app_factory_ensures_secret_key_after_setup() -> None:
@@ -94,7 +98,7 @@ def test_readyz_checks_the_real_database(tmp_path: Path) -> None:
     assert response.json() == {"status": "ok", "database": "ready"}
 
 
-def test_readyz_runs_synchronous_checker_in_threadpool() -> None:
+def test_readyz_runs_synchronous_checker_in_threadpool(web: WebHarness) -> None:
     def check_not_on_event_loop() -> bool:
         try:
             asyncio.get_running_loop()
@@ -102,10 +106,7 @@ def test_readyz_runs_synchronous_checker_in_threadpool() -> None:
             return True
         return False
 
-    app = create_app(
-        Settings(_env_file=None, secret_key="test-secret", auto_migrate=False),
-        database_checker=check_not_on_event_loop,
-    )
+    app = create_app(web.settings(), database_checker=check_not_on_event_loop)
 
     with TestClient(app) as client:
         response = client.get("/readyz")
@@ -113,16 +114,12 @@ def test_readyz_runs_synchronous_checker_in_threadpool() -> None:
     assert response.status_code == 200
 
 
-def test_root_renders_translatable_shell_and_local_assets() -> None:
-    app = create_app(
-        Settings(_env_file=None, secret_key="test-secret", auto_migrate=False),
-    )
-
-    with TestClient(app) as client:
-        response = client.get("/", headers={"accept-language": "pl-PL, en;q=0.8"})
-        htmx = client.get("/static/vendor/htmx.min.js")
-        alpine = client.get("/static/vendor/alpinejs-csp.min.js")
-        charts = client.get("/static/vendor/echarts.min.js")
+def test_root_renders_translatable_shell_and_local_assets(signed_in: TestClient) -> None:
+    client = signed_in
+    response = client.get("/", headers={"accept-language": "pl-PL, en;q=0.8"})
+    htmx = client.get("/static/vendor/htmx.min.js")
+    alpine = client.get("/static/vendor/alpinejs-csp.min.js")
+    charts = client.get("/static/vendor/echarts.min.js")
 
     assert response.status_code == 200
     assert '<html lang="pl" class="h-full">' in response.text
@@ -150,8 +147,8 @@ def test_root_renders_translatable_shell_and_local_assets() -> None:
     assert "no-store" not in htmx.headers.get("cache-control", "")
 
 
-def test_http_errors_are_localized_and_htmx_aware() -> None:
-    app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
+def test_http_errors_are_localized_and_htmx_aware(web: WebHarness) -> None:
+    app = web.app()
 
     @app.get("/_test/forbidden")
     async def forbidden() -> None:
@@ -166,6 +163,8 @@ def test_http_errors_are_localized_and_htmx_aware() -> None:
         raise HTTPException(status_code=418, detail="Teapot", headers={"X-Teapot": "retained"})
 
     with TestClient(app, raise_server_exceptions=False) as client:
+        web.complete_setup(app)
+        web.sign_in(client)
         forbidden_response = client.get("/_test/forbidden", headers={"accept-language": "pl"})
         partial_response = client.get(
             "/missing",
@@ -226,7 +225,7 @@ def test_http_errors_are_localized_and_htmx_aware() -> None:
 
 
 def test_500_uses_plain_text_fallback_when_template_rendering_fails(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, web: WebHarness
 ) -> None:
     import assetboard.app as app_module
 
@@ -234,13 +233,15 @@ def test_500_uses_plain_text_fallback_when_template_rendering_fails(
         raise RuntimeError("Synthetic template failure")
 
     monkeypatch.setattr(app_module, "render_template", fail_rendering)
-    app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
+    app = web.app()
 
     @app.get("/_test/failing-render")
     async def failing_render() -> None:
         raise RuntimeError("Synthetic request failure")
 
     with TestClient(app, raise_server_exceptions=False) as client:
+        web.complete_setup(app)
+        web.sign_in(client)
         response = client.get("/_test/failing-render", headers={"x-request-id": "fallback-id"})
 
     assert response.status_code == 500
@@ -250,10 +251,12 @@ def test_500_uses_plain_text_fallback_when_template_rendering_fails(
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_static_and_home_urls_include_root_path() -> None:
-    app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
+def test_static_and_home_urls_include_root_path(web: WebHarness) -> None:
+    app = web.app()
 
     with TestClient(app, root_path="/x") as client:
+        web.complete_setup(app)
+        web.sign_in(client)
         response = client.get("/")
         missing = client.get("/missing")
 

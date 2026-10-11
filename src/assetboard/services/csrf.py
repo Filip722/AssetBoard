@@ -75,3 +75,32 @@ def verify_anonymous_token(
         return False
     issued_at = datetime.fromtimestamp(int(timestamp), tz=now.tzinfo)
     return now - lifetime < issued_at <= now + CLOCK_SKEW
+
+
+def mask(token: str) -> str:
+    """Render ``token`` with a fresh one-time pad, so its bytes differ in every response.
+
+    Defeats BREACH-style compression oracles: the secret never appears verbatim in the page.
+    """
+    raw = token.encode("ascii")
+    pad = secrets.token_bytes(len(raw))
+    masked = bytes(byte ^ key for byte, key in zip(raw, pad, strict=True))
+    return base64.urlsafe_b64encode(pad + masked).rstrip(b"=").decode("ascii")
+
+
+def unmask(masked: str | None) -> str | None:
+    """Reverse ``mask``; ``None`` for anything malformed."""
+    if not masked or not masked.isascii() or len(masked) > 512:
+        return None
+    try:
+        data = base64.urlsafe_b64decode(masked + "=" * (-len(masked) % 4))
+    except ValueError:
+        return None
+    if not data or len(data) % 2:
+        return None
+    half = len(data) // 2
+    raw = bytes(byte ^ key for byte, key in zip(data[half:], data[:half], strict=True))
+    try:
+        return raw.decode("ascii")
+    except UnicodeDecodeError:
+        return None

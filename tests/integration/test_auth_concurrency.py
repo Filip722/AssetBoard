@@ -31,6 +31,7 @@ from assetboard.services.auth import (
     authenticate_user_async,
     authenticate_with_factory,
     change_password_with_factory,
+    register_with_factory,
     run_initial_setup,
     setup_is_open,
 )
@@ -709,3 +710,92 @@ def test_concurrent_setup_has_one_winner_and_a_setup_already_completed_loser(
         assert session.scalars(select(User.email)).all() == ["winner@example.com"]
         assert len(session.scalars(select(Workspace)).all()) == 1
         assert not setup_is_open(session)
+
+
+# Registration
+
+
+def _registration_settings() -> Settings:
+    return Settings(_env_file=None, allow_registration=True)
+
+
+def test_registration_hashes_outside_any_immediate_transaction(
+    database: Connect, hashes: HashRecorder
+) -> None:
+    factory = database().factory
+    settings = _registration_settings()
+    _setup_admin(factory, settings)
+    before = hashes.count("hash")
+    outcome = register_with_factory(
+        factory,
+        email="new@example.com",
+        display_name="New",
+        password="Registrant Strong Pw",
+        workspace_name="Budget",
+        settings=settings,
+        clock=CLOCK,
+        host="192.0.2.70",
+    )
+    rejected = register_with_factory(
+        factory,
+        email="new@example.com",
+        display_name="New",
+        password="Registrant Strong Pw",
+        workspace_name="Budget",
+        settings=settings,
+        clock=CLOCK,
+        host="192.0.2.70",
+    )
+    assert (outcome.status, rejected.status) == ("created", "rejected")
+    # One hash each, including the already-registered path (same cost), none under the lock.
+    assert hashes.count("hash") - before == 2
+    assert hashes.inside_immediate() == []
+
+
+def test_concurrent_registration_of_one_email_creates_one_user(database: Connect) -> None:
+    factory = database().factory
+    settings = _registration_settings()
+    _setup_admin(factory, settings)
+    statuses: list[str] = []
+
+    def attempt(index: int) -> None:
+        outcome = register_with_factory(
+            factory,
+            email="race@example.com",
+            display_name=f"Racer {index}",
+            password="Registrant Strong Pw",
+            workspace_name="Budget",
+            settings=settings,
+            clock=CLOCK,
+            host=f"192.0.2.{80 + index}",
+        )
+        statuses.append(outcome.status)
+
+    _run_threads(2, attempt)
+    assert sorted(statuses) == ["created", "rejected"]
+    with factory() as session:
+        assert len(session.scalars(select(User).where(User.email == "race@example.com")).all()) == 1
+
+
+def test_busy_gate_releases_the_registration_attempt(database: Connect) -> None:
+    factory = database().factory
+    settings = _registration_settings()
+    _setup_admin(factory, settings)
+
+    def busy(_password: str) -> str:
+        raise HashGateBusy
+
+    with pytest.raises(HashGateBusy):
+        register_with_factory(
+            factory,
+            email="busy@example.com",
+            display_name="Busy",
+            password="Registrant Strong Pw",
+            workspace_name="Budget",
+            settings=settings,
+            clock=CLOCK,
+            host="192.0.2.90",
+            hasher=busy,
+        )
+    row = _throttle(factory, "register", "192.0.2.90/32")
+    assert row is not None and row.failure_count == 0
