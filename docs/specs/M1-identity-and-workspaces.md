@@ -26,19 +26,29 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Passwords: argon2id; minimum length 10, no composition rules; check against a small bundled common-password list.
 - Sessions are **server-side** (`UserSession`), cookie holds an opaque random id (stored hashed), `HttpOnly`, `SameSite=Lax`, `Secure` when `BASE_URL` is https; idle timeout 14 days, absolute 60 days (configurable); "log out other devices".
 - Login/logout, change password (invalidates other sessions), CSRF on all forms.
-- Login throttling per IP and per account (e.g., 5 failures → exponential backoff), generic error messages (no user enumeration), constant-time-ish comparison path for unknown users.
+- Login throttling per IP and per account (e.g., 5 failures → exponential backoff), generic error messages (no user enumeration), constant-time-ish comparison path for unknown users. Decided in PR A: per-account 5 free failures, reset on success; per-IP (IPv4 address / IPv6 /64, hashed) 20 free failures in a time window that decays only with time; backoff doubles from 60 s, capped at 15 min. Registration has its own per-IP limit (5 attempts per hour, success or not) and never resets a login counter. Wrong current passwords on change-password count against the same per-account bucket. IPv4-mapped IPv6 client addresses are treated as IPv4. Stored IP prefixes on sessions and audit events are IPv4 /24 and IPv6 /48.
 - Open registration disabled by default; `ALLOW_REGISTRATION` env flag creates a new user + new empty workspace.
 - Audit events: login success/failure, logout, password change.
-- CLI: `assetboard create-admin`, `assetboard reset-password <email>` (prints one-time link or sets a new password interactively).
+- CLI: `assetboard create-admin`, `assetboard reset-password <email>` (sets a new password interactively or via `--password-stdin` and revokes all sessions; the one-time-link variant is deferred to F1.5). `create-admin` is a break-glass command: it also works when users exist, never modifies an existing user (duplicate email is an error), creates an owned workspace unless `--no-workspace`, and is audited with the CLI as actor. Both respect `AUTO_MIGRATE` (off + schema not at head = non-zero exit, nothing changed).
+- Setup gate: while there are zero users, GET /setup returns 200 with a form that includes a "setup token" field. The token is ASSETBOARD_SETUP_TOKEN if set, otherwise generated per process start and logged once at WARNING. POST /setup compares it with secrets.compare_digest, throttled; it creates the admin, workspace and owner membership in ONE transaction. Two concurrent POSTs: exactly one creates the admin and the other gets a deterministic "setup already completed" response (test). /setup returns 404 once any user exists.
+- The zero-user redirect to /setup exempts /healthz, /readyz, /static/* and /setup itself (test). Unauthenticated users otherwise go to /login; `next` accepts only relative paths (open-redirect test).
+- Emails are stripped and lowercased on write, with a unique index on the normalized value. Setup-form lists come from existing dependencies: currencies via Babel/minor_unit_for, time zones via zoneinfo, countries via Babel; no new dependency for them.
+- Sessions: rotate the session id on login; cookie is `__Host-`-prefixed when BASE_URL is https; `last_seen_at` is updated at most every 5 minutes (avoid a write per request on SQLite); expiry uses the injected Clock.
+- Throttle counters are stored in the database, keyed by account and by request.client.host (the real client IP only when ASSETBOARD_TRUSTED_PROXIES is set correctly behind a proxy; document this). Unknown users go through a dummy argon2 verify (timing test).
+- argon2-cffi is a new runtime dependency: justify it in the PR (purpose, license, maintenance). The common-password list records its source and license in a NOTICE file (verify the license; do not assume).
+- CLI (assetboard create-admin, reset-password) is non-interactive-capable (password via --password-stdin or prompt) and needs no setup token.
+- scripts/smoke_container.sh and the compose CI step are updated for the new first-run behaviour: assert / redirects to /setup, /setup is 200, then create an admin via `docker exec ... assetboard create-admin`, then /setup is 404 and / redirects to /login. /healthz and /readyz stay green throughout.
+- Documentation: remove or reword every "no authentication until M1" statement (README, SECURITY.md, docs/deployment.md, compose comments); add the new settings (ALLOW_REGISTRATION, session timeouts, SETUP_TOKEN, throttle limits) to the docs/deployment.md table; add ADR-0012 (local auth, server-side sessions, argon2id, setup token) and its index entry. All new UI strings exist in en and pl.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F1.1 from docs/specs/M1-identity-and-workspaces.md: User/Workspace/Membership/UserSession/AuditEvent models + migration,
-first-run /setup wizard, argon2id password hashing, server-side sessions (opaque id stored hashed), login/logout/change-password,
-CSRF on forms, login throttling, CLI create-admin and reset-password.
-Include tests for: setup only works when there are no users, throttling, session expiry (use the fixed Clock), no user enumeration.
+Implement F1.1 from docs/specs/M1-identity-and-workspaces.md. In your plan, propose splitting it into two PRs:
+(A) backend: User/Workspace/Membership/UserSession/AuditEvent models + migration, argon2id hashing, session service, throttle service, audit events, CLI create-admin/reset-password; no routes.
+(B) web: setup-token-gated /setup wizard, login/logout/change-password, CSRF on all forms (must work with HTMX and the strict CSP, no inline scripts), the zero-user redirect middleware with the exemptions in the acceptance list, templates, en/pl translations, smoke-test and compose-CI updates, docs and ADR-0012.
+Follow every bullet in the F1.1 acceptance list, including the extra bullets (setup token, concurrency, exemptions, cookie prefix, throttling, dummy verify, dependency justification, smoke test, docs).
 Do not implement OIDC or invitations yet.
+In the plan, list each acceptance criterion with the test that will prove it, and list every security assumption and open question. Do not write code until I say go.
 ```
 
 ---

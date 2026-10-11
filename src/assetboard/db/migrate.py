@@ -7,6 +7,10 @@ from typing import Any, Literal
 from alembic import command
 from alembic.autogenerate.api import AutogenContext
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 
 from assetboard.config import Settings
 from assetboard.db.types import DecimalType, UtcDateTime
@@ -32,6 +36,26 @@ def configured_database_url(config: Config) -> str:
 
 def upgrade_database(settings: Settings) -> None:
     command.upgrade(alembic_config(settings), "head")
+
+
+def database_is_at_head(settings: Settings) -> bool:
+    """Report whether the database is at the Alembic head without creating or changing it."""
+    database_url = configured_database_url(alembic_config(settings))
+    url = make_url(database_url)
+    if url.get_backend_name() == "sqlite":
+        database = url.database
+        if not database or database == ":memory:":
+            return False
+        if not database.startswith("file:") and not Path(database).expanduser().is_file():
+            return False
+    heads = set(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
+    engine = create_engine(url)
+    try:
+        with engine.connect() as connection:
+            current = set(MigrationContext.configure(connection).get_current_heads())
+    finally:
+        engine.dispose()
+    return current == heads
 
 
 def check_database_migrations(settings: Settings) -> None:

@@ -20,12 +20,42 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_DEFAULT_LOCALE` | `en` | App | Two-letter lowercase default locale. |
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | App | Three-letter ISO currency used as the default. |
 | `ASSETBOARD_AUTO_MIGRATE` | `true` | App | Apply pending database migrations at startup when enabled. Only one instance/worker may use a data volume with automatic migrations enabled. |
+| `ASSETBOARD_SETUP_TOKEN` | unset | App | First-run setup token (at least 22 characters; use a random value). If unset, a 256-bit token is generated at each process start and logged once at `WARNING` while no user exists. A configured token is never logged. |
+| `ASSETBOARD_ALLOW_REGISTRATION` | `false` | App | Allow open self-registration; each registrant gets a new empty workspace they own. |
+| `ASSETBOARD_SESSION_IDLE_TIMEOUT_DAYS` | `14` | App | Sessions expire after this many days without activity. Must not exceed the absolute timeout. |
+| `ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS` | `60` | App | Sessions expire this many days after login regardless of activity. |
+| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Failed logins (and wrong current passwords when changing a password) per account before exponential backoff starts. A successful login resets this counter; it also counts as zero after 24 hours without failures. |
+| `ASSETBOARD_AUTH_IP_FREE_FAILURES` | `20` | App | Failed logins per client address (IPv4 address or IPv6 /64) within the IP window before backoff starts. |
+| `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` | `60` | App | Window after which per-address login and setup-token failure counters decay. Successful logins do not reset them. |
+| `ASSETBOARD_AUTH_THROTTLE_BASE_SECONDS` | `60` | App | First backoff delay; it doubles with each further failure. |
+| `ASSETBOARD_AUTH_THROTTLE_MAX_SECONDS` | `900` | App | Maximum backoff delay (bounds how long an attacker can lock an account). |
+| `ASSETBOARD_SETUP_THROTTLE_FREE_FAILURES` | `5` | App | Wrong setup-token attempts per client address before backoff starts. |
+| `ASSETBOARD_REGISTRATION_IP_LIMIT` | `5` | App | Registration attempts (successful or not) allowed per client address within the registration window. |
+| `ASSETBOARD_REGISTRATION_WINDOW_MINUTES` | `60` | App | Window for the registration attempt limit. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
 
 The Compose file intentionally binds to loopback by default. Publishing on all interfaces exposes
 the service to the LAN; there is no authentication until M1, so restrict access accordingly.
+
+## Administrator commands
+
+These commands run inside the container (for example `docker exec -it <container> assetboard
+create-admin`) and need no setup token. With `ASSETBOARD_AUTO_MIGRATE=true` they apply pending
+migrations first, like application startup; with `false` they refuse to run until
+`assetboard migrate` has brought the database to the latest schema.
+
+- `assetboard create-admin` is a break-glass command: it creates a new instance administrator even
+  when users already exist. It never modifies an existing user; an email that is already
+  registered is an error. By default it also creates a workspace owned by the new administrator,
+  as first-run setup does; `--no-workspace` skips that. On an empty instance it also closes
+  first-run setup. For scripts, pass `--email`, `--display-name` and `--password-stdin`.
+- `assetboard reset-password <email>` sets a new password for any user (prompted, or from
+  stdin with `--password-stdin`) and signs that user out of every session. It does not change whether the account is active. Anyone who can run commands
+  in the container can therefore take over any account; protect shell access accordingly.
+
+Both commands write an audit event with the CLI as the actor.
 
 ## Run a published image
 

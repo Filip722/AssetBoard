@@ -29,6 +29,18 @@ def test_settings_are_side_effect_free_and_use_spec_defaults(
     assert settings.default_currency == "EUR"
     assert settings.auto_migrate is True
     assert settings.secret_key is None
+    assert settings.setup_token is None
+    assert settings.allow_registration is False
+    assert settings.session_idle_timeout_days == 14
+    assert settings.session_absolute_timeout_days == 60
+    assert settings.auth_account_free_failures == 5
+    assert settings.auth_ip_free_failures == 20
+    assert settings.auth_ip_window_minutes == 60
+    assert settings.registration_ip_limit == 5
+    assert settings.registration_window_minutes == 60
+    assert settings.auth_throttle_base_seconds == 60
+    assert settings.auth_throttle_max_seconds == 900
+    assert settings.setup_throttle_free_failures == 5
     assert not data_dir.exists()
 
 
@@ -151,3 +163,25 @@ def test_settings_reject_invalid_environment_logging_locale_and_currency() -> No
 def test_settings_reject_non_sqlite_database_url(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="DATABASE_URL"):
         Settings(_env_file=None, data_dir=tmp_path, database_url="postgresql://example.test/app")
+
+
+def test_settings_configure_auth_thresholds_timeouts_and_secret_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(f"{ENV_PREFIX}_SETUP_TOKEN", "0123456789abcdefghijkl")
+    monkeypatch.setenv(f"{ENV_PREFIX}_SESSION_IDLE_TIMEOUT_DAYS", "7")
+    monkeypatch.setenv(f"{ENV_PREFIX}_SESSION_ABSOLUTE_TIMEOUT_DAYS", "14")
+    monkeypatch.setenv(f"{ENV_PREFIX}_AUTH_IP_FREE_FAILURES", "30")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.setup_token is not None
+    assert settings.setup_token.get_secret_value() == "0123456789abcdefghijkl"
+    assert settings.session_idle_timeout_days == 7
+    assert settings.session_absolute_timeout_days == 14
+    assert settings.auth_ip_free_failures == 30
+
+
+def test_settings_reject_idle_timeout_longer_than_absolute_timeout() -> None:
+    with pytest.raises(ValueError, match="SESSION_IDLE_TIMEOUT_DAYS"):
+        Settings(_env_file=None, session_idle_timeout_days=30, session_absolute_timeout_days=14)

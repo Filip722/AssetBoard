@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from assetboard.branding import ENV_PREFIX
@@ -35,6 +35,18 @@ class Settings(BaseSettings):
     default_locale: str = "en"
     default_currency: str = "EUR"
     auto_migrate: bool = True
+    setup_token: SecretStr | None = None
+    allow_registration: bool = False
+    session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
+    session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)
+    auth_account_free_failures: int = Field(default=5, ge=1)
+    auth_ip_free_failures: int = Field(default=20, ge=1)
+    auth_ip_window_minutes: int = Field(default=60, ge=1, le=1440)
+    auth_throttle_base_seconds: int = Field(default=60, ge=1)
+    auth_throttle_max_seconds: int = Field(default=900, ge=1)
+    setup_throttle_free_failures: int = Field(default=5, ge=1)
+    registration_ip_limit: int = Field(default=5, ge=1)
+    registration_window_minutes: int = Field(default=60, ge=1, le=1440)
 
     def __init__(self, *, _env_file: str | Path | None = ".env", **values: Any) -> None:
         super().__init__(_env_file=_env_file, **values)
@@ -138,6 +150,16 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def finalize_settings(self) -> Settings:
+        if self.setup_token is not None:
+            token = self.setup_token.get_secret_value()
+            if len(token) < 22:
+                raise ValueError(
+                    "SETUP_TOKEN must be at least 22 characters (128 bits when generated randomly)"
+                )
+        if self.session_idle_timeout_days > self.session_absolute_timeout_days:
+            raise ValueError("SESSION_IDLE_TIMEOUT_DAYS must be <= SESSION_ABSOLUTE_TIMEOUT_DAYS")
+        if self.auth_throttle_max_seconds < self.auth_throttle_base_seconds:
+            raise ValueError("AUTH_THROTTLE_MAX_SECONDS must be >= AUTH_THROTTLE_BASE_SECONDS")
         if self.database_url is None:
             database_filename = self.data_dir / "assetboard.db"
             self.database_url = f"sqlite:///{database_filename}"

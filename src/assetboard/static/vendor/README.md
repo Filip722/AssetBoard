@@ -24,3 +24,13 @@ versioned upstream release during `make css` and cached in
 the shipped assets, so no standalone Tailwind license file is kept here.
 
 Apache ECharts 5.6.0 ships an upstream `NOTICE`; its exact text is included in `ECHARTS-NOTICE.txt`.
+
+### Bundled data (not served)
+
+| File | Upstream revision | License | SHA-256 | License file | Source |
+|---|---|---|---|---|---|
+| `src/assetboard/data/common-passwords.txt` | SecLists `913b327317496d062bcc7cace524aaad8a693be2` | MIT | `fa1ea0cf2f673458b58be3a7171d2b7fc6f2e704b4691e69c13a9a8511f5cf31` | `src/assetboard/data/SECLists-LICENSE.txt` | https://github.com/danielmiessler/SecLists (`Passwords/Common-Credentials/10k-most-common.txt`) |
+
+The password list is the first 10,000 lines of the upstream file at that revision, byte for byte;
+the upstream file has 10,001 entries. Its source and license are recorded in
+`src/assetboard/data/NOTICE`, which the container image ships under `/licenses/AssetBoard/`.

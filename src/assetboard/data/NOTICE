@@ -1,0 +1,10 @@
+Common password list
+
+File: common-passwords.txt (first 10,000 entries)
+Source: danielmiessler/SecLists, Passwords/Common-Credentials/10k-most-common.txt
+Source revision: 913b327317496d062bcc7cace524aaad8a693be2
+Source URL: https://github.com/danielmiessler/SecLists/blob/913b327317496d062bcc7cace524aaad8a693be2/Passwords/Common-Credentials/10k-most-common.txt
+License: MIT; see SECLists-LICENSE.txt, copied from the same source revision.
+
+The upstream file contains 10,001 entries at this revision. AssetBoard packages the first
+10,000 entries to meet the project's maximum list size.

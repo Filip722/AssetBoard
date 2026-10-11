@@ -77,6 +77,8 @@ RUN mkdir -p /data /licenses/AssetBoard/vendor \
 
 COPY --from=builder --chown=10001:10001 /opt/venv /opt/venv
 COPY --from=builder /build/LICENSE /licenses/AssetBoard/LICENSE
+COPY --from=builder /build/src/assetboard/data/NOTICE /licenses/AssetBoard/NOTICE
+COPY --from=builder /build/src/assetboard/data/SECLists-LICENSE.txt /licenses/AssetBoard/SECLists-LICENSE.txt
 COPY --from=builder /build/src/assetboard/static/vendor/*-LICENSE.txt /licenses/AssetBoard/vendor/
 COPY --from=builder /build/src/assetboard/static/vendor/ECHARTS-NOTICE.txt /licenses/AssetBoard/vendor/
 

@@ -13,6 +13,9 @@ REQUIRED_FILES = {
     "assetboard/static/vendor/echarts.min.js",
     "assetboard/locales/en/LC_MESSAGES/messages.mo",
     "assetboard/locales/pl/LC_MESSAGES/messages.mo",
+    "assetboard/data/common-passwords.txt",
+    "assetboard/data/NOTICE",
+    "assetboard/data/SECLists-LICENSE.txt",
 }
 
 

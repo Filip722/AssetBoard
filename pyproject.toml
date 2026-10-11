@@ -8,6 +8,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.14,<2",
+    "argon2-cffi>=25.1,<26",
     "Babel>=2.16,<3",
     "fastapi>=0.116,<1",
     "Jinja2>=3.1,<4",
