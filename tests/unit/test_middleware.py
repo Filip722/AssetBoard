@@ -47,7 +47,8 @@ def test_request_log_has_safe_path_status_duration_and_request_id() -> None:
         handler.close()
 
     assert response.status_code == 200
-    lines = output.getvalue().splitlines()
+    # Startup also logs (the first-run setup token); only request lines matter here.
+    lines = [line for line in output.getvalue().splitlines() if "request_complete" in line]
     assert len(lines) == 1
     assert lines[0].startswith("safe-trace request_complete method=GET path=/readyz ")
     assert "status_code=200" in lines[0]

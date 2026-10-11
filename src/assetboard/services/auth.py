@@ -1,9 +1,15 @@
 """Local accounts, server-side sessions, throttling and first-run setup.
 
-Flows that record throttle counters or audit events on failure (login, registration, setup
-token) return an outcome instead of raising, so the caller commits those writes. Errors carry a
-stable ``code`` that the web layer maps to a translated message; the English text is for logs
-and the CLI only.
+Flows that record throttle counters or audit events on failure (login, password change,
+registration, setup token) return an outcome instead of raising, so the caller commits those
+writes. Errors carry a stable ``code`` that the web layer maps to a translated message; the
+English text is for logs and the CLI only.
+
+Login and password change reserve their throttle attempt *before* the password is verified.
+With a session factory, the reservation is its own short ``BEGIN IMMEDIATE`` transaction
+(ADR-0007), so parallel requests cannot all pass the throttle check before any failure is
+recorded; slow hashing then runs outside any transaction. The single-session functions run the
+same steps inside the caller's transaction.
 """
 
 from __future__ import annotations
@@ -13,21 +19,26 @@ import hmac
 import ipaddress
 import logging
 import secrets
+import threading
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache
 from importlib import resources
-from typing import Literal
+from typing import Literal, Protocol
 from uuid import UUID, uuid4
 
+import anyio.from_thread
+import anyio.to_thread
 from argon2 import Parameters, PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import delete, or_, select, update
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.config import Settings
+from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
@@ -38,6 +49,7 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail, normalize_email
+from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
 ActorType = Literal["user", "cli", "system"]
@@ -52,7 +64,50 @@ THROTTLE_IDLE_RESET = timedelta(hours=24)
 # Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
 ARGON2_PARAMETERS: Parameters | None = None
 _cached_dummy_hashes: dict[str, str] = {}
-_process_setup_token: str | None = None
+_dummy_hash_lock = threading.Lock()
+
+Verifier = Callable[[str, str], bool]
+Hasher = Callable[[str], str]
+
+
+class TransactionRunner(Protocol):
+    """Runs one unit of work in a transaction and returns its result."""
+
+    def __call__[T](self, operation: Callable[[Session], T], /) -> T: ...
+
+    def read[T](self, operation: Callable[[Session], T], /) -> T:
+        """Run a read-only step; it must not write."""
+        ...
+
+
+class SameSession:
+    """Runs every step in the caller's session and transaction (CLI, tests)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def __call__[T](self, operation: Callable[[Session], T], /) -> T:
+        return operation(self._session)
+
+    def read[T](self, operation: Callable[[Session], T], /) -> T:
+        return operation(self._session)
+
+
+class ImmediateTransactions:
+    """Runs every write step in its own committed ``BEGIN IMMEDIATE`` transaction (web).
+
+    Read-only steps use an ordinary deferred transaction, so they never take the write lock.
+    """
+
+    def __init__(self, factory: sessionmaker[Session]) -> None:
+        self._factory = factory
+
+    def __call__[T](self, operation: Callable[[Session], T], /) -> T:
+        return run_immediate(self._factory, operation)
+
+    def read[T](self, operation: Callable[[Session], T], /) -> T:
+        with self._factory() as session:
+            return operation(session)
 
 
 class AuthError(ValueError):
@@ -178,20 +233,39 @@ def password_hasher() -> PasswordHasher:
     return PasswordHasher.from_parameters(ARGON2_PARAMETERS)
 
 
-def hash_password(password: str, email: str, display_name: str) -> str:
-    validate_password(password, email, display_name)
+def argon2_hash(password: str) -> str:
+    """Hash without policy checks; callers validate first."""
     encoded = password_hasher().hash(password)
     if not encoded.startswith("$argon2id$"):
         raise RuntimeError("PasswordHasher did not produce an Argon2id hash")
     return encoded
 
 
+def hash_password(password: str, email: str, display_name: str) -> str:
+    validate_password(password, email, display_name)
+    return argon2_hash(password)
+
+
 def _dummy_hash() -> str:
+    """The hash verified for unknown users; computed once per process, never recomputed.
+
+    ``prepare_dummy_hash`` runs at startup, so requests normally only read the cache. The lock
+    makes concurrent cold callers (CLI, tests) compute it exactly once.
+    """
     key = repr(ARGON2_PARAMETERS)
-    if key not in _cached_dummy_hashes:
-        # Never a valid credential for any account; never logged.
-        _cached_dummy_hashes[key] = password_hasher().hash(secrets.token_urlsafe(32))
-    return _cached_dummy_hashes[key]
+    cached = _cached_dummy_hashes.get(key)
+    if cached is not None:
+        return cached
+    with _dummy_hash_lock:
+        if key not in _cached_dummy_hashes:
+            # Never a valid credential for any account; never logged.
+            _cached_dummy_hashes[key] = password_hasher().hash(secrets.token_urlsafe(32))
+        return _cached_dummy_hashes[key]
+
+
+def prepare_dummy_hash() -> None:
+    """Compute the dummy hash at startup so no request pays for it."""
+    _dummy_hash()
 
 
 def verify_password(password_hash: str, password: str) -> bool:
@@ -361,26 +435,73 @@ def _count_attempt(
     return row
 
 
-def _count_account_failure(
-    session: Session, account_key: str, now: datetime, settings: Settings
-) -> None:
-    _count_attempt(
-        session,
-        "account",
-        account_key,
-        now=now,
-        window=None,
-        free=settings.auth_account_free_failures,
-        settings=settings,
-    )
-
-
 def _reset_account(session: Session, account_key: str, now: datetime) -> None:
+    """Successful authentication: clear the account counter and start a new window.
+
+    The new ``window_started_at`` makes any reservation still in flight from before the reset
+    a no-op when it is released.
+    """
     row = _find_throttle(session, "account", account_key)
-    if row is not None and (row.failure_count or row.blocked_until is not None):
+    if row is not None:
         row.failure_count = 0
         row.blocked_until = None
+        row.window_started_at = now
         row.updated_at = now
+
+
+@dataclass(frozen=True, slots=True)
+class ThrottleSlot:
+    scope: ThrottleScope
+    key: str
+    window: timedelta | None
+    free: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReservedAttempt:
+    """One counted attempt, identified so the same request can take it back."""
+
+    scope: ThrottleScope
+    key: str
+    window_started_at: datetime
+    block_set: datetime | None
+
+
+def reserve_attempts(
+    session: Session, slots: Sequence[ThrottleSlot], now: datetime, settings: Settings
+) -> tuple[ReservedAttempt, ...] | None:
+    """Count one attempt in every slot, or return ``None`` (writing nothing) if any is blocked."""
+    if any(_is_blocked(_find_throttle(session, slot.scope, slot.key), now) for slot in slots):
+        return None
+    reserved: list[ReservedAttempt] = []
+    for slot in slots:
+        row = _count_attempt(
+            session,
+            slot.scope,
+            slot.key,
+            now=now,
+            window=slot.window,
+            free=slot.free,
+            settings=settings,
+        )
+        block_set = row.blocked_until if row.failure_count > slot.free else None
+        reserved.append(ReservedAttempt(slot.scope, slot.key, row.window_started_at, block_set))
+    return tuple(reserved)
+
+
+def release_attempts(session: Session, reserved: Sequence[ReservedAttempt]) -> None:
+    """Take back this request's own attempts.
+
+    Only within the same window (a reset or a new window since then makes it a no-op), never
+    below zero, and a block is cleared only if this reservation set it.
+    """
+    for attempt in reserved:
+        row = _find_throttle(session, attempt.scope, attempt.key)
+        if row is None or row.window_started_at != attempt.window_started_at:
+            continue
+        row.failure_count = max(0, row.failure_count - 1)
+        if attempt.block_set is not None and row.blocked_until == attempt.block_set:
+            row.blocked_until = None
 
 
 def prune_auth_throttles(session: Session, clock: Clock) -> int:
@@ -401,19 +522,33 @@ def prune_auth_throttles(session: Session, clock: Clock) -> int:
 # Setup token
 
 
-def setup_token_for_process(
-    settings: Settings, *, user_exists: bool, logger: logging.Logger
+def setup_is_open(session: Session) -> bool:
+    """The single definition of "first-run setup is open": ``setup_state.completed_at`` is null.
+
+    Every path that creates a user claims setup in the same transaction (web setup and
+    ``create-admin``), and registration refuses while setup is open.
+    """
+    row = session.execute(select(SetupState.completed_at).where(SetupState.id == 1)).one_or_none()
+    if row is None:
+        raise RuntimeError("setup_state row is missing; the database is not migrated")
+    return row[0] is None
+
+
+def setup_token_at_startup(
+    settings: Settings, *, setup_open: bool, logger: logging.Logger
 ) -> str | None:
-    """Return the setup token only while setup is open; configured secrets are never logged."""
-    global _process_setup_token
-    if user_exists:
+    """Called once per process start: the token for this process, or ``None`` if setup is closed.
+
+    A configured ``SETUP_TOKEN`` is returned and never logged. Otherwise a 256-bit token is
+    generated and logged once at WARNING, only while setup is open.
+    """
+    if not setup_open:
         return None
     if settings.setup_token is not None:
         return settings.setup_token.get_secret_value()
-    if _process_setup_token is None:
-        _process_setup_token = secrets.token_urlsafe(32)
-        logger.warning("Generated first-run setup token: %s", _process_setup_token)
-    return _process_setup_token
+    token = secrets.token_urlsafe(32)
+    logger.warning("Generated first-run setup token: %s", token)
+    return token
 
 
 def verify_setup_token(
@@ -448,6 +583,144 @@ def verify_setup_token(
 # Login and sessions
 
 
+def _login_keys(email: str) -> tuple[str, str]:
+    lookup = email.strip().lower()[:MAX_EMAIL_LENGTH]
+    try:
+        return lookup, normalize_email(lookup)
+    except InvalidEmail:
+        return lookup, f"invalid:{lookup}"
+
+
+@dataclass(frozen=True, slots=True)
+class _LoginCandidate:
+    reserved: tuple[ReservedAttempt, ...]
+    user_id: UUID | None
+    password_hash: str | None
+
+
+def _login_flow(
+    run: TransactionRunner,
+    *,
+    email: str,
+    password: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None,
+    existing_session_id: str | None,
+    verify: Verifier | None,
+    hasher: Hasher | None,
+) -> LoginOutcome:
+    lookup, account_key = _login_keys(email)
+    slots = (
+        ThrottleSlot("account", account_key, None, settings.auth_account_free_failures),
+        ThrottleSlot(
+            "ip",
+            _ip_key(host),
+            timedelta(minutes=settings.auth_ip_window_minutes),
+            settings.auth_ip_free_failures,
+        ),
+    )
+
+    def reserve(session: Session) -> _LoginCandidate | None:
+        # Blocked attempts are answered from read-only lookups and write nothing.
+        reserved = reserve_attempts(session, slots, clock.now(), settings)
+        if reserved is None:
+            return None
+        user = session.scalar(select(User).where(User.email == lookup))
+        return _LoginCandidate(
+            reserved, user.id if user else None, user.password_hash if user else None
+        )
+
+    def blocked(session: Session) -> bool:
+        now = clock.now()
+        return any(_is_blocked(_find_throttle(session, s.scope, s.key), now) for s in slots)
+
+    # A deferred read first, so a flood of blocked requests never takes the write lock;
+    # ``reserve`` checks again under the lock.
+    if run.read(blocked):
+        return LoginOutcome()
+    candidate = run(reserve)
+    if candidate is None:
+        return LoginOutcome()
+    rehashed: str | None = None
+    try:
+        check = verify or verify_password
+        verified = check(candidate.password_hash or _dummy_hash(), password)
+        # Decided right after verification and hashed before ``finish``: no hashing ever
+        # runs inside the write transaction.
+        if (
+            verified
+            and candidate.password_hash is not None
+            and password_hasher().check_needs_rehash(candidate.password_hash)
+        ):
+            try:
+                rehashed = (hasher or argon2_hash)(password)
+            except HashGateBusy:
+                # Best effort: the login still succeeds; the next login retries the rehash.
+                rehashed = None
+    except BaseException:
+        run(lambda session: release_attempts(session, candidate.reserved))
+        raise
+
+    def finish(session: Session) -> LoginOutcome:
+        now = clock.now()
+        user = session.get(User, candidate.user_id) if candidate.user_id else None
+        succeeded = (
+            verified
+            and user is not None
+            and user.is_active
+            and user.password_hash is not None
+            and user.password_hash == candidate.password_hash
+        )
+        if not succeeded or user is None or user.password_hash is None:
+            # The reservation stays: it is this failure's count.
+            prune_auth_throttles(session, clock)
+            _audit(
+                session,
+                clock,
+                action="auth.login_failure",
+                entity_type="user",
+                entity_id=str(user.id) if user else None,
+                actor_type="user",
+                actor_user_id=user.id if user else None,
+                host=host,
+                user_agent=user_agent,
+            )
+            return LoginOutcome()
+        # The account counter resets; the IP counter only takes back this request's attempt
+        # and otherwise decays with its time window.
+        _reset_account(session, account_key, now)
+        release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
+        if rehashed is not None:
+            # Safe: ``succeeded`` above means the stored hash is still the verified one.
+            user.password_hash = rehashed
+        user.last_login_at = now
+        if existing_session_id:
+            session.execute(
+                delete(UserSession).where(
+                    UserSession.id_hash == session_id_hash(existing_session_id)
+                )
+            )
+        new_session_id = create_user_session(
+            session, user, settings=settings, clock=clock, host=host, user_agent=user_agent
+        )
+        _audit(
+            session,
+            clock,
+            action="auth.login_success",
+            entity_type="user",
+            entity_id=str(user.id),
+            actor_type="user",
+            actor_user_id=user.id,
+            host=host,
+            user_agent=user_agent,
+        )
+        return LoginOutcome(user=user, session_id=new_session_id)
+
+    return run(finish)
+
+
 def authenticate_user(
     session: Session,
     *,
@@ -459,73 +732,96 @@ def authenticate_user(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
 ) -> LoginOutcome:
-    """Authenticate with email + password; the caller commits whatever the outcome."""
-    now = clock.now()
-    lookup = email.strip().lower()[:MAX_EMAIL_LENGTH]
-    try:
-        account_key = normalize_email(lookup)
-    except InvalidEmail:
-        account_key = f"invalid:{lookup}"
-    ip_key = _ip_key(host)
-    # Blocked attempts are answered from read-only lookups and write nothing.
-    if _is_blocked(_find_throttle(session, "ip", ip_key), now) or _is_blocked(
-        _find_throttle(session, "account", account_key), now
-    ):
-        return LoginOutcome()
-
-    user = session.scalar(select(User).where(User.email == lookup))
-    password_hash = user.password_hash if user is not None else None
-    verified = verify_password(password_hash or _dummy_hash(), password)
-    if user is None or password_hash is None or not user.is_active or not verified:
-        _count_account_failure(session, account_key, now, settings)
-        _count_attempt(
-            session,
-            "ip",
-            ip_key,
-            now=now,
-            window=timedelta(minutes=settings.auth_ip_window_minutes),
-            free=settings.auth_ip_free_failures,
-            settings=settings,
-        )
-        prune_auth_throttles(session, clock)
-        _audit(
-            session,
-            clock,
-            action="auth.login_failure",
-            entity_type="user",
-            entity_id=str(user.id) if user else None,
-            actor_type="user",
-            actor_user_id=user.id if user else None,
-            host=host,
-            user_agent=user_agent,
-        )
-        return LoginOutcome()
-
-    # Only the account counter resets; the per-IP counter decays with its time window.
-    _reset_account(session, account_key, now)
-    hasher = password_hasher()
-    if hasher.check_needs_rehash(password_hash):
-        user.password_hash = hasher.hash(password)
-    user.last_login_at = now
-    if existing_session_id:
-        session.execute(
-            delete(UserSession).where(UserSession.id_hash == session_id_hash(existing_session_id))
-        )
-    new_session_id = create_user_session(
-        session, user, settings=settings, clock=clock, host=host, user_agent=user_agent
-    )
-    _audit(
-        session,
-        clock,
-        action="auth.login_success",
-        entity_type="user",
-        entity_id=str(user.id),
-        actor_type="user",
-        actor_user_id=user.id,
+    """Authenticate inside the caller's transaction; the caller commits whatever the outcome."""
+    return _login_flow(
+        SameSession(session),
+        email=email,
+        password=password,
+        settings=settings,
+        clock=clock,
         host=host,
         user_agent=user_agent,
+        existing_session_id=existing_session_id,
+        verify=None,
+        hasher=None,
     )
-    return LoginOutcome(user=user, session_id=new_session_id)
+
+
+def authenticate_with_factory(
+    factory: sessionmaker[Session],
+    *,
+    email: str,
+    password: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+    existing_session_id: str | None = None,
+    verify: Verifier | None = None,
+    hasher: Hasher | None = None,
+) -> LoginOutcome:
+    """Authenticate with the reservation committed before ``verify`` runs (blocking)."""
+    return _login_flow(
+        ImmediateTransactions(factory),
+        email=email,
+        password=password,
+        settings=settings,
+        clock=clock,
+        host=host,
+        user_agent=user_agent,
+        existing_session_id=existing_session_id,
+        verify=verify,
+        hasher=hasher,
+    )
+
+
+def _gate_verifier(gate: HashGate) -> Verifier:
+    """From a worker thread, run each verification through the event loop's hash gate."""
+
+    def verify(password_hash: str, password: str) -> bool:
+        return anyio.from_thread.run(gate.run, lambda: verify_password(password_hash, password))
+
+    return verify
+
+
+def _gate_hasher(gate: HashGate) -> Hasher:
+    def hash_(password: str) -> str:
+        return anyio.from_thread.run(gate.run, lambda: argon2_hash(password))
+
+    return hash_
+
+
+async def authenticate_user_async(
+    factory: sessionmaker[Session],
+    gate: HashGate,
+    *,
+    email: str,
+    password: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+    existing_session_id: str | None = None,
+) -> LoginOutcome:
+    """Web entry point: database work in a worker thread, hashing through ``gate``.
+
+    Raises ``HashGateBusy`` (after releasing the reserved attempt) when hashing is saturated.
+    """
+    verify, hasher = _gate_verifier(gate), _gate_hasher(gate)
+    return await anyio.to_thread.run_sync(
+        lambda: authenticate_with_factory(
+            factory,
+            email=email,
+            password=password,
+            settings=settings,
+            clock=clock,
+            host=host,
+            user_agent=user_agent,
+            existing_session_id=existing_session_id,
+            verify=verify,
+            hasher=hasher,
+        )
+    )
 
 
 def create_user_session(
@@ -643,6 +939,103 @@ def revoke_other_sessions(
     return revoked
 
 
+def _change_password_flow(
+    run: TransactionRunner,
+    *,
+    user_id: UUID,
+    current_password: str,
+    new_password: str,
+    settings: Settings,
+    clock: Clock,
+    current_session_id: str | None,
+    host: str | None,
+    user_agent: str | None,
+    verify: Verifier | None,
+    hasher: Hasher | None,
+) -> PasswordChangeOutcome:
+    @dataclass(frozen=True, slots=True)
+    class Candidate:
+        reserved: tuple[ReservedAttempt, ...]
+        password_hash: str | None
+        email: str
+        display_name: str
+
+    def reserve(session: Session) -> Candidate | None:
+        user = session.get(User, user_id)
+        if user is None:
+            raise UnknownUser
+        slot = ThrottleSlot("account", user.email, None, settings.auth_account_free_failures)
+        reserved = reserve_attempts(session, (slot,), clock.now(), settings)
+        if reserved is None:
+            return None
+        return Candidate(reserved, user.password_hash, user.email, user.display_name)
+
+    def blocked(session: Session) -> bool:
+        user = session.get(User, user_id)
+        if user is None:
+            raise UnknownUser
+        return _is_blocked(_find_throttle(session, "account", user.email), clock.now())
+
+    # Deferred read first; ``reserve`` checks again under the write lock.
+    if run.read(blocked):
+        return PasswordChangeOutcome(status="throttled")
+    candidate = run(reserve)
+    if candidate is None:
+        return PasswordChangeOutcome(status="throttled")
+
+    def release(session: Session) -> None:
+        release_attempts(session, candidate.reserved)
+
+    try:
+        check = verify or verify_password
+        verified = candidate.password_hash is not None and check(
+            candidate.password_hash, current_password
+        )
+    except BaseException:
+        run(release)
+        raise
+    if not verified:
+        # The reservation stays: it is this failure's count.
+        run(lambda session: prune_auth_throttles(session, clock))
+        return PasswordChangeOutcome(status="invalid_current")
+
+    try:
+        validate_password(new_password, candidate.email, candidate.display_name)
+    except PasswordPolicyError as exc:
+        run(lambda session: _reset_account(session, candidate.email, clock.now()))
+        return PasswordChangeOutcome(status="invalid_new", error=exc)
+    try:
+        new_hash = (hasher or argon2_hash)(new_password)
+    except BaseException:
+        run(release)
+        raise
+
+    def apply(session: Session) -> PasswordChangeOutcome:
+        _reset_account(session, candidate.email, clock.now())
+        user = session.get(User, user_id)
+        if user is None or user.password_hash != candidate.password_hash:
+            # Changed concurrently (another device or the CLI); do not overwrite it.
+            return PasswordChangeOutcome(status="invalid_current")
+        user.password_hash = new_hash
+        keep_hash = session_id_hash(current_session_id) if current_session_id else None
+        revoked = _delete_sessions_except(session, user.id, keep_hash)
+        _audit(
+            session,
+            clock,
+            action="auth.password_change",
+            entity_type="user",
+            entity_id=str(user.id),
+            actor_type="user",
+            actor_user_id=user.id,
+            host=host,
+            user_agent=user_agent,
+            data={"other_sessions_revoked": revoked},
+        )
+        return PasswordChangeOutcome(status="changed", revoked_sessions=revoked)
+
+    return run(apply)
+
+
 def change_password(
     session: Session,
     user: User,
@@ -659,35 +1052,79 @@ def change_password(
 
     Wrong current passwords count against the same per-account throttle as login.
     """
-    now = clock.now()
-    account_key = user.email
-    if _is_blocked(_find_throttle(session, "account", account_key), now):
-        return PasswordChangeOutcome(status="throttled")
-    if user.password_hash is None or not verify_password(user.password_hash, current_password):
-        _count_account_failure(session, account_key, now, settings)
-        prune_auth_throttles(session, clock)
-        return PasswordChangeOutcome(status="invalid_current")
-    _reset_account(session, account_key, now)
-    try:
-        new_hash = hash_password(new_password, user.email, user.display_name)
-    except PasswordPolicyError as exc:
-        return PasswordChangeOutcome(status="invalid_new", error=exc)
-    user.password_hash = new_hash
-    keep_hash = session_id_hash(current_session_id) if current_session_id else None
-    revoked = _delete_sessions_except(session, user.id, keep_hash)
-    _audit(
-        session,
-        clock,
-        action="auth.password_change",
-        entity_type="user",
-        entity_id=str(user.id),
-        actor_type="user",
-        actor_user_id=user.id,
+    return _change_password_flow(
+        SameSession(session),
+        user_id=user.id,
+        current_password=current_password,
+        new_password=new_password,
+        settings=settings,
+        clock=clock,
+        current_session_id=current_session_id,
         host=host,
         user_agent=user_agent,
-        data={"other_sessions_revoked": revoked},
+        verify=None,
+        hasher=None,
     )
-    return PasswordChangeOutcome(status="changed", revoked_sessions=revoked)
+
+
+def change_password_with_factory(
+    factory: sessionmaker[Session],
+    *,
+    user_id: UUID,
+    current_password: str,
+    new_password: str,
+    settings: Settings,
+    clock: Clock,
+    current_session_id: str | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
+    verify: Verifier | None = None,
+    hasher: Hasher | None = None,
+) -> PasswordChangeOutcome:
+    return _change_password_flow(
+        ImmediateTransactions(factory),
+        user_id=user_id,
+        current_password=current_password,
+        new_password=new_password,
+        settings=settings,
+        clock=clock,
+        current_session_id=current_session_id,
+        host=host,
+        user_agent=user_agent,
+        verify=verify,
+        hasher=hasher,
+    )
+
+
+async def change_password_async(
+    factory: sessionmaker[Session],
+    gate: HashGate,
+    *,
+    user_id: UUID,
+    current_password: str,
+    new_password: str,
+    settings: Settings,
+    clock: Clock,
+    current_session_id: str | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
+) -> PasswordChangeOutcome:
+    verify, hasher = _gate_verifier(gate), _gate_hasher(gate)
+    return await anyio.to_thread.run_sync(
+        lambda: change_password_with_factory(
+            factory,
+            user_id=user_id,
+            current_password=current_password,
+            new_password=new_password,
+            settings=settings,
+            clock=clock,
+            current_session_id=current_session_id,
+            host=host,
+            user_agent=user_agent,
+            verify=verify,
+            hasher=hasher,
+        )
+    )
 
 
 # Account creation
@@ -740,13 +1177,19 @@ def _create_user_records(
     options: WorkspaceOptions | None,
     settings: Settings,
     is_admin: bool,
+    password_hash: str | None = None,
 ) -> tuple[User, Workspace | None]:
-    """Create a user and, when ``options`` is given, a workspace they own."""
+    """Create a user and, when ``options`` is given, a workspace they own.
+
+    ``password_hash`` lets the caller hash outside the transaction; the policy is checked here
+    either way.
+    """
     clean_display_name = _clean_name(
         display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
     )
     normalized_email = normalize_email(email)
-    password_hash = hash_password(password, normalized_email, clean_display_name)
+    validate_password(password, normalized_email, clean_display_name)
+    password_hash = password_hash or argon2_hash(password)
     user = User(
         email=normalized_email,
         display_name=clean_display_name,
@@ -792,6 +1235,7 @@ def create_initial_admin(
     workspace_locale: str | None = None,
     host: str | None = None,
     user_agent: str | None = None,
+    password_hash: str | None = None,
 ) -> tuple[User, Workspace]:
     """First-run setup: admin + workspace + owner membership in the caller's transaction."""
     options = _workspace_options(
@@ -801,7 +1245,7 @@ def create_initial_admin(
         timezone=timezone,
         workspace_locale=workspace_locale,
     )
-    if not _claim_setup(session, clock) or session.scalar(select(User.id).limit(1)) is not None:
+    if not _claim_setup(session, clock):
         raise SetupAlreadyCompleted
     user, workspace = _create_user_records(
         session,
@@ -812,6 +1256,7 @@ def create_initial_admin(
         options=options,
         settings=settings,
         is_admin=True,
+        password_hash=password_hash,
     )
     if workspace is None:
         raise RuntimeError("Initial setup must create a workspace")
@@ -828,6 +1273,108 @@ def create_initial_admin(
     )
     session.flush()
     return user, workspace
+
+
+def run_initial_setup(
+    factory: sessionmaker[Session],
+    *,
+    email: str,
+    display_name: str,
+    password: str,
+    workspace_name: str,
+    settings: Settings,
+    clock: Clock,
+    base_currency: str | None = None,
+    country_code: str | None = None,
+    timezone: str | None = None,
+    workspace_locale: str | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
+    hasher: Hasher | None = None,
+) -> tuple[User, Workspace]:
+    """First-run setup in its own ``BEGIN IMMEDIATE`` transaction, hashing beforehand.
+
+    Exactly one concurrent caller wins; every loser gets ``SetupAlreadyCompleted``, including
+    one that gave up waiting for SQLite's write lock ("database is locked").
+    """
+    with factory() as session:
+        if not setup_is_open(session):
+            raise SetupAlreadyCompleted
+    clean_display_name = _clean_name(
+        display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
+    )
+    normalized_email = normalize_email(email)
+    validate_password(password, normalized_email, clean_display_name)
+    _workspace_options(
+        settings,
+        base_currency=base_currency,
+        country_code=country_code,
+        timezone=timezone,
+        workspace_locale=workspace_locale,
+    )
+    password_hash = (hasher or argon2_hash)(password)
+    try:
+        return run_immediate(
+            factory,
+            lambda session: create_initial_admin(
+                session,
+                email=normalized_email,
+                display_name=clean_display_name,
+                password=password,
+                workspace_name=workspace_name,
+                settings=settings,
+                clock=clock,
+                base_currency=base_currency,
+                country_code=country_code,
+                timezone=timezone,
+                workspace_locale=workspace_locale,
+                host=host,
+                user_agent=user_agent,
+                password_hash=password_hash,
+            ),
+        )
+    except OperationalError as exc:
+        if is_database_locked(exc):
+            raise SetupAlreadyCompleted from exc
+        raise
+
+
+async def run_initial_setup_async(
+    factory: sessionmaker[Session],
+    gate: HashGate,
+    *,
+    email: str,
+    display_name: str,
+    password: str,
+    workspace_name: str,
+    settings: Settings,
+    clock: Clock,
+    base_currency: str | None = None,
+    country_code: str | None = None,
+    timezone: str | None = None,
+    workspace_locale: str | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[User, Workspace]:
+    hasher = _gate_hasher(gate)
+    return await anyio.to_thread.run_sync(
+        lambda: run_initial_setup(
+            factory,
+            email=email,
+            display_name=display_name,
+            password=password,
+            workspace_name=workspace_name,
+            settings=settings,
+            clock=clock,
+            base_currency=base_currency,
+            country_code=country_code,
+            timezone=timezone,
+            workspace_locale=workspace_locale,
+            host=host,
+            user_agent=user_agent,
+            hasher=hasher,
+        )
+    )
 
 
 def create_admin_cli(
@@ -906,7 +1453,7 @@ def register_user(
     outcome discloses whether an email is already registered (see ``RegistrationOutcome``).
     The caller commits whatever the outcome.
     """
-    if not settings.allow_registration:
+    if not settings.allow_registration or setup_is_open(session):
         raise RegistrationDisabled
     now = clock.now()
     key = _ip_key(host)

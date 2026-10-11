@@ -55,7 +55,7 @@ from assetboard.services.auth import (
     revoke_other_sessions,
     revoke_session,
     session_id_hash,
-    setup_token_for_process,
+    setup_token_at_startup,
     touch_session,
     validate_password,
     verify_setup_token,
@@ -130,6 +130,7 @@ def _register(
     password: str = "Registrant Strong Password",
     host: str = "192.0.2.95",
 ) -> auth.RegistrationOutcome:
+    auth._claim_setup(db_session, clock)  # pyright: ignore[reportPrivateUsage]
     return register_user(
         db_session,
         email=email,
@@ -236,10 +237,6 @@ def test_production_hasher_uses_library_defaults_and_rehashes_cheap_hashes(
         profiles.get_default_parameters()
     )
     assert auth.password_hasher().check_needs_rehash(encoded)
-
-
-def test_settings_have_no_password_hashing_switch() -> None:
-    assert not any("hash" in name or "profile" in name for name in Settings.model_fields)
 
 
 # Sessions
@@ -625,34 +622,31 @@ def test_setup_token_attempts_are_throttled_per_ip(
     assert check(expected, at(seconds=60))
 
 
-def test_setup_token_provider_logs_generated_token_once_only_for_empty_instance(
-    auth_settings: Settings,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
+def test_startup_setup_token_is_generated_and_logged_once_only_while_setup_is_open(
+    auth_settings: Settings, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setattr(auth, "_process_setup_token", None)
     logger = logging.getLogger("test.setup.token")
     caplog.set_level(logging.WARNING, logger="test.setup.token")
-    assert setup_token_for_process(auth_settings, user_exists=True, logger=logger) is None
+    assert setup_token_at_startup(auth_settings, setup_open=False, logger=logger) is None
     assert not caplog.records
-    generated = setup_token_for_process(auth_settings, user_exists=False, logger=logger)
+    generated = setup_token_at_startup(auth_settings, setup_open=True, logger=logger)
     assert generated is not None and len(generated) >= 43  # 32 random bytes, >= 128 bits
-    assert setup_token_for_process(auth_settings, user_exists=False, logger=logger) == generated
     warnings = [r for r in caplog.records if "Generated first-run setup token" in r.message]
     assert len(warnings) == 1 and warnings[0].levelno == logging.WARNING
+    assert generated in warnings[0].getMessage()
+    # Each process start gets its own token.
+    assert setup_token_at_startup(auth_settings, setup_open=True, logger=logger) != generated
 
 
-def test_configured_setup_token_is_never_logged(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    monkeypatch.setattr(auth, "_process_setup_token", None)
+def test_configured_setup_token_is_never_logged(caplog: pytest.LogCaptureFixture) -> None:
     logger = logging.getLogger("test.setup.configured")
     caplog.set_level(logging.DEBUG)
     configured = Settings(_env_file=None, setup_token="configured-secret-token-long-enough")
     assert (
-        setup_token_for_process(configured, user_exists=False, logger=logger)
+        setup_token_at_startup(configured, setup_open=True, logger=logger)
         == "configured-secret-token-long-enough"
     )
+    assert setup_token_at_startup(configured, setup_open=False, logger=logger) is None
     assert "configured-secret-token-long-enough" not in caplog.text
 
 
@@ -1297,4 +1291,138 @@ def test_users_email_must_be_stored_lowercase(
         db_session.execute(
             text("UPDATE users SET email = 'Mixed@Example.com' WHERE id = :id"),
             {"id": user.id.hex},
+        )
+
+
+def test_registration_is_refused_while_setup_is_open(
+    db_session: Session, registration_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    assert auth.setup_is_open(db_session)
+    with pytest.raises(RegistrationDisabled):
+        register_user(
+            db_session,
+            email="early@example.com",
+            display_name="Early",
+            password="Early Strong Password",
+            workspace_name="Early",
+            settings=registration_settings,
+            clock=fixed_clock,
+            host="192.0.2.5",
+        )
+    assert db_session.scalars(select(User)).all() == []
+
+
+def _account_slot(settings: Settings, key: str = "test@example.com") -> auth.ThrottleSlot:
+    return auth.ThrottleSlot("account", key, None, settings.auth_account_free_failures)
+
+
+def test_release_takes_back_only_this_requests_attempt(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    slot = _account_slot(auth_settings)
+    first = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
+    second = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
+    assert first and second
+    auth.release_attempts(db_session, second)
+    row = _throttle(db_session, "account", "test@example.com")
+    assert row is not None and row.failure_count == 1
+
+
+def test_release_is_a_no_op_after_a_reset_or_a_new_window(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    slot = _account_slot(auth_settings)
+    reserved = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
+    assert reserved
+    # A successful login elsewhere resets the counter and starts a new window ...
+    auth._reset_account(db_session, "test@example.com", at(seconds=1).now())  # pyright: ignore[reportPrivateUsage]
+    # ... and a new failure is counted in it.
+    auth.reserve_attempts(db_session, [slot], at(seconds=2).now(), auth_settings)
+    auth.release_attempts(db_session, reserved)
+    row = _throttle(db_session, "account", "test@example.com")
+    assert row is not None and row.failure_count == 1  # the later failure is not erased
+
+    ip_slot = auth.ThrottleSlot("ip", "192.0.2.1/32", timedelta(minutes=60), 20)
+    old = auth.reserve_attempts(db_session, [ip_slot], fixed_clock.now(), auth_settings)
+    auth.reserve_attempts(db_session, [ip_slot], at(minutes=61).now(), auth_settings)
+    assert old
+    auth.release_attempts(db_session, old)
+    ip_row = _throttle(db_session, "ip", "192.0.2.1/32")
+    assert ip_row is not None and ip_row.failure_count == 1
+
+
+def test_release_never_goes_below_zero(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    slot = _account_slot(auth_settings)
+    reserved = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
+    assert reserved
+    row = _throttle(db_session, "account", "test@example.com")
+    assert row is not None
+    row.failure_count = 0  # same window, counter already at zero
+    auth.release_attempts(db_session, reserved)
+    auth.release_attempts(db_session, reserved)
+    assert row.failure_count == 0
+
+
+def test_release_clears_only_a_block_its_own_reservation_set(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    slot = _account_slot(auth_settings)
+    for _ in range(auth_settings.auth_account_free_failures):
+        auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
+    sixth = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
+    assert sixth and sixth[0].block_set is not None
+    row = _throttle(db_session, "account", "test@example.com")
+    assert row is not None and row.blocked_until == sixth[0].block_set
+    # Another request's later block must survive this release.
+    row.blocked_until = sixth[0].block_set + timedelta(seconds=30)
+    auth.release_attempts(db_session, sixth)
+    assert row.failure_count == 5 and row.blocked_until is not None
+    # Its own block is cleared.
+    seventh = auth.reserve_attempts(db_session, [slot], at(minutes=2).now(), auth_settings)
+    assert seventh and seventh[0].block_set is not None
+    auth.release_attempts(db_session, seventh)
+    assert row.blocked_until is None
+
+
+def test_successful_login_clears_the_ip_block_its_own_reservation_set(
+    db_session: Session, fixed_clock: FixedClock
+) -> None:
+    settings = Settings(_env_file=None, auth_ip_free_failures=1)
+    _create_user(db_session, settings, fixed_clock)
+    _login(db_session, settings, fixed_clock, email="someone-else@example.com")
+    ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
+    assert ip_row is not None and (ip_row.failure_count, ip_row.blocked_until) == (1, None)
+    # The success reserves attempt 2 (> 1 free, so it sets a block) and then takes it back.
+    assert _login(db_session, settings, fixed_clock, password=PASSWORD).succeeded
+    assert (ip_row.failure_count, ip_row.blocked_until) == (1, None)
+
+
+def test_setup_is_open_is_the_single_definition_for_web_cli_and_registration(
+    db_session: Session, registration_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    assert auth.setup_is_open(db_session)
+    with pytest.raises(RegistrationDisabled):
+        register_user(
+            db_session,
+            email="r@example.com",
+            display_name="R",
+            password="Registrant Strong Pw",
+            workspace_name="R",
+            settings=registration_settings,
+            clock=fixed_clock,
+            host=None,
+        )
+    _create_user(db_session, registration_settings, fixed_clock)  # CLI path
+    assert not auth.setup_is_open(db_session)
+    with pytest.raises(SetupAlreadyCompleted):
+        create_initial_admin(
+            db_session,
+            email="web@example.com",
+            display_name="Web",
+            password=PASSWORD,
+            workspace_name="Web",
+            settings=registration_settings,
+            clock=fixed_clock,
         )

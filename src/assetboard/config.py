@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     setup_throttle_free_failures: int = Field(default=5, ge=1)
     registration_ip_limit: int = Field(default=5, ge=1)
     registration_window_minutes: int = Field(default=60, ge=1, le=1440)
+    auth_max_concurrent_hashes: int = Field(default=2, ge=1, le=8)
 
     def __init__(self, *, _env_file: str | Path | None = ".env", **values: Any) -> None:
         super().__init__(_env_file=_env_file, **values)

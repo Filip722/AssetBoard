@@ -46,6 +46,7 @@ def isolate_application_data_dir(
         "SETUP_THROTTLE_FREE_FAILURES",
         "REGISTRATION_IP_LIMIT",
         "REGISTRATION_WINDOW_MINUTES",
+        "AUTH_MAX_CONCURRENT_HASHES",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}_{name}", raising=False)
 

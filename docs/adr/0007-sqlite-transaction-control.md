@@ -1,7 +1,7 @@
 # ADR-0007: SQLite transaction control
 
 **Status:** Accepted
-**Date:** 2026-10-10
+**Date:** 2026-10-10 (amended 2026-10-11)
 
 ## Context
 
@@ -16,3 +16,23 @@ Disable sqlite3's implicit transaction management on connect by setting `isolati
 ## Consequences
 
 Schema changes and nested transactions use consistent SQLAlchemy transaction boundaries. The engine owns transaction starts, so all SQLite connections must be created through `create_database_engine`.
+
+## Amendment (2026-10-11): opt-in `BEGIN IMMEDIATE` per transaction
+
+**Context.** Authentication needs a few short transactions where a read decides a write:
+claiming first-run setup, and reserving a login or password-change attempt against the throttle
+before the password is verified. In a deferred transaction, two connections can both read,
+then the second one's upgrade to a write fails immediately with `SQLITE_BUSY` (the busy timeout
+does not apply to that upgrade), or both see a stale value.
+
+**Decision.** The default stays a deferred `BEGIN`. A transaction can opt in to
+`BEGIN IMMEDIATE` through the `assetboard_begin_immediate` execution option, which the engine's
+`begin` hook reads. Code uses it only through `assetboard.db.engine.immediate_transaction` (or
+`run_immediate`), and only for short write transactions that do no slow work (no password
+hashing) while holding the lock. Savepoints (`begin_nested`) work inside it. Other dialects
+ignore the option.
+
+**Consequences.** Concurrent writers queue at `BEGIN` for up to the busy timeout, so these
+transactions are serialised without retry logic. When the timeout is exceeded, SQLite raises
+"database is locked"; callers map that to the same response as losing the race (for example
+`SetupAlreadyCompleted`). Ordinary read transactions still do not reserve the writer slot.

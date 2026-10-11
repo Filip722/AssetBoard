@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import logging
 import re
 from importlib.metadata import version
 from pathlib import Path
@@ -12,8 +14,10 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from assetboard.app import create_app
+from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.migrate import alembic_config
+from assetboard.services.auth import derive_subkey, run_initial_setup
 
 
 def test_app_factory_ensures_secret_key_after_setup() -> None:
@@ -258,3 +262,113 @@ def test_static_and_home_urls_include_root_path() -> None:
     assert 'href="/x/static/css/app.css?v=' in response.text
     assert missing.status_code == 404
     assert 'href="/x/"' in missing.text
+
+
+def _capture_app_log(app: object) -> tuple[logging.Logger, io.StringIO, logging.Handler]:
+    logger: logging.Logger = app.state.logger  # type: ignore[attr-defined]
+    output = io.StringIO()
+    handler = logging.StreamHandler(output)
+    handler.setLevel(logging.WARNING)
+    logger.addHandler(handler)
+    return logger, output, handler
+
+
+def test_setup_token_is_generated_and_logged_once_at_startup_while_setup_is_open(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    app = create_app(settings)
+    logger, output, handler = _capture_app_log(app)
+    try:
+        assert app.state.setup_token is None
+        with TestClient(app):
+            # Before any request has been made.
+            token = app.state.setup_token
+            assert token is not None and len(token) >= 43
+            assert output.getvalue().count("Generated first-run setup token") == 1
+            assert token in output.getvalue()
+    finally:
+        logger.removeHandler(handler)
+
+    restarted = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    logger, output, handler = _capture_app_log(restarted)
+    try:
+        with TestClient(restarted):
+            assert restarted.state.setup_token not in (None, token)
+            assert output.getvalue().count("Generated first-run setup token") == 1
+            run_initial_setup(
+                restarted.state.session_factory,
+                email="admin@example.com",
+                display_name="Admin",
+                password="Correct Horse Battery!",
+                workspace_name="Home",
+                settings=settings,
+                clock=Clock(),
+            )
+    finally:
+        logger.removeHandler(handler)
+
+    closed = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    logger, output, handler = _capture_app_log(closed)
+    try:
+        with TestClient(closed):
+            assert closed.state.setup_token is None
+            assert "setup token" not in output.getvalue()
+    finally:
+        logger.removeHandler(handler)
+
+
+def test_configured_setup_token_is_used_at_startup_and_never_logged(tmp_path: Path) -> None:
+    configured = "operator-configured-setup-token"
+    app = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="s", setup_token=configured)
+    )
+    logger, output, handler = _capture_app_log(app)
+    logger.setLevel(logging.DEBUG)
+    handler.setLevel(logging.DEBUG)
+    try:
+        with TestClient(app):
+            assert app.state.setup_token == configured
+    finally:
+        logger.removeHandler(handler)
+    assert configured not in output.getvalue()
+
+
+def test_csrf_key_is_a_subkey_of_the_persisted_secret_and_survives_restart(
+    tmp_path: Path,
+) -> None:
+    def csrf_key() -> bytes:
+        app = create_app(Settings(_env_file=None, data_dir=tmp_path), database_checker=lambda: True)
+        app.state.database_engine.dispose()
+        return app.state.csrf_key
+
+    first = csrf_key()
+    secret = (tmp_path / "secret_key").read_text(encoding="utf-8")
+    assert first == derive_subkey(secret, "csrf")
+    assert secret.encode() not in first
+    assert csrf_key() == first  # restart: same key file, same subkey
+
+    (tmp_path / "secret_key").unlink()
+    assert csrf_key() != first  # lost key file: outstanding tokens stop verifying
+
+    explicit = create_app(
+        Settings(_env_file=None, data_dir=tmp_path, secret_key="operator-secret"),
+        database_checker=lambda: True,
+    )
+    explicit.state.database_engine.dispose()
+    assert explicit.state.csrf_key == derive_subkey("operator-secret", "csrf")
+
+
+def test_dummy_hash_is_computed_once_at_startup_before_any_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from assetboard.services import auth
+
+    monkeypatch.setattr(auth, "_cached_dummy_hashes", {})
+    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    with TestClient(app):
+        cached = dict(auth._cached_dummy_hashes)  # pyright: ignore[reportPrivateUsage]
+        assert len(cached) == 1
+        assert next(iter(cached.values())).startswith("$argon2id$")
+        auth.prepare_dummy_hash()  # later callers reuse it
+        assert auth._cached_dummy_hashes == cached  # pyright: ignore[reportPrivateUsage]
