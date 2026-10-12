@@ -58,6 +58,82 @@ msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
+msgid "Same as the system"
+msgstr "Jak w systemie"
+
+msgid "Light"
+msgstr "Jasny"
+
+msgid "Dark"
+msgstr "Ciemny"
+
+msgid ""
+"Enter a display name of 1 to 120 characters, without control or invisible"
+" characters."
+msgstr ""
+"Podaj wyświetlaną nazwę o długości od 1 do 120 znaków, bez znaków "
+"sterujących i niewidocznych."
+
+msgid "Choose one of the listed languages."
+msgstr "Wybierz jeden z języków z listy."
+
+msgid "Choose one of the listed themes."
+msgstr "Wybierz jeden z motywów z listy."
+
+#, python-format
+msgid ""
+"Your account is already linked to %(provider)s. Remove that link first to"
+" link a different %(provider)s account."
+msgstr ""
+"Twoje konto jest już powiązane z %(provider)s. Najpierw usuń to "
+"powiązanie, aby powiązać inne konto %(provider)s."
+
+msgid ""
+"Your account is already linked to a proxy user. Remove that link first to"
+" link a different one."
+msgstr ""
+"Twoje konto jest już powiązane z użytkownikiem serwera proxy. Najpierw "
+"usuń to powiązanie, aby powiązać innego."
+
+msgid "The sign-in method is linked to your account."
+msgstr "Metoda logowania została powiązana z Twoim kontem."
+
+msgid "This sign-in is already linked to your account."
+msgstr "To logowanie jest już powiązane z Twoim kontem."
+
+msgid ""
+"Linking failed. Try again; if it keeps failing, contact your "
+"administrator."
+msgstr ""
+"Powiązanie nie powiodło się. Spróbuj ponownie, a jeśli problem się "
+"powtarza, skontaktuj się z administratorem."
+
+#, python-format
+msgid "Linking failed: it was cancelled at %(provider)s."
+msgstr "Powiązanie nie powiodło się: anulowano je w %(provider)s."
+
+#, python-format
+msgid "Linking failed: %(provider)s cannot be reached right now."
+msgstr "Powiązanie nie powiodło się: nie można teraz połączyć się z %(provider)s."
+
+msgid "Linking failed: the server is busy. Try again in a moment."
+msgstr ""
+"Powiązanie nie powiodło się: serwer jest zajęty. Spróbuj ponownie za "
+"chwilę."
+
+msgid ""
+"This is your last way to sign in, so it cannot be removed. Link another "
+"sign-in method or set a password first."
+msgstr ""
+"To Twój ostatni sposób logowania, więc nie można go usunąć. Najpierw "
+"powiąż inną metodę logowania albo ustaw hasło."
+
+msgid "Browser language"
+msgstr "Język przeglądarki"
+
+msgid "The sign-in method was removed from your account."
+msgstr "Metoda logowania została usunięta z Twojego konta."
+
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
 
@@ -72,9 +148,6 @@ msgstr "To hasło jest zbyt popularne. Wybierz inne."
 
 msgid "The password must differ from your email name and your display name."
 msgstr "Hasło musi się różnić od nazwy w adresie e-mail i od wyświetlanej nazwy."
-
-msgid "Enter a display name of 1 to 120 characters."
-msgstr "Podaj wyświetlaną nazwę o długości od 1 do 120 znaków."
 
 msgid "Enter a workspace name of 1 to 120 characters."
 msgstr "Podaj nazwę obszaru roboczego o długości od 1 do 120 znaków."
@@ -134,6 +207,23 @@ msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 #, python-format
 msgid "Other sessions signed out: %(count)d."
 msgstr "Wylogowane inne sesje: %(count)d."
+
+msgid ""
+"The password is not correct, or there were too many attempts. Try again "
+"later."
+msgstr ""
+"Hasło jest nieprawidłowe albo było zbyt wiele prób. Spróbuj ponownie "
+"później."
+
+msgid "The server is busy. Try again in a moment."
+msgstr "Serwer jest zajęty. Spróbuj ponownie za chwilę."
+
+msgid ""
+"Sign in again to confirm this change: without a password, it needs a "
+"sign-in from the last 10 minutes."
+msgstr ""
+"Zaloguj się ponownie, aby potwierdzić tę zmianę: bez hasła wymaga ona "
+"logowania z ostatnich 10 minut."
 
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
@@ -231,8 +321,10 @@ msgstr ""
 
 msgid ""
 "An account with this email address already exists. Sign in with your "
-"password."
-msgstr "Konto z tym adresem e-mail już istnieje. Zaloguj się hasłem."
+"password, then link it from your profile."
+msgstr ""
+"Konto z tym adresem e-mail już istnieje. Zaloguj się hasłem, a potem "
+"powiąż je w swoim profilu."
 
 #, python-format
 msgid ""
@@ -369,6 +461,9 @@ msgstr "Ustawienia obszaru roboczego"
 msgid "Members"
 msgstr "Członkowie"
 
+msgid "Profile"
+msgstr "Profil"
+
 msgid "Account security"
 msgstr "Bezpieczeństwo konta"
 
@@ -436,6 +531,84 @@ msgstr ""
 "Twój plan miesięczny i aktywność pojawią się tutaj, gdy dodasz pierwsze "
 "pozycje."
 
+msgid "Link a sign-in method"
+msgstr "Powiąż metodę logowania"
+
+#, python-format
+msgid "Continuing to %(provider)s to link it to your account…"
+msgstr "Przechodzę do %(provider)s, aby powiązać go z Twoim kontem…"
+
+#, python-format
+msgid "Continue to %(provider)s"
+msgstr "Przejdź do dostawcy %(provider)s"
+
+msgid "Your details"
+msgstr "Twoje dane"
+
+msgid "Display name"
+msgstr "Wyświetlana nazwa"
+
+msgid "Language"
+msgstr "Język"
+
+msgid "Theme"
+msgstr "Motyw"
+
+msgid "Save"
+msgstr "Zapisz"
+
+msgid "The dark-mode button changes the theme on one device only."
+msgstr "Przycisk trybu ciemnego zmienia motyw tylko na jednym urządzeniu."
+
+msgid "Use the saved theme on this device"
+msgstr "Użyj zapisanego motywu na tym urządzeniu"
+
+msgid "Password and devices"
+msgstr "Hasło i urządzenia"
+
+msgid "Change your password or sign out other devices."
+msgstr "Zmień hasło albo wyloguj inne urządzenia."
+
+msgid "This account has no password. You can still sign out other devices."
+msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
+
+msgid "Sign-in methods"
+msgstr "Metody logowania"
+
+#, python-format
+msgid "Reverse proxy: %(user)s"
+msgstr "Serwer proxy: %(user)s"
+
+#, python-format
+msgid "Earlier identity provider (%(host)s)"
+msgstr "Wcześniejszy dostawca tożsamości (%(host)s)"
+
+#, python-format
+msgid "Linked on %(date)s"
+msgstr "Powiązano %(date)s"
+
+msgid "not usable with the current settings"
+msgstr "nie działa przy obecnych ustawieniach"
+
+msgid "Remove"
+msgstr "Usuń"
+
+msgid "No identity provider or proxy sign-in is linked to this account."
+msgstr ""
+"Z tym kontem nie jest powiązany żaden dostawca tożsamości ani logowanie "
+"przez proxy."
+
+#, python-format
+msgid "Link %(provider)s"
+msgstr "Powiąż %(provider)s"
+
+#, python-format
+msgid "Your proxy signs you in as %(user)s."
+msgstr "Serwer proxy loguje Cię jako %(user)s."
+
+msgid "Link this proxy sign-in"
+msgstr "Powiąż to logowanie przez proxy"
+
 msgid "Link your account"
 msgstr "Połącz swoje konto"
 
@@ -500,10 +673,6 @@ msgstr ""
 "Wylogowano Cię z tej aplikacji. Trwa wylogowywanie także u dostawcy "
 "%(provider)s…"
 
-#, python-format
-msgid "Continue to %(provider)s"
-msgstr "Przejdź do dostawcy %(provider)s"
-
 msgid "Change password"
 msgstr "Zmień hasło"
 
@@ -527,9 +696,6 @@ msgstr "Wyloguj się wszędzie poza tym urządzeniem."
 
 msgid "Sign out other devices"
 msgstr "Wyloguj inne urządzenia"
-
-msgid "Display name"
-msgstr "Wyświetlana nazwa"
 
 msgid "Workspace name"
 msgstr "Nazwa obszaru roboczego"
@@ -573,9 +739,6 @@ msgstr "Nie ustawiono"
 msgid "Time zone"
 msgstr "Strefa czasowa"
 
-msgid "Language"
-msgstr "Język"
-
 msgid "Create administrator"
 msgstr "Utwórz administratora"
 
@@ -608,6 +771,22 @@ msgstr "Zaloguj się, aby przyjąć"
 msgid "Create account and join"
 msgstr "Utwórz konto i dołącz"
 
+msgid "Your password"
+msgstr "Twoje hasło"
+
+#, python-format
+msgid "Confirmed by your recent sign-in for %(minutes)d more minutes."
+msgstr "Potwierdzone niedawnym logowaniem jeszcze przez %(minutes)d min."
+
+msgid ""
+"To make this change, sign out and sign in again (with your identity "
+"provider, or by opening any page through your proxy). You then have 10 "
+"minutes."
+msgstr ""
+"Aby wprowadzić tę zmianę, wyloguj się i zaloguj ponownie (przez dostawcę "
+"tożsamości albo otwierając dowolną stronę przez serwer proxy). Potem masz"
+" na to 10 minut."
+
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
 
@@ -623,9 +802,6 @@ msgstr "Zmień rolę"
 #, python-format
 msgid "Remove %(name)s from this workspace?"
 msgstr "Usunąć użytkownika %(name)s z tego obszaru roboczego?"
-
-msgid "Remove"
-msgstr "Usuń"
 
 msgid "Invitations"
 msgstr "Zaproszenia"
@@ -706,4 +882,7 @@ msgstr ""
 
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
+
+#~ msgid "Enter a display name of at most 120 characters."
+#~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
 

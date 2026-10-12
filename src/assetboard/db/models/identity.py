@@ -39,7 +39,8 @@ class User(IdMixin, TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     password_hash: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
+    # The language the user chose in the profile; NULL follows the browser (F1.5).
+    locale: Mapped[str | None] = mapped_column(String(8), nullable=True, default=None)
     theme: Mapped[str] = mapped_column(String(16), nullable=False, default="system")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

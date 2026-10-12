@@ -1,5 +1,8 @@
 <!doctype html>
-<html lang="{{ locale }}" class="h-full">
+{# The saved profile theme is the server-rendered default; theme.js (in <head>, before the body
+   paints) applies this device's toggle override, if any. #}
+{% set saved_theme = web_session.theme if web_session else "system" %}
+<html lang="{{ locale }}" class="h-full{% if saved_theme == 'dark' %} dark{% endif %}"{% if saved_theme != 'system' %} data-theme="{{ saved_theme }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -48,6 +51,7 @@
             <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Workspace settings") }}</a>
             <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Members") }}</a>
             {% endif %}
+            <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Profile") }}</a>
             <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Account security") }}</a>
             {% if web_session %}
             <form method="post" action="{{ scoped_url(request, 'logout') }}">

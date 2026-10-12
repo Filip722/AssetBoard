@@ -215,6 +215,10 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
 
 **Acceptance**
 - Profile page: display name, locale, theme, password (if local), linked identities (unlink if another login method remains).
+  Locale: "Browser language" (stored as NULL, the default for every account) follows
+  Accept-Language; a saved language wins over it. Sensitive actions (link, unlink, sign out
+  everywhere) are confirmed with the password, or without one by a sign-in from the last
+  10 minutes (ADR-0012 amendment).
 - Instance admin page: users list, activate/deactivate, promote/demote instance admin, create user with temporary password.
 - Audit log page (owner/instance admin): filterable list of `AuditEvent`s; auth and membership events appear.
 - Deactivated users cannot log in and their sessions are revoked.

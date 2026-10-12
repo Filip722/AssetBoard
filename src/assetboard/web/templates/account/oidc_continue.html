@@ -1,0 +1,11 @@
+{% extends "auth_base.html" %}
+{# Continues to the provider to link an identity (F1.5). A page, not a redirect: CSP
+   form-action applies to redirects that follow a form POST (ADR-0014). #}
+{% block referrer %}no-referrer{% endblock %}
+{% block title %}{{ _("Link a sign-in method") }} · {{ app_name }}{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="0; url={{ authorization_url }}">{% endblock %}
+{% block heading %}{{ _("Link a sign-in method") }}{% endblock %}
+{% block content %}
+<p class="mt-4 text-sm text-muted dark:text-slate-300">{{ _("Continuing to %(provider)s to link it to your account…", provider=provider) }}</p>
+<p class="mt-6 text-center text-sm"><a class="font-semibold text-accent" href="{{ authorization_url }}" rel="noreferrer" data-provider-link>{{ _("Continue to %(provider)s", provider=provider) }}</a></p>
+{% endblock %}

@@ -19,6 +19,7 @@ from assetboard.branding import CLI_NAME
 from assetboard.middleware import PEER_SCOPE_KEY
 from assetboard.services import csrf
 from assetboard.services.auth import WebSession, client_ip_prefix
+from assetboard.services.external_identity import SignInIdentity
 from assetboard.services.proxy_auth import (
     ProxyHeaders,
     identity_header_names,
@@ -159,11 +160,17 @@ class ProxyRequest:
     headers: ProxyHeaders | None = None
 
     @property
+    def identity(self) -> SignInIdentity | None:
+        """The identity the headers carry, only from a trusted peer with valid headers."""
+        if not self.trusted or self.headers is None:
+            return None
+        return self.headers.identity
+
+    @property
     def subject(self) -> str | None:
         """The proxy user name, only from a trusted peer with valid identity headers."""
-        if self.headers is None or self.headers.identity is None:
-            return None
-        return self.headers.identity.subject
+        identity = self.identity
+        return identity.subject if identity is not None else None
 
 
 def proxy_request(request: Request) -> ProxyRequest | None:

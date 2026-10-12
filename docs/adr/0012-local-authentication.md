@@ -117,3 +117,30 @@ ADR-0015 adds reverse-proxy header authentication. For local authentication this
   from `ASSETBOARD_TRUSTED_PROXIES` with uvicorn's own `ProxyHeadersMiddleware`. The client
   address used for throttling (`request.client.host`) is unchanged.
 - **Sessions record how they started** (`auth_method`: `password`, `oidc` or `proxy`).
+
+## Amendment (2026-10-13): profile and sensitive actions (F1.5)
+
+- **One confirmation entry point.** Linking or unlinking a sign-in method and signing out other
+  devices are confirmed through `services.profile.confirm_sensitive`. An account with a password
+  always confirms with it, through the existing `confirm_password_with_factory` primitive
+  (login's throttle, dummy verify, audited failures), unchanged.
+- **Accounts without a password** (created through OIDC or the proxy) confirm with a fresh
+  external session instead: the current session started through OIDC or the proxy at most
+  10 minutes ago (`UserSession.created_at`, not its last activity). **This is weaker than a
+  password: whoever holds the session cookie in those 10 minutes after the sign-in can confirm.**
+  Outside that window the action is refused ("sign in again") and nothing is written. For an
+  OIDC link the window applies to **starting** it: the provider round trip may then finish up to
+  10 minutes later, the lifetime of the signed flow cookie. Successful
+  actions record how they were confirmed: `{"via": "profile", "confirmed": "password"}` or
+  `"fresh_session"`.
+- **Never without a way to sign in.** Unlinking checks, in the same `BEGIN IMMEDIATE`
+  transaction as the delete, that a usable method remains: a password that today's settings
+  allow (not under `OIDC_ONLY`, unless the user is an administrator and
+  `ALLOW_LOCAL_ADMIN_LOGIN` is on), an identity of the configured OIDC issuer, or a proxy
+  identity while proxy authentication is on. Unlinking an OIDC identity ends the user's other
+  OIDC sessions; proxy sessions end through the proxy binding (ADR-0015).
+- **Language.** `users.locale` is nullable: NULL follows `Accept-Language`, a saved language
+  wins over it (there is no per-device language cookie). New accounts start with NULL.
+- **Migrations on SQLite** run with foreign-key enforcement off and check `PRAGMA
+  foreign_key_check` before committing, so rebuilding a referenced table (batch mode) cannot
+  cascade-delete the rows that point at it.

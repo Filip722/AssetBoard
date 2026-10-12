@@ -20,10 +20,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.engine import is_database_locked, run_immediate
+from assetboard.db.models.identity import User, UserSession
 from assetboard.i18n import gettext
 from assetboard.services.auth import MAX_PASSWORD_LENGTH, session_id_hash
 from assetboard.services.context import select_workspace
@@ -35,7 +37,9 @@ from assetboard.services.oidc_accounts import (
     sign_in_external,
 )
 from assetboard.services.oidc_flow import FlowState, PendingLink
+from assetboard.services.profile import link_identity_to_user
 from assetboard.web.auth_routes import signed_in_redirect
+from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.invite_routes import (
     BUSY,
     EMAIL_MISMATCH,
@@ -58,7 +62,6 @@ from assetboard.web.security import (
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 FormStr = Annotated[str, Form()]
-RETRY_AFTER_SECONDS = "5"
 
 
 def _(message: str) -> str:
@@ -94,8 +97,10 @@ FAILURES: dict[str, tuple[int, str]] = {
     ),
     "account_exists": (
         409,
-        # F1.5 adds "then link it from your profile" once that page exists.
-        _("An account with this email address already exists. Sign in with your password."),
+        _(
+            "An account with this email address already exists. Sign in with your password, "
+            "then link it from your profile."
+        ),
     ),
     "email_unverified": (
         403,
@@ -155,7 +160,7 @@ def _failed(request: Request, reason: str) -> Response:
     return response
 
 
-async def _audit(request: Request, reason: str) -> None:
+async def _audit(request: Request, reason: str, *, via: str | None = None) -> None:
     """Best effort: a busy database must not turn a refused sign-in into an error."""
     state = _state(request)
     try:
@@ -166,6 +171,7 @@ async def _audit(request: Request, reason: str) -> None:
                 clock=state.clock,
                 host=client_host(request),
                 user_agent=_user_agent(request),
+                via=via,
             )
         )
     except OperationalError as exc:
@@ -230,6 +236,9 @@ async def oidc_callback(request: Request) -> Response:
         _log(request, "flow_replayed")
         return _failed(request, "start_over")
     params = dict(request.query_params.items())
+    if flow.link_user is not None:
+        # Linking from the profile (F1.5): never a sign-in, so no login event and no rotation.
+        return await _finish_link(request, client, flow, params)
     try:
         identity = await run_in_threadpool(
             lambda: client.complete(
@@ -355,8 +364,84 @@ async def oidc_failed(request: Request, reason: str) -> Response:
         status_code=status,
     )
     if status == 503:
-        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
     return response
+
+
+# Linking from the profile (F1.5)
+
+# Outcome codes for ``/account?link=…``: an allowlist, never free text.
+LINK_CODES = frozenset(
+    {"linked", "already_linked", "one_per_provider", "failed", "cancelled", "unavailable", "busy"}
+)
+
+
+def _link_result(request: Request, code: str) -> Response:
+    response = RedirectResponse(f"/account?link={code}", status_code=303)
+    settings = _state(request).settings
+    clear_cookie(response, settings, oidc_flow_cookie_name(settings))
+    return response
+
+
+async def _finish_link(
+    request: Request, client: OidcClient, flow: FlowState, params: dict[str, str]
+) -> Response:
+    state = _state(request)
+    current = web_session(request)
+    if (
+        current is None
+        or current.user_id != flow.link_user
+        or current.session_hash != flow.link_session
+    ):
+        # Another browser session (or none) than the one that confirmed: link nothing.
+        _log(request, "link_session_mismatch")
+        return _link_result(request, "failed")
+    try:
+        identity = await run_in_threadpool(
+            lambda: client.complete(
+                params, state=flow.state, nonce=flow.nonce, code_verifier=flow.code_verifier
+            )
+        )
+    except OidcError as error:
+        _log(request, error.reason, error.detail)
+        if error.auditable:
+            await _audit(request, error.reason, via="profile")
+        code = {
+            "access_denied": "cancelled",
+            "provider_unreachable": "unavailable",
+            "discovery_failed": "unavailable",
+        }.get(error.reason, "failed")
+        return _link_result(request, code)
+    user_id, session_hash = flow.link_user, flow.link_session
+    confirmed = "fresh_session" if flow.link_confirmed == "fresh_session" else "password"
+
+    def link(session: Session) -> str:
+        # Checked again under the write lock: the confirming session must still exist.
+        row = session.get(UserSession, session_hash)
+        user = session.get(User, user_id)
+        if row is None or row.user_id != user_id or user is None:
+            return "failed"
+        return link_identity_to_user(
+            session,
+            user,
+            provider=identity.issuer,
+            subject=identity.subject,
+            email=identity.email if identity.email_verified else None,
+            confirmed=confirmed,
+            clock=state.clock,
+            host=client_host(request),
+            user_agent=_user_agent(request),
+        )
+
+    try:
+        status = await run_in_threadpool(run_immediate, state.session_factory, link)
+    except OperationalError as exc:
+        if not is_database_locked(exc):
+            raise
+        return _link_result(request, "busy")
+    # "refused" (linked to someone else) is the generic failure: no oracle.
+    known = {"linked", "already_linked", "one_per_provider"}
+    return _link_result(request, status if status in known else "failed")
 
 
 # Password confirmation before linking (``/login/link``, same-origin like ``/login``). Shared
@@ -430,7 +515,7 @@ async def link_submit(request: Request, password: FormStr = "") -> Response:
         if not is_database_locked(exc):
             raise
         response = _link_page(request, pending, error=BUSY, status_code=503)
-        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
         return response
     if outcome.status != "linked" or outcome.session_id is None or outcome.expires_at is None:
         # Wrong password, throttled, linking turned off meanwhile: one message for all.

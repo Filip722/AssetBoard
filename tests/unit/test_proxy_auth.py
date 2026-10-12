@@ -33,7 +33,7 @@ from assetboard.services.proxy_auth import (
     peer_is_trusted,
     read_identity_headers,
 )
-from assetboard.web.security import proxy_peer_trusted
+from assetboard.web.security import ProxyRequest, proxy_peer_trusted
 
 
 def proxy_settings(tmp_path: Path, **overrides: Any) -> Settings:
@@ -483,3 +483,13 @@ def test_startup_is_quiet_about_trusted_proxies_without_proxy_auth(tmp_path: Pat
     with app_log() as log:
         create_app(settings)
     assert not [line for line in log.at(logging.WARNING) if "TRUSTED_PROXIES" in line]
+
+
+def test_proxy_request_identity_is_none_unless_the_peer_is_trusted(tmp_path: Path) -> None:
+    parsed = read_identity_headers(
+        headers(remote_user="ola", remote_email="ola@example.com"), proxy_settings(tmp_path)
+    )
+    assert ProxyRequest(trusted=True, headers=parsed).identity == parsed.identity
+    assert ProxyRequest(trusted=True, headers=parsed).subject == "ola"
+    untrusted = ProxyRequest(trusted=False, headers=parsed)
+    assert untrusted.identity is None and untrusted.subject is None

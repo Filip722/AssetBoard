@@ -34,6 +34,7 @@ from assetboard.services.oidc_accounts import (
     sign_in_external,
 )
 from assetboard.services.proxy_auth import hashed
+from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.invite_routes import BUSY, EMAIL_MISMATCH, EMAIL_MISMATCH_REVOKED, INVALID
 from assetboard.web.oidc_routes import finish_external_sign_in
 from assetboard.web.rendering import render_template
@@ -52,7 +53,6 @@ def _enabled(request: Request) -> None:
 
 
 router = APIRouter(dependencies=[Depends(_enabled)])
-RETRY_AFTER_SECONDS = "5"
 
 
 def _(message: str) -> str:
@@ -77,7 +77,10 @@ FAILURES: dict[str, tuple[int, str]] = {
     ),
     "account_exists": (
         409,
-        _("An account with this email address already exists. Sign in with your password."),
+        _(
+            "An account with this email address already exists. Sign in with your password, "
+            "then link it from your profile."
+        ),
     ),
     "email_unverified": (
         403,
@@ -236,5 +239,5 @@ def _failure_page(request: Request, reason: str) -> Response:
         request, "auth/proxy_failed.html", context={"message": text}, status_code=status
     )
     if status == 503:
-        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
     return response

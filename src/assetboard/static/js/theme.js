@@ -1,10 +1,18 @@
 (() => {
+  // Precedence: this device's toggle (localStorage) > the saved profile theme (data-theme on
+  // <html>, rendered by the server) > the system setting. Runs in <head>, before the body paints.
   const storageKey = "theme";
+  const root = document.documentElement;
+  const systemDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+  let preference = null;
   try {
-    const preference = localStorage.getItem(storageKey);
-    const dark = preference ? preference === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", dark);
+    preference = localStorage.getItem(storageKey);
   } catch {
-    document.documentElement.classList.toggle("dark", window.matchMedia("(prefers-color-scheme: dark)").matches);
+    // Storage unavailable: fall back to the saved theme.
   }
+  if (preference !== "dark" && preference !== "light") {
+    const saved = root.dataset.theme;
+    preference = saved === "dark" || saved === "light" ? saved : null;
+  }
+  root.classList.toggle("dark", preference ? preference === "dark" : systemDark());
 })();

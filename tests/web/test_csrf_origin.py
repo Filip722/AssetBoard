@@ -133,7 +133,9 @@ def test_htmx_requests_send_the_meta_tag_token_in_a_header(
     assert meta is not None
     meta = meta.group(1)
     ok = signed_in.post(
-        "/account/logout-others", headers={"HX-Request": "true", "X-CSRF-Token": meta}
+        "/account/logout-others",
+        data={"confirm_password": web.admin_password},  # a sensitive action since F1.5
+        headers={"HX-Request": "true", "X-CSRF-Token": meta},
     )
     assert ok.status_code == 200
     # The header wins over the form field: a bad header fails even with a good field.
@@ -155,7 +157,9 @@ def test_tokens_are_masked_differently_in_every_response(
     assert first != second
     for token in (first, second):
         response = signed_in.post(
-            "/account/logout-others", headers={"HX-Request": "true", "X-CSRF-Token": token}
+            "/account/logout-others",
+            data={"confirm_password": web.admin_password},  # a sensitive action since F1.5
+            headers={"HX-Request": "true", "X-CSRF-Token": token},
         )
         assert response.status_code == 200
     with TestClient(signed_in.app) as signed_out:

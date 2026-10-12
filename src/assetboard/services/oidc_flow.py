@@ -101,24 +101,33 @@ def _text(payload: dict[str, Any], name: str) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class FlowState:
+    """One OIDC round trip. With ``link_user`` it links the identity to that signed-in user
+    (F1.5, from the profile) instead of signing in: ``link_session`` is the session hash that
+    started it and ``link_confirmed`` how the user confirmed (``password`` or
+    ``fresh_session``)."""
+
     state: str
     nonce: str
     code_verifier: str
     next_path: str
+    link_user: UUID | None = None
+    link_session: str | None = None
+    link_confirmed: str | None = None
 
     def seal(self, key: bytes, *, now: datetime) -> str:
-        return seal(
-            key,
-            FLOW_PURPOSE,
-            {
-                "state": self.state,
-                "nonce": self.nonce,
-                "verifier": self.code_verifier,
-                "next": self.next_path,
-            },
-            now=now,
-            lifetime=FLOW_LIFETIME,
-        )
+        payload: dict[str, JsonValue] = {
+            "state": self.state,
+            "nonce": self.nonce,
+            "verifier": self.code_verifier,
+            "next": self.next_path,
+        }
+        if self.link_user is not None:
+            payload |= {
+                "link_user": str(self.link_user),
+                "link_session": self.link_session,
+                "link_confirmed": self.link_confirmed,
+            }
+        return seal(key, FLOW_PURPOSE, payload, now=now, lifetime=FLOW_LIFETIME)
 
     @classmethod
     def unseal(cls, key: bytes, value: str | None, *, now: datetime) -> FlowState | None:
@@ -129,7 +138,17 @@ class FlowState:
         verifier, next_path = _text(payload, "verifier"), _text(payload, "next")
         if not state or not nonce or not verifier or next_path is None:
             return None
-        return cls(state, nonce, verifier, next_path)
+        if "link_user" not in payload:
+            return cls(state, nonce, verifier, next_path)
+        user, session = _text(payload, "link_user"), _text(payload, "link_session")
+        confirmed = _text(payload, "link_confirmed")
+        if not user or not session or confirmed not in {"password", "fresh_session"}:
+            return None
+        try:
+            user_id = UUID(user)
+        except ValueError:
+            return None
+        return cls(state, nonce, verifier, next_path, user_id, session, confirmed)
 
 
 @dataclass(frozen=True, slots=True)

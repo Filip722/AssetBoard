@@ -12,6 +12,21 @@ document.addEventListener("click", (event) => {
     }
   }
 
+  const themeReset = target.closest("[data-theme-reset]");
+  if (themeReset) {
+    // Drop this device's override: the saved profile theme (or the system setting) applies.
+    try {
+      localStorage.removeItem("theme");
+    } catch {
+      // Nothing stored, nothing to remove.
+    }
+    const saved = document.documentElement.dataset.theme;
+    const dark =
+      saved === "dark" ||
+      (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", dark);
+  }
+
   const dismiss = target.closest("[data-toast-dismiss]");
   if (dismiss) dismiss.closest("[role='status']")?.remove();
 

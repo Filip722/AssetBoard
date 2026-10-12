@@ -493,9 +493,10 @@ def test_failure_pages_send_no_referrer_and_have_no_forms(oidc: Oidc, reason: st
     assert ("retry-after" in response.headers) is (FAILURES[reason][0] == 503)
 
 
-def test_no_failure_message_mentions_the_profile_yet() -> None:
-    # Linking from the profile arrives with F1.5, which restores that sentence.
-    assert all("profile" not in message.lower() for _status, message in FAILURES.values())
+def test_account_exists_points_to_linking_from_the_profile() -> None:
+    # F1.5 restores the sentence; every other message still says nothing about the profile.
+    for reason, (_status, message) in FAILURES.items():
+        assert ("link it from your profile" in message) == (reason == "account_exists"), reason
 
 
 def test_unknown_failure_reasons_are_404(oidc: Oidc) -> None:

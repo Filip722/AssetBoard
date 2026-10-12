@@ -11,10 +11,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.engine import is_database_locked, run_immediate
+from assetboard.db.models.identity import User
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail
 from assetboard.i18n import gettext
 from assetboard.services.auth import (
@@ -36,13 +38,16 @@ from assetboard.services.auth import (
     user_has_password,
     verify_setup_token,
 )
+from assetboard.services.profile import ConfirmMethod
 from assetboard.services.workspace_options import (
     country_names,
     currency_codes,
     locale_codes,
     timezone_names,
 )
-from assetboard.web.errors import error_response, is_htmx_fragment_request
+from assetboard.web.confirm import BUSY as CONFIRM_BUSY
+from assetboard.web.confirm import CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
+from assetboard.web.errors import BUSY_RETRY_AFTER, error_response, is_htmx_fragment_request
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     clear_csrf_cookie,
@@ -77,7 +82,9 @@ ERROR_MESSAGES = {
     "password_matches_identity": _(
         "The password must differ from your email name and your display name."
     ),
-    "invalid_display_name": _("Enter a display name of 1 to 120 characters."),
+    "invalid_display_name": _(
+        "Enter a display name of 1 to 120 characters, without control or invisible characters."
+    ),
     "invalid_workspace_name": _("Enter a workspace name of 1 to 120 characters."),
     "invalid_workspace_settings": _(
         "Choose a supported currency, country, time zone and language."
@@ -631,6 +638,7 @@ async def _password_page(
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
             "no_password": None if has_password else _t(request, NO_PASSWORD),
+            "confirm": await confirm_view(request, current),
         },
         status_code=status_code,
     )
@@ -707,25 +715,46 @@ async def password_submit(
 
 
 @router.post("/account/logout-others", name="logout_others")
-async def logout_others(request: Request) -> Response:
+async def logout_others(request: Request, confirm_password: FormStr = "") -> Response:
     current = _require_session(request)
     state = _state(request)
     session_id = request.cookies.get(session_cookie_name(state.settings)) or ""
-    revoked = await run_in_threadpool(
-        run_immediate,
-        state.session_factory,
-        lambda session: revoke_other_sessions(
+
+    def revoke(session: Session, user: User, _method: ConfirmMethod) -> int:
+        return revoke_other_sessions(
             session,
-            current.user_id,
+            user.id,
             session_id,
             clock=state.clock,
             host=client_host(request),
             user_agent=_user_agent(request),
-        ),
+        )
+
+    # Sensitive (F1.5): confirmed like every profile action.
+    outcome = await run_confirmed(
+        request, current, purpose="logout_others", password=confirm_password, action=revoke
     )
+    fragment = is_htmx_fragment_request(request)
+    if outcome.status != "confirmed" or outcome.value is None:
+        key, status = {
+            "busy": (CONFIRM_BUSY, 503),
+            "stale": (CONFIRM_STALE, 403),
+        }.get(outcome.status, (CONFIRM_FAILED, 401))
+        if fragment:
+            response = render_template(
+                request,
+                "auth/notice_fragment.html",
+                context={"notice": _t(request, key), "failed": True},
+                status_code=status,
+            )
+        else:
+            response = await _password_page(request, errors={"confirm": key}, status_code=status)
+        if status == 503:
+            response.headers["Retry-After"] = BUSY_RETRY_AFTER
+        return response
     notice = gettext("Other sessions signed out: %(count)d.", request.state.locale) % {
-        "count": revoked
+        "count": outcome.value
     }
-    if is_htmx_fragment_request(request):
+    if fragment:
         return render_template(request, "auth/notice_fragment.html", context={"notice": notice})
     return await _password_page(request, notice=notice)

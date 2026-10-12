@@ -735,7 +735,19 @@ def test_a_linked_identity_does_not_need_a_verified_email(db: WorkspaceDb, tmp_p
 
 @pytest.mark.parametrize(
     "name",
-    ["Ola\nadmin@example.com 200 OK", "\u202eOla", "\u200b\u200b", "", "   ", "\x00\x1b[31m"],
+    [
+        "Ola\nadmin@example.com 200 OK",
+        "\u202eOla",
+        "\u200b\u200b",
+        "",
+        "   ",
+        "\x00\x1b[31m",
+        "Ola\u200c\nNowak",
+        "Ola\ue000",  # private use: survives clean_text, refused by the name rule
+        "\U000f0000",
+        "\u0378",  # unassigned
+        "\u2028\u2029",
+    ],
 )
 def test_awkward_provider_names_never_break_account_creation(
     db: WorkspaceDb, tmp_path: Path, name: str
@@ -956,3 +968,35 @@ def test_a_proxy_identity_while_proxy_auth_is_off_is_a_programming_error(
 ) -> None:
     with pytest.raises(ValueError, match="proxy authentication is off"):
         sign_in(db, oidc_settings(tmp_path), proxy_identity())
+
+
+@pytest.mark.parametrize(
+    ("claims", "expected"),
+    [
+        # Cleaned: the zero-width non-joiner is dropped, the newline becomes a space.
+        ({"name": "Ola\u200c\nNowak"}, "Ola Nowak"),
+        # The name fails the rule even cleaned: the next candidate, preferred_username.
+        ({"name": "Ola\ue000", "preferred_username": "ola.n"}, "ola.n"),
+        # Nothing usable in the claims: the email's local part.
+        ({"name": "\ue000", "preferred_username": "\u0378"}, "ola"),
+    ],
+)
+def test_provider_names_fall_back_to_a_clean_form_or_the_email(
+    db: WorkspaceDb, tmp_path: Path, claims: dict[str, str], expected: str
+) -> None:
+    clock = StepClock(db.clock.now().isoformat())
+    idp = FakeIdp(clock)
+    idp.claims.update(claims)
+    settings = oidc_settings(tmp_path, oidc_auto_create=True)
+    client = OidcClient(settings, idp, clock)
+    request = client.begin()
+    who = client.complete(
+        idp.authorize(request.url),
+        state=request.state,
+        nonce=request.nonce,
+        code_verifier=request.code_verifier,
+    )
+    assert who.display_name == expected
+    outcome = sign_in(db, settings, who)
+    assert outcome.status == "signed_in" and outcome.user_id is not None
+    assert user(db, outcome.user_id).display_name == expected

@@ -26,7 +26,7 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
-from assetboard.domain.identity import InvalidEmail
+from assetboard.domain.identity import InvalidDisplayName, InvalidEmail, normalize_display_name
 from assetboard.services import auth
 from assetboard.services.auth import (
     EmailAlreadyRegistered,
@@ -1427,3 +1427,16 @@ def test_setup_is_open_is_the_single_definition_for_web_cli_and_registration(
             settings=registration_settings,
             clock=fixed_clock,
         )
+
+
+@pytest.mark.parametrize(
+    "name", ["Ola\x07", "Ola\u202eadmin", "Ola\u200b", "Ola\nAdmin", "\u2028", " ", "x" * 121]
+)
+def test_display_names_refuse_control_and_format_characters(name: str) -> None:
+    with pytest.raises(InvalidDisplayName):
+        normalize_display_name(name)
+
+
+def test_display_names_are_trimmed_and_inner_whitespace_collapsed() -> None:
+    assert normalize_display_name("  Ola   Nowak ") == "Ola Nowak"
+    assert normalize_display_name("Żaneta Łęcka") == "Żaneta Łęcka"

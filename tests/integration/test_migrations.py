@@ -296,3 +296,89 @@ def test_0006_round_trip_allows_proxy_sessions_and_drops_them_on_downgrade(
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0007_round_trip_makes_the_user_locale_nullable_and_keeps_every_row(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'f15.db'}",
+        default_locale="pl",
+    )
+    upgrade_database(settings)
+    command.downgrade(alembic_config(settings), "0006_f14")
+    engine = create_database_engine(settings.database_url or "")
+    user_id, workspace_id = "00000000000000000000000000000001", "00000000000000000000000000000002"
+    stamp = "'2026-01-01 00:00:00'"
+
+    def counts() -> dict[str, int]:
+        with engine.connect() as connection:
+            return {
+                table: connection.exec_driver_sql(f"SELECT count(*) FROM {table}").scalar_one()
+                for table in ("users", "user_sessions", "external_identities", "memberships")
+            }
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, locale, theme, is_active, "
+                f"is_instance_admin, created_at, updated_at) VALUES (?, 'a@example.com', 'A', "
+                f"'en', 'system', 1, 0, {stamp}, {stamp})",
+                (user_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                (workspace_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO memberships (id, workspace_id, user_id, role, created_at, "
+                f"updated_at) VALUES ('00000000000000000000000000000003', ?, ?, 'owner', "
+                f"{stamp}, {stamp})",
+                (workspace_id, user_id),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO user_sessions (id_hash, user_id, created_at, last_seen_at, "
+                f"expires_at, auth_method) VALUES (?, ?, {stamp}, {stamp}, "
+                "'2026-02-01 00:00:00', 'oidc')",
+                ("a" * 64, user_id),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO external_identities (id, user_id, provider, subject, created_at, "
+                f"updated_at) VALUES ('00000000000000000000000000000004', ?, 'proxy', 'a', "
+                f"{stamp}, {stamp})",
+                (user_id,),
+            )
+        before = counts()
+        assert before == {
+            "users": 1,
+            "user_sessions": 1,
+            "external_identities": 1,
+            "memberships": 1,
+        }
+
+        upgrade_database(settings)
+        # Rebuilding users must not cascade into the rows that reference it.
+        assert counts() == before
+        columns = {c["name"]: c for c in inspect(engine).get_columns("users")}
+        assert columns["locale"]["nullable"] is True
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("SELECT locale FROM users").scalar_one() is None
+            # The workspace locale is untouched.
+            assert connection.exec_driver_sql("SELECT locale FROM workspaces").scalar_one() == "en"
+
+        command.downgrade(alembic_config(settings), "0006_f14")
+        assert counts() == before
+        columns = {c["name"]: c for c in inspect(engine).get_columns("users")}
+        assert columns["locale"]["nullable"] is False
+        with engine.connect() as connection:
+            # NULL becomes DEFAULT_LOCALE on the way down.
+            assert connection.exec_driver_sql("SELECT locale FROM users").scalar_one() == "pl"
+
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()

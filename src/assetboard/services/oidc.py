@@ -39,7 +39,12 @@ from joserfc.jwk import KeySet
 from assetboard.branding import APP_NAME
 from assetboard.clock import Clock
 from assetboard.config import Settings
-from assetboard.domain.identity import InvalidEmail, normalize_email
+from assetboard.domain.identity import (
+    InvalidDisplayName,
+    InvalidEmail,
+    normalize_display_name,
+    normalize_email,
+)
 from assetboard.services.external_identity import SignInIdentity
 
 logger = logging.getLogger(f"{APP_NAME.lower()}.oidc")
@@ -632,15 +637,19 @@ def log_safe(value: str, limit: int = 200) -> str:
 
 
 def _display_name(claims: Mapping[str, Any], userinfo: Mapping[str, Any], email: str | None) -> str:
-    """Always 1 to 120 printable characters, so account creation cannot reject it."""
+    """A name account creation always accepts: the first candidate that passes
+    ``normalize_display_name`` once cleaned (name, preferred_username, the email's local part),
+    else "User". A provider's awkward claim never fails the sign-in."""
     candidates: list[object] = [
         source.get(name) for source in (claims, userinfo) for name in ("name", "preferred_username")
     ]
     if email:
         candidates.append(email.split("@", 1)[0])
     for value in candidates:
-        if isinstance(value, str):
-            cleaned = clean_text(value, 120)
-            if cleaned:
-                return cleaned
+        if not isinstance(value, str):
+            continue
+        try:
+            return normalize_display_name(clean_text(value, 120))
+        except InvalidDisplayName:
+            continue
     return "User"

@@ -416,3 +416,18 @@ def test_reset_password_gives_an_oidc_only_user_a_password(tmp_path: Path) -> No
     assert reset.exit_code == 0, reset.output
     [(_email, password_hash)] = _users(data_dir)
     assert password_hash is not None and password_hash.startswith("$argon2id$")
+
+
+def test_create_admin_leaves_the_language_to_the_browser(tmp_path: Path) -> None:
+    data_dir = tmp_path / "locale-data"
+    env = _auth_env(data_dir, DEFAULT_LOCALE="pl")
+    result = _create_admin(env, "cli@example.com", "--locale", "pl")
+    assert result.exit_code == 0, result.output
+    connection = sqlite3.connect(data_dir / "assetboard.db")
+    try:
+        user_locale = connection.execute("SELECT locale FROM users").fetchone()
+        workspace_locale = connection.execute("SELECT locale FROM workspaces").fetchone()
+    finally:
+        connection.close()
+    # The workspace keeps its locale; the account has none until the profile sets one (F1.5).
+    assert user_locale == (None,) and workspace_locale == ("pl",)

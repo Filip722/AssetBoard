@@ -108,10 +108,14 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.evaluate(
                 "document.querySelector('meta[name=\"csrf-token\"]').content = 'tampered'"
             )
+            # Signing out other devices is confirmed with the password (F1.5); the field is
+            # required, so the browser submits nothing without it.
+            page.get_by_label("Your password").fill("Correct Horse Battery!")
             page.get_by_role("button", name="Sign out other devices").click()
             csrf_toast = page.locator('#toast-container [data-toast][role="alert"]')
             expect(csrf_toast).to_contain_text("This form has expired")
             page.reload(wait_until="networkidle")
+            page.get_by_label("Your password").fill("Correct Horse Battery!")
             page.get_by_role("button", name="Sign out other devices").click()
             expect(page.locator("#sessions-status")).to_contain_text(
                 "Other sessions signed out: 0."

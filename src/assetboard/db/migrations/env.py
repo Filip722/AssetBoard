@@ -32,11 +32,39 @@ def run_migrations_online() -> None:
     engine = create_database_engine(configured_database_url(config))
     try:
         with engine.connect() as connection:
-            configure_context(connection)
-            with context.begin_transaction():
-                context.run_migrations()
+            sqlite = connection.dialect.name == "sqlite"
+            if sqlite:
+                # SQLite rebuilds a table to change a column (batch mode): with foreign keys on,
+                # dropping the old table would cascade-delete every row that references it.
+                # SQLite's documented procedure: enforcement off around the change (set outside
+                # a transaction, on the driver connection), then PRAGMA foreign_key_check before
+                # committing.
+                _driver_execute(connection, "PRAGMA foreign_keys=OFF")
+            try:
+                configure_context(connection)
+                with context.begin_transaction():
+                    context.run_migrations()
+                    if sqlite:
+                        broken = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+                        if broken:
+                            # Rows: (table, rowid, referenced table, foreign key index).
+                            pairs = sorted({f"{row[0]} -> {row[2]}" for row in broken})
+                            raise RuntimeError(
+                                f"migration left {len(broken)} broken foreign key reference(s): "
+                                + ", ".join(pairs)
+                            )
+            finally:
+                if sqlite:
+                    _driver_execute(connection, "PRAGMA foreign_keys=ON")
     finally:
         engine.dispose()
+
+
+def _driver_execute(connection: Connection, statement: str) -> None:
+    driver = connection.connection.driver_connection
+    if driver is None:
+        raise RuntimeError("no driver connection")
+    driver.execute(statement)
 
 
 def configure_context(connection: Connection) -> None:

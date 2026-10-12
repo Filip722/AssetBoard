@@ -91,3 +91,21 @@
 {% macro money(value) -%}
 <span class="tabular-nums">{{ format_money(value, locale) }}</span>
 {%- endmacro %}
+
+{# Confirmation for a sensitive account action (F1.5): the account's password, or a fresh
+   external sign-in for accounts without one. ``confirm`` is web.confirm.ConfirmView. #}
+{% macro confirm_block(confirm, suffix, label) -%}
+{% if confirm.method == "password" %}
+<div class="space-y-1.5">
+  <label for="confirm-password-{{ suffix }}" class="block text-sm font-medium text-ink dark:text-slate-200">{{ _("Your password") }}</label>
+  <input id="confirm-password-{{ suffix }}" name="confirm_password" type="password" required autocomplete="current-password" maxlength="1024"
+         class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+</div>
+<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ label }}</button>
+{% elif confirm.method == "fresh_session" %}
+<p class="text-xs text-muted dark:text-slate-400" data-confirm-fresh>{{ _("Confirmed by your recent sign-in for %(minutes)d more minutes.", minutes=confirm.minutes_left) }}</p>
+<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ label }}</button>
+{% else %}
+<p class="text-xs text-muted dark:text-slate-400" data-confirm-stale>{{ _("To make this change, sign out and sign in again (with your identity provider, or by opening any page through your proxy). You then have 10 minutes.") }}</p>
+{% endif %}
+{%- endmacro %}

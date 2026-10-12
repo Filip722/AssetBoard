@@ -38,7 +38,7 @@ class UserRef:
     id: UUID
     email: str
     display_name: str
-    locale: str
+    locale: str | None  # None: follows the browser (F1.5)
     is_instance_admin: bool
 
 

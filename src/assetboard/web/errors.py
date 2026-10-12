@@ -14,7 +14,11 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from assetboard.branding import APP_NAME
+from assetboard.services.hash_gate import RETRY_AFTER_SECONDS
 from assetboard.web.rendering import render_template
+
+# Retry-After for every "server busy" 503 (hashing limit, locked database).
+BUSY_RETRY_AFTER = str(RETRY_AFTER_SECONDS)
 
 
 def is_htmx_fragment_request(request: Request) -> bool:

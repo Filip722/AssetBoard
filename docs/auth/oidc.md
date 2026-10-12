@@ -161,8 +161,8 @@ provider, or a new realm or hostname) existing links no longer match:
   `ASSETBOARD_OIDC_LINK_BY_EMAIL=true`, the next OIDC sign-in asks for that password once.
 - **Accounts created through OIDC have no password** and are never linked by email. An
   administrator first gives them one with `assetboard reset-password <email>`; the person then
-  links the new provider with that password (or, from a later version, signs in with it and
-  links from the profile).
+  links the new provider with that password, or signs in with it and links the provider from
+  the profile ([docs/accounts.md](../accounts.md#sign-in-methods)).
 
 ## Logs
 

@@ -160,6 +160,7 @@ def test_logout_other_devices_keeps_the_current_session(web: WebHarness) -> None
         token = web.page_token(laptop, "/account/password")
         response = laptop.post(
             "/account/logout-others",
+            data={"confirm_password": web.admin_password},  # a sensitive action since F1.5
             headers={"HX-Request": "true", "X-CSRF-Token": token},
         )
         assert response.status_code == 200 and "Other sessions signed out: 1." in response.text

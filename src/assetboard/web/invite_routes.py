@@ -40,6 +40,7 @@ from assetboard.web.auth_routes import (
     signed_in_redirect,
     too_long,
 )
+from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     client_host,
@@ -129,7 +130,7 @@ async def _preview(request: Request, token: str) -> InvitationPreview | None:
 def _busy(request: Request, token: str) -> Response:
     """The database stayed locked: the invitation is unchanged, so the visitor can retry."""
     response = _invite_page(request, token, None, error=BUSY, status_code=503)
-    response.headers["Retry-After"] = "5"
+    response.headers["Retry-After"] = BUSY_RETRY_AFTER
     return response
 
 

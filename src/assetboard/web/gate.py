@@ -21,6 +21,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from assetboard.branding import APP_NAME, CLI_NAME
 from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.i18n import gettext
+from assetboard.i18n.locale import resolve_locale
 from assetboard.middleware import route_path
 from assetboard.services.auth import (
     WebSession,
@@ -265,6 +266,15 @@ class AccessGateMiddleware:
         proxy = proxy_request(request)
         current = await _load_session(request, proxy)
         scope.setdefault("state", {})["web_session"] = current
+        if current is not None and current.locale is not None:
+            # Precedence (F1.5): a per-device language cookie (the app sets none), then the
+            # saved profile locale, then Accept-Language. LocaleMiddleware ran before the
+            # session was known; a NULL profile locale keeps its Accept-Language result.
+            scope["state"]["locale"] = resolve_locale(
+                user_locale=current.locale,
+                accept_language=request.headers.get("accept-language", ""),
+                default_locale=app.state.settings.default_locale,
+            )
         if (
             current is None
             and path not in SIGNED_OUT_PATHS

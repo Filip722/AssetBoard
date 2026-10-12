@@ -55,6 +55,70 @@ msgstr ""
 msgid "Enter a valid amount."
 msgstr ""
 
+msgid "Same as the system"
+msgstr ""
+
+msgid "Light"
+msgstr ""
+
+msgid "Dark"
+msgstr ""
+
+msgid ""
+"Enter a display name of 1 to 120 characters, without control or invisible"
+" characters."
+msgstr ""
+
+msgid "Choose one of the listed languages."
+msgstr ""
+
+msgid "Choose one of the listed themes."
+msgstr ""
+
+#, python-format
+msgid ""
+"Your account is already linked to %(provider)s. Remove that link first to"
+" link a different %(provider)s account."
+msgstr ""
+
+msgid ""
+"Your account is already linked to a proxy user. Remove that link first to"
+" link a different one."
+msgstr ""
+
+msgid "The sign-in method is linked to your account."
+msgstr ""
+
+msgid "This sign-in is already linked to your account."
+msgstr ""
+
+msgid ""
+"Linking failed. Try again; if it keeps failing, contact your "
+"administrator."
+msgstr ""
+
+#, python-format
+msgid "Linking failed: it was cancelled at %(provider)s."
+msgstr ""
+
+#, python-format
+msgid "Linking failed: %(provider)s cannot be reached right now."
+msgstr ""
+
+msgid "Linking failed: the server is busy. Try again in a moment."
+msgstr ""
+
+msgid ""
+"This is your last way to sign in, so it cannot be removed. Link another "
+"sign-in method or set a password first."
+msgstr ""
+
+msgid "Browser language"
+msgstr ""
+
+msgid "The sign-in method was removed from your account."
+msgstr ""
+
 msgid "Enter a valid email address."
 msgstr ""
 
@@ -68,9 +132,6 @@ msgid "This password is too common. Choose another one."
 msgstr ""
 
 msgid "The password must differ from your email name and your display name."
-msgstr ""
-
-msgid "Enter a display name of 1 to 120 characters."
 msgstr ""
 
 msgid "Enter a workspace name of 1 to 120 characters."
@@ -124,6 +185,19 @@ msgstr ""
 
 #, python-format
 msgid "Other sessions signed out: %(count)d."
+msgstr ""
+
+msgid ""
+"The password is not correct, or there were too many attempts. Try again "
+"later."
+msgstr ""
+
+msgid "The server is busy. Try again in a moment."
+msgstr ""
+
+msgid ""
+"Sign in again to confirm this change: without a password, it needs a "
+"sign-in from the last 10 minutes."
 msgstr ""
 
 msgid "This request came from another site and was blocked."
@@ -205,7 +279,7 @@ msgstr ""
 
 msgid ""
 "An account with this email address already exists. Sign in with your "
-"password."
+"password, then link it from your profile."
 msgstr ""
 
 #, python-format
@@ -326,6 +400,9 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
+msgid "Profile"
+msgstr ""
+
 msgid "Account security"
 msgstr ""
 
@@ -391,6 +468,82 @@ msgid ""
 "items."
 msgstr ""
 
+msgid "Link a sign-in method"
+msgstr ""
+
+#, python-format
+msgid "Continuing to %(provider)s to link it to your account…"
+msgstr ""
+
+#, python-format
+msgid "Continue to %(provider)s"
+msgstr ""
+
+msgid "Your details"
+msgstr ""
+
+msgid "Display name"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Theme"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "The dark-mode button changes the theme on one device only."
+msgstr ""
+
+msgid "Use the saved theme on this device"
+msgstr ""
+
+msgid "Password and devices"
+msgstr ""
+
+msgid "Change your password or sign out other devices."
+msgstr ""
+
+msgid "This account has no password. You can still sign out other devices."
+msgstr ""
+
+msgid "Sign-in methods"
+msgstr ""
+
+#, python-format
+msgid "Reverse proxy: %(user)s"
+msgstr ""
+
+#, python-format
+msgid "Earlier identity provider (%(host)s)"
+msgstr ""
+
+#, python-format
+msgid "Linked on %(date)s"
+msgstr ""
+
+msgid "not usable with the current settings"
+msgstr ""
+
+msgid "Remove"
+msgstr ""
+
+msgid "No identity provider or proxy sign-in is linked to this account."
+msgstr ""
+
+#, python-format
+msgid "Link %(provider)s"
+msgstr ""
+
+#, python-format
+msgid "Your proxy signs you in as %(user)s."
+msgstr ""
+
+msgid "Link this proxy sign-in"
+msgstr ""
+
 msgid "Link your account"
 msgstr ""
 
@@ -451,10 +604,6 @@ msgstr ""
 msgid "You are signed out here. Signing you out of %(provider)s too…"
 msgstr ""
 
-#, python-format
-msgid "Continue to %(provider)s"
-msgstr ""
-
 msgid "Change password"
 msgstr ""
 
@@ -477,9 +626,6 @@ msgid "Sign out everywhere except on this device."
 msgstr ""
 
 msgid "Sign out other devices"
-msgstr ""
-
-msgid "Display name"
 msgstr ""
 
 msgid "Workspace name"
@@ -521,9 +667,6 @@ msgstr ""
 msgid "Time zone"
 msgstr ""
 
-msgid "Language"
-msgstr ""
-
 msgid "Create administrator"
 msgstr ""
 
@@ -554,6 +697,19 @@ msgstr ""
 msgid "Create account and join"
 msgstr ""
 
+msgid "Your password"
+msgstr ""
+
+#, python-format
+msgid "Confirmed by your recent sign-in for %(minutes)d more minutes."
+msgstr ""
+
+msgid ""
+"To make this change, sign out and sign in again (with your identity "
+"provider, or by opening any page through your proxy). You then have 10 "
+"minutes."
+msgstr ""
+
 msgid "People in this workspace"
 msgstr ""
 
@@ -568,9 +724,6 @@ msgstr ""
 
 #, python-format
 msgid "Remove %(name)s from this workspace?"
-msgstr ""
-
-msgid "Remove"
 msgstr ""
 
 msgid "Invitations"
@@ -669,5 +822,17 @@ msgstr ""
 #~ "%(email)s already exists. Enter its "
 #~ "password once to sign in with "
 #~ "%(provider)s from now on."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An account with this email address "
+#~ "already exists. Sign in with your "
+#~ "password."
+#~ msgstr ""
+
+#~ msgid "Enter a display name of at most 120 characters."
+#~ msgstr ""
+
+#~ msgid "Enter a display name of 1 to 120 characters."
 #~ msgstr ""
 

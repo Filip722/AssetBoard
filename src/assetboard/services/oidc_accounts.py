@@ -195,8 +195,12 @@ def record_oidc_failure(
     host: str | None,
     user_agent: str | None,
     user_id: UUID | None = None,
+    via: str | None = None,
 ) -> None:
-    """Audit a refused OIDC sign-in: a reason code only, never tokens, codes or claims."""
+    """Audit a refused OIDC sign-in: a reason code only, never tokens, codes or claims.
+
+    ``via="profile"`` marks a failure while linking from the profile (F1.5).
+    """
     record_sign_in_failure(
         factory,
         "auth.oidc_failure",
@@ -205,6 +209,7 @@ def record_oidc_failure(
         host=host,
         user_agent=user_agent,
         user_id=user_id,
+        via=via,
     )
 
 
@@ -217,11 +222,14 @@ def record_sign_in_failure(
     host: str | None,
     user_agent: str | None,
     user_id: UUID | None = None,
+    via: str | None = None,
 ) -> None:
     """Audit a refused external sign-in under ``action``: a reason code only."""
     run_immediate(
         factory,
-        lambda session: _audit_failure(session, action, reason, clock, host, user_agent, user_id),
+        lambda session: _audit_failure(
+            session, action, reason, clock, host, user_agent, user_id, via=via
+        ),
     )
 
 
@@ -233,7 +241,12 @@ def _audit_failure(
     host: str | None,
     user_agent: str | None,
     user_id: UUID | None,
+    *,
+    via: str | None = None,
 ) -> None:
+    data: dict[str, str | int | bool] = {"reason": reason}
+    if via is not None:
+        data["via"] = via
     record_auth_event(
         session,
         clock,
@@ -241,7 +254,7 @@ def _audit_failure(
         entity_id=str(user_id) if user_id else None,
         host=host,
         user_agent=user_agent,
-        data={"reason": reason},
+        data=data,
     )
 
 
