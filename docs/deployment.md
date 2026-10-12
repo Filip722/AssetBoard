@@ -51,9 +51,10 @@ creates the administrator and the first workspace and signs you in; afterwards `
 alternative that needs no token.
 
 Sessions are stored on the server. The session cookie lasts for the absolute session lifetime
-(`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. Run a
-single application process (one Uvicorn worker): the setup token, the password-hashing limit and
-some caches live in the process.
+(`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. For MFA,
+prefer OIDC or reverse-proxy auth backed by an IdP that enforces multi-factor authentication; TOTP
+is intentionally deferred to the post-1.0 backlog. Run a single application process (one Uvicorn
+worker): the setup token, the password-hashing limit and some caches live in the process.
 
 ### Invitations
 
