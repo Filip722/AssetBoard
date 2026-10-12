@@ -50,9 +50,14 @@ toast).
   `WorkspaceReassignmentError` if code changes it, including from `NULL` to a value. Bulk
   `update()` and `delete()` statements are not used for workspace data.
 
-`UserMembershipReader` is the one reader scoped by user instead of workspace. It lists the
-signed-in user's own memberships, which the Context and the workspace switcher need before a
-workspace is known.
+Two readers are scoped by something other than the workspace, because they are needed before a
+Context exists:
+
+- `UserMembershipReader` is scoped by user. It lists the signed-in user's own memberships, which
+  the Context and the workspace switcher need.
+- `InvitationTokenReader` is scoped by invitation token hash. It returns only where an
+  invitation lives; the accept flow builds a `WorkspaceScope` from that row and continues
+  through the scoped repositories (ADR-0013).
 
 ## Owner actions and stale Contexts
 
@@ -69,6 +74,11 @@ The workspace row itself is changed only through `CurrentWorkspaceRepository`, w
 updates `ctx.workspace.id` and only the fields in `UPDATABLE_FIELDS`.
 
 ## How to add a new workspace-owned model
+
+`Invitation` (F1.2) is a worked example: `WorkspaceScopedMixin`, migration `0004_f12`,
+`InvitationRepository` (generic update and delete unsupported; named transitions such as
+`revoke` and `mark_used` instead), a `TenantCase` in `tests/tenant/factories.py`, and coverage
+entries for each extra method.
 
 1. **Model.** Inherit `WorkspaceScopedMixin`, which adds a non-null, indexed `workspace_id`
    foreign key and the `WorkspaceOwned` marker. A model whose `workspace_id` must be nullable

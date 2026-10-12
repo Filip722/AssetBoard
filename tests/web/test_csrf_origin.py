@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from assetboard.middleware import SECURITY_HEADERS
 from assetboard.services import csrf
+from assetboard.web.security import require_csrf
 
 if TYPE_CHECKING:
     from conftest import WebHarness
@@ -59,6 +60,10 @@ def test_every_state_changing_route_requires_a_valid_csrf_token(
         "/workspace/settings",
         "/workspace/members/{membership_id}/role",
         "/workspace/members/{membership_id}/remove",
+        "/workspace/invitations",
+        "/workspace/invitations/{invitation_id}/revoke",
+        "/invite/{token}/accept",
+        "/invite/{token}/register",
     }
     other_session_token = csrf.mask(csrf.session_token(signed_in.app.state.csrf_key, "f" * 64))  # type: ignore[attr-defined]
     for method, path in routes:
@@ -70,16 +75,30 @@ def test_every_state_changing_route_requires_a_valid_csrf_token(
     assert signed_in.get("/").status_code == 200  # still signed in
 
 
+def test_every_state_changing_route_declares_the_csrf_dependency(signed_in: TestClient) -> None:
+    """Structural twin of the route walk: a route without ``require_csrf`` fails here by name."""
+    missing = [
+        f"{method} {route.path}"
+        for route in _api_routes(signed_in.app.routes)  # type: ignore[attr-defined]
+        for method in sorted((route.methods or set()) & UNSAFE)
+        if not any(dependency.dependency is require_csrf for dependency in route.dependencies)
+    ]
+    assert missing == []
+
+
 def test_signed_out_forms_require_the_anonymous_token_and_its_cookie(web: WebHarness) -> None:
     app = web.app(allow_registration=True)
     with TestClient(app) as client:
         web.complete_setup(app)
-        signed_out_routes = {path for _, path in _unsafe_routes(app)} & {
+        expected = {
             "/login",
             "/register",
             "/setup",
+            "/invite/{token}/accept",
+            "/invite/{token}/register",
         }
-        assert signed_out_routes == {"/login", "/register", "/setup"}
+        signed_out_routes = {path for _, path in _unsafe_routes(app)} & expected
+        assert signed_out_routes == expected
         with TestClient(app) as other_browser:
             foreign_token = web.csrf(other_browser.get("/login").text)
         for path in sorted(signed_out_routes):

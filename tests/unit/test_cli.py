@@ -285,6 +285,7 @@ def test_serve_trusts_no_proxy_when_trusted_proxies_is_empty(
     assert result.exit_code == 0, result.output
     assert calls["proxy_headers"] is False
     assert calls["forwarded_allow_ips"] == ""
+    assert calls["access_log"] is False  # the app's own request log redacts tokens (ADR-0013)
 
 
 def test_serve_reports_create_app_runtime_error(

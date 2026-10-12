@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Iterator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -28,13 +29,16 @@ from assetboard.db.base import (
     WorkspaceScopedMixin,
 )
 from assetboard.db.engine import create_database_engine
-from assetboard.db.models.identity import AuditEvent, Membership, User, Workspace
+from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User, Workspace
 from assetboard.db.repositories import (
     UPDATABLE_FIELDS,
     AuditEventRepository,
     CurrentWorkspaceRepository,
     ForeignWorkspace,
+    InvitationRepository,
+    InvitationTokenReader,
     MembershipRepository,
+    NotFound,
     ScopedRepository,
     UserMembershipReader,
 )
@@ -44,6 +48,7 @@ from tests.tenant.coverage import (
     CURRENT_WORKSPACE_METHOD_COVERAGE,
     EXTRA_METHOD_COVERAGE,
     READER_METHOD_COVERAGE,
+    TOKEN_READER_METHOD_COVERAGE,
 )
 from tests.tenant.factories import TENANT_CASES
 from tests.tenant.harness import (
@@ -262,6 +267,13 @@ def test_membership_queries_stay_in_their_workspace(
     assert in_b.for_user(a_viewer.user_id) is None
     assert (in_a.count_owners(), in_b.count_owners()) == (1, 2)
 
+    newcomer = User(email="newcomer@example.com", display_name="Newcomer")
+    db_session.add(newcomer)
+    db_session.flush()
+    added = in_a.add_member(user_id=newcomer.id, role="editor")
+    assert added.workspace_id == ctx_a.workspace.id
+    assert in_b.for_user(newcomer.id) is None
+
 
 def test_audit_record_writes_into_its_own_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
@@ -308,6 +320,67 @@ def test_current_workspace_repository_touches_only_its_workspace(
     assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
 
 
+def test_invitation_transitions_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    now = fixed_clock.now()
+    creator = _member(db_session, ctx_a.workspace.id, "creator@example.com", "owner")
+    in_a, in_b = InvitationRepository(db_session, ctx_a), InvitationRepository(db_session, ctx_b)
+
+    def make(repository: InvitationRepository) -> Invitation:
+        return repository.create(
+            token_hash=uuid4().hex * 2,
+            role="viewer",
+            email=None,
+            expires_at=now + timedelta(days=1),
+            created_by_user_id=creator.user_id,
+        )
+
+    a_invite, b_invite = make(in_a), make(in_b)
+    assert a_invite.workspace_id == ctx_a.workspace.id
+    assert [i.id for i in in_a.list_pending(now)] == [a_invite.id]
+    assert [i.id for i in in_b.list_pending(now)] == [b_invite.id]
+    assert (in_a.count_pending(now), in_b.count_pending(now)) == (1, 1)
+    before = raw_row(db_session, Invitation, a_invite.id)
+    for transition in (
+        lambda: in_b.revoke(a_invite.id, now),
+        lambda: in_b.mark_used(a_invite.id, user_id=creator.user_id, now=now),
+        lambda: in_b.record_failed_email(a_invite.id, now=now, limit=5),
+    ):
+        with pytest.raises(NotFound):
+            transition()
+    db_session.expire_all()
+    assert raw_row(db_session, Invitation, a_invite.id) == before
+    # Positive control: the owning workspace can make each transition.
+    assert in_a.record_failed_email(a_invite.id, now=now, limit=2) is False
+    assert in_a.record_failed_email(a_invite.id, now=now, limit=2) is True
+    assert in_a.count_pending(now) == 0
+    in_b.mark_used(b_invite.id, user_id=creator.user_id, now=now)
+    with pytest.raises(NotFound):
+        in_b.revoke(b_invite.id, now)  # only pending invitations can be revoked
+
+
+def test_invitation_token_reader_finds_only_the_matching_hash(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    a_invite = InvitationRepository(db_session, ctx_a).add(
+        TENANT_CASES[Invitation].factory(db_session, ctx_a.workspace.id)
+    )
+    b_invite = InvitationRepository(db_session, ctx_b).add(
+        TENANT_CASES[Invitation].factory(db_session, ctx_b.workspace.id)
+    )
+    reader = InvitationTokenReader(db_session)
+    found = reader.locate(a_invite.token_hash)
+    assert found is not None
+    assert (found.invitation_id, found.workspace_id) == (a_invite.id, ctx_a.workspace.id)
+    found_b = reader.locate(b_invite.token_hash)
+    assert found_b is not None and found_b.workspace_id == ctx_b.workspace.id
+    assert reader.locate("0" * 64) is None
+    assert reader.locate(a_invite.token_hash.upper()) is None
+
+
 # Method coverage (#11)
 
 
@@ -321,7 +394,9 @@ def test_every_public_repository_method_is_covered() -> None:
         assert method in public_methods(names[repository_name]), "stale extra entry"
     assert set(READER_METHOD_COVERAGE) == public_methods(UserMembershipReader)
     assert set(CURRENT_WORKSPACE_METHOD_COVERAGE) == public_methods(CurrentWorkspaceRepository)
+    assert set(TOKEN_READER_METHOD_COVERAGE) == public_methods(InvitationTokenReader)
     covering = {
+        *TOKEN_READER_METHOD_COVERAGE.values(),
         *BASE_METHOD_COVERAGE.values(),
         *EXTRA_METHOD_COVERAGE.values(),
         *READER_METHOD_COVERAGE.values(),

@@ -26,6 +26,18 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",
     ("AuditEventRepository", "record"): "test_audit_record_writes_into_its_own_workspace",
+    ("MembershipRepository", "add_member"): "test_membership_queries_stay_in_their_workspace",
+    **{
+        ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
+        for method in (
+            "create",
+            "list_pending",
+            "count_pending",
+            "revoke",
+            "mark_used",
+            "record_failed_email",
+        )
+    },
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {
@@ -37,4 +49,9 @@ READER_METHOD_COVERAGE: dict[str, str] = {
 CURRENT_WORKSPACE_METHOD_COVERAGE: dict[str, str] = {
     "get": "test_current_workspace_repository_touches_only_its_workspace",
     "update": "test_current_workspace_repository_touches_only_its_workspace",
+}
+
+# InvitationTokenReader is scoped by token hash (the invitee has no Context yet).
+TOKEN_READER_METHOD_COVERAGE: dict[str, str] = {
+    "locate": "test_invitation_token_reader_finds_only_the_matching_hash",
 }

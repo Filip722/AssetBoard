@@ -3,6 +3,7 @@
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
+    Invitation,
     Membership,
     SetupState,
     User,
@@ -13,6 +14,7 @@ from assetboard.db.models.identity import (
 __all__ = [
     "AuditEvent",
     "AuthThrottle",
+    "Invitation",
     "Membership",
     "SetupState",
     "User",

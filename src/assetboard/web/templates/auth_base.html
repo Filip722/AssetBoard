@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="referrer" content="same-origin">
+  <meta name="referrer" content="{% block referrer %}same-origin{% endblock %}">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}">
   <script src="{{ static_url(request, 'js/theme.js') }}"></script>

@@ -38,6 +38,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "audit_events",
         "auth_throttles",
+        "invitations",
         "memberships",
         "setup_state",
         "user_sessions",
@@ -166,5 +167,30 @@ def test_session_workspace_is_nulled_on_workspace_delete(tmp_path: Path) -> None
                 "SELECT current_workspace_id FROM user_sessions"
             ).scalar_one()
         assert selected is None
+    finally:
+        engine.dispose()
+
+
+def test_0004_round_trip(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f12b.db'}"
+    )
+    upgrade_database(settings)
+    script = ScriptDirectory.from_config(alembic_config(settings))
+    revision = script.get_revision("0004_f12")
+    assert revision is not None and revision.down_revision == "0003_f12"
+    for head in script.get_heads():
+        assert "0004_f12" in {rev.revision for rev in script.iterate_revisions(head, "base")}
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "invitations" in inspector.get_table_names()
+        unique = {item["name"] for item in inspector.get_unique_constraints("invitations")}
+        assert "uq_invitations_token_hash" in unique
+        command.downgrade(alembic_config(settings), "0003_f12")
+        assert "invitations" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
     finally:
         engine.dispose()

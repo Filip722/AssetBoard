@@ -49,6 +49,7 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail, normalize_email
+from assetboard.services import invitations
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
@@ -178,7 +179,9 @@ class PasswordChangeOutcome:
     error: AuthError | None = None
 
 
-RegistrationStatus = Literal["created", "invalid", "rejected", "throttled"]
+RegistrationStatus = Literal[
+    "created", "invalid", "rejected", "throttled", "invitation_invalid", "email_mismatch"
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +196,9 @@ class RegistrationOutcome:
     user: User | None = None
     workspace: Workspace | None = None
     error: AuthError | None = None
+    # Invitation sign-up: the workspace joined, and whether a wrong email revoked the link.
+    joined_workspace_id: UUID | None = None
+    invitation_revoked: bool = False
 
 
 # Passwords
@@ -1438,7 +1444,24 @@ def create_admin_cli(
 class _RegistrationInput:
     email: str
     display_name: str
-    options: WorkspaceOptions
+    options: WorkspaceOptions | None
+
+
+@dataclass(frozen=True, slots=True)
+class InvitationSignUp:
+    """Sign-up through an invitation link: no own workspace; joins the invitation's instead."""
+
+    factory: sessionmaker[Session]
+    token: str
+    clock: Clock
+
+    def check(self, email: str) -> None:
+        invitations.check_for_sign_up(self.factory, self.token, email=email, clock=self.clock)
+
+    def consume(self, session: Session, user_id: UUID, email: str) -> UUID:
+        return invitations.consume_for_new_user(
+            session, self.token, user_id=user_id, email=email, now=self.clock.now()
+        )
 
 
 def _register_flow(
@@ -1457,8 +1480,10 @@ def _register_flow(
     timezone: str | None,
     workspace_locale: str | None,
     hasher: Hasher | None,
+    invitation: InvitationSignUp | None = None,
 ) -> RegistrationOutcome:
-    if not settings.allow_registration:
+    # A valid invitation allows sign-up even when open registration is off (ADR-0013).
+    if invitation is None and not settings.allow_registration:
         raise RegistrationDisabled
     key = _ip_key(host)
     window = timedelta(minutes=settings.registration_window_minutes)
@@ -1492,26 +1517,35 @@ def _register_flow(
             display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
         )
         validate_password(password, normalized_email, clean_display_name)
-        _clean_name(
-            workspace_name or clean_display_name,
-            "invalid_workspace_name",
-            "Workspace name must contain 1 to 120 characters",
-        )
-        details = _RegistrationInput(
-            normalized_email,
-            clean_display_name,
-            _workspace_options(
+        options: WorkspaceOptions | None = None
+        if invitation is None:
+            _clean_name(
+                workspace_name or clean_display_name,
+                "invalid_workspace_name",
+                "Workspace name must contain 1 to 120 characters",
+            )
+            options = _workspace_options(
                 settings,
                 base_currency=base_currency,
                 country_code=country_code,
                 timezone=timezone,
                 workspace_locale=workspace_locale,
-            ),
-        )
+            )
+        details = _RegistrationInput(normalized_email, clean_display_name, options)
     except (AuthError, InvalidEmail) as exc:
         # The attempt stays counted; invalid input costs no hashing.
         error = exc if isinstance(exc, AuthError) else InvalidAccountDetails(exc.code, str(exc))
         return RegistrationOutcome(status="invalid", error=error)
+
+    if invitation is not None:
+        # Before hashing: the invitation is pending and its email lock matches (a mismatch is
+        # counted and may revoke it).
+        try:
+            invitation.check(details.email)
+        except invitations.EmailMismatch as exc:
+            return RegistrationOutcome(status="email_mismatch", invitation_revoked=exc.revoked)
+        except invitations.InvitationInvalid:
+            return RegistrationOutcome(status="invitation_invalid")
 
     try:
         # Hashed before the duplicate check, so an existing email takes the same time.
@@ -1539,7 +1573,11 @@ def _register_flow(
         except IntegrityError:
             # Defence in depth: a concurrent registration of the same email won the insert.
             return RegistrationOutcome(status="rejected")
-        if workspace is None:
+        joined: UUID | None = None
+        if invitation is not None:
+            # Raises InvitationInvalid (rolling the user back) if the link was used meanwhile.
+            joined = invitation.consume(session, user.id, details.email)
+        elif workspace is None:
             raise RuntimeError("Registration must create a workspace")
         _audit(
             session,
@@ -1549,14 +1587,20 @@ def _register_flow(
             entity_id=str(user.id),
             actor_type="user",
             actor_user_id=user.id,
-            workspace_id=workspace.id,
+            workspace_id=workspace.id if workspace is not None else None,
             host=host,
             user_agent=user_agent,
+            data={"via": "invitation"} if invitation is not None else None,
         )
         session.flush()
-        return RegistrationOutcome(status="created", user=user, workspace=workspace)
+        return RegistrationOutcome(
+            status="created", user=user, workspace=workspace, joined_workspace_id=joined
+        )
 
-    return run(create)
+    try:
+        return run(create)
+    except invitations.InvitationInvalid:
+        return RegistrationOutcome(status="invitation_invalid")
 
 
 def register_user(
@@ -1668,6 +1712,70 @@ async def register_user_async(
             country_code=country_code,
             timezone=timezone,
             workspace_locale=workspace_locale,
+            hasher=hasher,
+        )
+    )
+
+
+def register_with_invitation(
+    factory: sessionmaker[Session],
+    *,
+    token: str,
+    email: str,
+    display_name: str,
+    password: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+    hasher: Hasher | None = None,
+) -> RegistrationOutcome:
+    """Invitation sign-up (allowed even when open registration is off); same throttle and gate."""
+    return _register_flow(
+        ImmediateTransactions(factory),
+        email=email,
+        display_name=display_name,
+        password=password,
+        workspace_name="",
+        settings=settings,
+        clock=clock,
+        host=host,
+        user_agent=user_agent,
+        base_currency=None,
+        country_code=None,
+        timezone=None,
+        workspace_locale=None,
+        hasher=hasher,
+        invitation=InvitationSignUp(factory, token, clock),
+    )
+
+
+async def register_with_invitation_async(
+    factory: sessionmaker[Session],
+    gate: HashGate,
+    *,
+    token: str,
+    email: str,
+    display_name: str,
+    password: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+) -> RegistrationOutcome:
+    """Web entry point; raises ``HashGateBusy`` after releasing the counted attempt."""
+    hasher = _gate_hasher(gate)
+    return await anyio.to_thread.run_sync(
+        lambda: register_with_invitation(
+            factory,
+            token=token,
+            email=email,
+            display_name=display_name,
+            password=password,
+            settings=settings,
+            clock=clock,
+            host=host,
+            user_agent=user_agent,
             hasher=hasher,
         )
     )

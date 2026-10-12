@@ -1,0 +1,32 @@
+{% extends "auth_base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% block title %}{{ _("Invitation") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Invitation") }}{% endblock %}
+{% block content %}
+{% if error %}
+<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-invite-error>{{ error }}</p>
+{% endif %}
+{% if notice %}
+<p class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status">{{ notice }}</p>
+{% endif %}
+{% if preview %}
+<p class="mt-4 text-sm text-muted dark:text-slate-300" data-invite-summary>{{ _("You are invited to join %(workspace)s as %(role)s.", workspace=preview.workspace_name, role=role_name) }}</p>
+{% if preview.email_locked %}<p class="mt-2 text-xs text-muted dark:text-slate-400">{{ _("This invitation can only be accepted with the email address it was sent to.") }}</p>{% endif %}
+{% if signed_in %}
+<form method="post" action="{{ scoped_url(request, 'invite_accept', token=token) }}" class="mt-6">
+  {{ csrf_input() }}
+  {{ primary_button(_("Accept invitation")) }}
+</form>
+{% else %}
+<p class="mt-6 text-sm">{{ _("Already have an account?") }} <a class="font-semibold text-accent" href="{{ login_url }}" rel="noreferrer">{{ _("Sign in to accept") }}</a></p>
+<h2 class="mt-6 text-base font-semibold">{{ _("Create an account") }}</h2>
+<form method="post" action="{{ scoped_url(request, 'invite_register', token=token) }}" class="mt-4 space-y-4" novalidate>
+  {{ csrf_input() }}
+  {{ field("email", _("Email"), type="email", value=values.email, error=errors.get("email"), required=true, autocomplete="email", maxlength=320) }}
+  {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
+  {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 10 characters. Common passwords are not accepted.")) }}
+  {{ primary_button(_("Create account and join")) }}
+</form>
+{% endif %}
+{% endif %}
+{% endblock %}

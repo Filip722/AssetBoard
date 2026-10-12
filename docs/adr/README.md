@@ -19,6 +19,7 @@ The decisions below are accepted unless noted otherwise.
 | [0010](0010-release-automation.md) | Release Please and workflow-call image publishing | Accepted |
 | [0011](0011-tzdata-dependency.md) | Locked timezone database data | Accepted |
 | [0012](0012-local-authentication.md) | Local authentication, server-side sessions and first-run setup | Accepted |
+| [0013](0013-invitation-links.md) | Invitation links | Accepted |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.

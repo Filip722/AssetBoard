@@ -10,6 +10,7 @@ each sees the previous one's result.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -18,13 +19,19 @@ from assetboard.db.engine import run_immediate
 from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
+    InvitationRepository,
     MembershipRepository,
     WorkspaceMember,
 )
+from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.services.context import Context, PermissionDenied, Role, require_role
+from assetboard.services.invitations import new_token
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
 MAX_WORKSPACE_NAME_LENGTH = 120
+INVITATION_EXPIRY_DAYS = (1, 7, 30)
+DEFAULT_INVITATION_EXPIRY_DAYS = 7
+MAX_PENDING_INVITATIONS = 50
 
 
 class WorkspaceError(Exception):
@@ -48,6 +55,39 @@ class InvalidWorkspaceSettings(WorkspaceError):
         super().__init__(code)
         self.field = field
         self.code = code
+
+
+class InvalidInvitation(WorkspaceError):
+    def __init__(self, field: str, code: str) -> None:
+        super().__init__(code)
+        self.field = field
+        self.code = code
+
+
+class TooManyInvitations(WorkspaceError):
+    """The workspace already has ``MAX_PENDING_INVITATIONS`` pending invitations."""
+
+    code = "too_many_invitations"
+
+
+@dataclass(frozen=True, slots=True)
+class CreatedInvitation:
+    """Returned once: the token is not stored and cannot be shown again."""
+
+    id: UUID
+    token: str
+    role: str
+    email: str | None
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PendingInvitation:
+    id: UUID
+    role: str
+    email: str | None
+    expires_at: datetime
+    created_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,6 +249,101 @@ def remove_member(factory: sessionmaker[Session], ctx: Context, *, membership_id
             entity_id=str(target.id),
             ts=ctx.clock.now(),
             data={"user_id": str(target.user_id), "role": removed_role},
+        )
+
+    run_immediate(factory, write)
+
+
+# Invitations (owners); the invitee's side is services/invitations.py
+
+
+def list_invitations(factory: sessionmaker[Session], ctx: Context) -> list[PendingInvitation]:
+    require_role(ctx, Role.OWNER)
+    with factory() as session:
+        return [
+            PendingInvitation(
+                id=invitation.id,
+                role=invitation.role,
+                email=invitation.email,
+                expires_at=invitation.expires_at,
+                created_at=invitation.created_at,
+            )
+            for invitation in InvitationRepository(session, ctx).list_pending(ctx.clock.now())
+        ]
+
+
+def create_invitation(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    role: Role | str,
+    email: str | None,
+    expires_in_days: int,
+) -> CreatedInvitation:
+    """Create a single-use invitation link. Owner invitations must be locked to an email."""
+    require_role(ctx, Role.OWNER)
+    invited_role = Role(role)
+    if expires_in_days not in INVITATION_EXPIRY_DAYS:
+        raise InvalidInvitation("expires_in_days", "invalid_expiry")
+    locked_email: str | None = None
+    if email and email.strip():
+        try:
+            locked_email = normalize_email(email)
+        except InvalidEmail as exc:
+            raise InvalidInvitation("email", "invalid_email") from exc
+    if invited_role is Role.OWNER and locked_email is None:
+        raise InvalidInvitation("email", "owner_requires_email")
+    token, token_hash = new_token()
+    now = ctx.clock.now()
+    expires_at = now + timedelta(days=expires_in_days)
+
+    def write(session: Session) -> CreatedInvitation:
+        _require_owner_now(session, ctx)
+        _checkpoint("create_invitation")
+        invitations = InvitationRepository(session, ctx)
+        if invitations.count_pending(now) >= MAX_PENDING_INVITATIONS:
+            raise TooManyInvitations
+        invitation = invitations.create(
+            token_hash=token_hash,
+            role=invited_role.value,
+            email=locked_email,
+            expires_at=expires_at,
+            created_by_user_id=ctx.user.id,
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="invitation.created",
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+            ts=now,
+            data={
+                "role": invited_role.value,
+                "email_locked": locked_email is not None,
+                "expires_in_days": expires_in_days,
+            },
+        )
+        return CreatedInvitation(
+            invitation.id, token, invited_role.value, locked_email, invitation.expires_at
+        )
+
+    return run_immediate(factory, write)
+
+
+def revoke_invitation(factory: sessionmaker[Session], ctx: Context, *, invitation_id: UUID) -> None:
+    require_role(ctx, Role.OWNER)
+
+    def write(session: Session) -> None:
+        _require_owner_now(session, ctx)
+        _checkpoint("revoke_invitation")
+        now = ctx.clock.now()
+        invitation = InvitationRepository(session, ctx).revoke(invitation_id, now)
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="invitation.revoked",
+            entity_type="invitation",
+            entity_id=str(invitation.id),
+            ts=now,
+            data={"reason": "owner"},
         )
 
     run_immediate(factory, write)

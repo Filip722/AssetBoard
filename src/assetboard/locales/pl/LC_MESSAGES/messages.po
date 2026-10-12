@@ -159,6 +159,36 @@ msgstr "Uruchamianie"
 msgid "The application is starting. Try again in a moment."
 msgstr "Aplikacja się uruchamia. Spróbuj ponownie za chwilę."
 
+msgid ""
+"This invitation link is not valid. It may have expired, been used or been"
+" revoked. Ask the workspace owner for a new link."
+msgstr ""
+"Ten link z zaproszeniem jest nieważny. Mógł wygasnąć, zostać już użyty "
+"albo odwołany. Poproś właściciela obszaru roboczego o nowy link."
+
+msgid "This invitation was sent to a different email address."
+msgstr "To zaproszenie zostało wysłane na inny adres e-mail."
+
+msgid ""
+"This invitation was sent to a different email address. It has now been "
+"revoked after too many attempts; ask the workspace owner for a new link."
+msgstr ""
+"To zaproszenie zostało wysłane na inny adres e-mail. Po zbyt wielu "
+"próbach zostało odwołane; poproś właściciela obszaru roboczego o nowy "
+"link."
+
+msgid "You are already a member of this workspace."
+msgstr "Już należysz do tego obszaru roboczego."
+
+msgid "Owner"
+msgstr "Właściciel"
+
+msgid "Editor"
+msgstr "Edytor"
+
+msgid "Viewer"
+msgstr "Przeglądający"
+
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
 
@@ -179,23 +209,27 @@ msgstr ""
 msgid "You cannot remove yourself from the workspace."
 msgstr "Nie możesz usunąć siebie z obszaru roboczego."
 
-msgid "The change could not be made. Reload the page and try again."
-msgstr "Nie udało się wprowadzić zmiany. Odśwież stronę i spróbuj ponownie."
+msgid "Owner invitations must be locked to an email address."
+msgstr "Zaproszenia dla właścicieli muszą być powiązane z adresem e-mail."
 
-msgid "Owner"
-msgstr "Właściciel"
-
-msgid "Editor"
-msgstr "Edytor"
-
-msgid "Viewer"
-msgstr "Przeglądający"
-
-msgid "Workspace settings saved."
-msgstr "Zapisano ustawienia obszaru roboczego."
+msgid "Choose how long the link stays valid."
+msgstr "Wybierz, jak długo link ma być ważny."
 
 msgid "Choose a role."
 msgstr "Wybierz rolę."
+
+msgid ""
+"This workspace has too many pending invitations. Revoke some before "
+"creating more."
+msgstr ""
+"Ten obszar roboczy ma zbyt wiele oczekujących zaproszeń. Odwołaj część z "
+"nich, zanim utworzysz kolejne."
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr "Nie udało się wprowadzić zmiany. Odśwież stronę i spróbuj ponownie."
+
+msgid "Workspace settings saved."
+msgstr "Zapisano ustawienia obszaru roboczego."
 
 msgid "Home"
 msgstr "Strona główna"
@@ -396,6 +430,29 @@ msgstr "Zamknij"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
+msgid "Invitation"
+msgstr "Zaproszenie"
+
+#, python-format
+msgid "You are invited to join %(workspace)s as %(role)s."
+msgstr "Zaproszono Cię do obszaru roboczego %(workspace)s z rolą: %(role)s."
+
+msgid ""
+"This invitation can only be accepted with the email address it was sent "
+"to."
+msgstr ""
+"To zaproszenie można przyjąć tylko z adresu e-mail, na który zostało "
+"wysłane."
+
+msgid "Accept invitation"
+msgstr "Przyjmij zaproszenie"
+
+msgid "Sign in to accept"
+msgstr "Zaloguj się, aby przyjąć"
+
+msgid "Create account and join"
+msgstr "Utwórz konto i dołącz"
+
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
 
@@ -414,6 +471,68 @@ msgstr "Usunąć użytkownika %(name)s z tego obszaru roboczego?"
 
 msgid "Remove"
 msgstr "Usuń"
+
+msgid "Invitations"
+msgstr "Zaproszenia"
+
+msgid "Invitation link created. Copy it now: it is shown only once."
+msgstr ""
+"Utworzono link z zaproszeniem. Skopiuj go teraz: jest wyświetlany tylko "
+"raz."
+
+msgid "Invitation link"
+msgstr "Link z zaproszeniem"
+
+msgid "Copy"
+msgstr "Kopiuj"
+
+msgid "Email (optional)"
+msgstr "E-mail (opcjonalnie)"
+
+msgid "Valid for"
+msgstr "Ważny przez"
+
+#, python-format
+msgid "%(num)d day"
+msgid_plural "%(num)d days"
+msgstr[0] "%(num)d dzień"
+msgstr[1] "%(num)d dni"
+msgstr[2] "%(num)d dni"
+
+msgid ""
+"With an email, only an account with that address can accept. Owner "
+"invitations must have one: an owner can change everything, including "
+"members."
+msgstr ""
+"Z adresem e-mail zaproszenie może przyjąć tylko konto z tym adresem. "
+"Zaproszenia dla właścicieli muszą go mieć: właściciel może zmienić "
+"wszystko, łącznie z członkami."
+
+msgid ""
+"The email is not verified, so share the link only with the person you "
+"mean to invite."
+msgstr ""
+"Adres e-mail nie jest weryfikowany, więc udostępnij link tylko osobie, "
+"którą chcesz zaprosić."
+
+msgid "Create invitation link"
+msgstr "Utwórz link z zaproszeniem"
+
+msgid "Pending invitations"
+msgstr "Oczekujące zaproszenia"
+
+#, python-format
+msgid "Expires %(date)s"
+msgstr "Wygasa %(date)s"
+
+msgid "Revoke this invitation link?"
+msgstr "Odwołać ten link z zaproszeniem?"
+
+msgid "Revoke"
+msgstr "Odwołaj"
+
+msgid "No pending invitations."
+msgstr "Brak oczekujących zaproszeń."
 
 msgid "General"
 msgstr "Ogólne"

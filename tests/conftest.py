@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import logging
 import re
+import socket
+import threading
+import time
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import pytest
+import uvicorn
 from argon2 import profiles
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -302,3 +307,31 @@ def owner(web: WebHarness) -> Iterator[OwnerApp]:
         web.complete_setup(app)
         assert web.sign_in(client).status_code == 303
         yield OwnerApp(app, client, web)
+
+
+# A real uvicorn server in a background thread
+
+
+def _free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+@contextmanager
+def live_server(app: Any, **options: Any) -> Iterator[str]:
+    port = _free_port()
+    settings: dict[str, Any] = {"log_level": "warning", **options}
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, **settings)
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 20
+    while not server.started:
+        assert time.monotonic() < deadline, "server did not start"
+        time.sleep(0.01)
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=20)

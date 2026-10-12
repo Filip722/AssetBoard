@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from assetboard.db.models.identity import AuditEvent
@@ -21,19 +22,20 @@ class AuditEventRepository(ScopedRepository[AuditEvent]):
     def record(
         self,
         *,
-        actor_user_id: UUID,
+        actor_user_id: UUID | None,
         action: str,
         entity_type: str,
         entity_id: str | None,
         ts: datetime,
         data: Mapping[str, str | int | bool] | None = None,
+        actor_type: Literal["user", "system"] = "user",
     ) -> AuditEvent:
-        """Append a user action to this workspace's audit log."""
+        """Append an action to this workspace's audit log."""
         return self.add(
             AuditEvent(
                 id=uuid4(),
                 actor_user_id=actor_user_id,
-                actor_type="user",
+                actor_type=actor_type,
                 action=action,
                 entity_type=entity_type,
                 entity_id=entity_id,

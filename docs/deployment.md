@@ -55,6 +55,16 @@ Sessions are stored on the server. The session cookie lasts for the absolute ses
 single application process (one Uvicorn worker): the setup token, the password-hashing limit and
 some caches live in the process.
 
+### Invitations
+
+Workspace owners add people from **Members** with an invitation link. AssetBoard sends no email:
+copy the link (it is shown only once) and share it privately. The link works once and expires
+after 1, 7 or 30 days. Whoever opens it can sign in, or create an account even when
+`ASSETBOARD_ALLOW_REGISTRATION` is off; an account created this way joins only that workspace.
+An invitation can be locked to an email address; owner invitations must be. The lock is not
+proof that the person controls that address, since email addresses are not verified. See
+[ADR-0013](adr/0013-invitation-links.md).
+
 ### Database schema state
 
 The schema is checked once at startup. With `ASSETBOARD_AUTO_MIGRATE=true` (the default) an older
@@ -143,8 +153,8 @@ cookies over plain HTTP (for example to a LAN address), and sign-in fails there.
 request was addressed to (scheme plus `Host`), and never when the browser reports a cross-site
 request. Make sure the proxy passes the original `Host` header and scheme.
 
-**Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login` and
-`POST /register` at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
+**Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login`,
+`POST /register` and `/invite/` (invitation sign-up) at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
 middleware, or a Caddy rate-limit module), such as a few requests per minute per client address.
 This keeps password-guessing floods from reaching the app at all. Also cap the request body size
 at the proxy (for example nginx `client_max_body_size 1m;`, the Traefik `Buffering` middleware's
@@ -165,6 +175,21 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### F1.2: workspaces and invitations
+
+- **Uvicorn's access log is off.** `assetboard serve` no longer prints uvicorn's access lines
+  (`"GET /path HTTP/1.1" 200`): they show full URLs, and invitation links carry a token in the
+  path and in `/login?next=…`. The application's own `request_complete` log line still records
+  every request, with invitation tokens replaced by `[redacted]` and without query strings.
+  There is no setting to turn the access log back on. If you parse access lines, switch to
+  `request_complete`.
+- **Reverse-proxy logs may still record invitation tokens.** A token can appear in the
+  `/invite/<token>` path and in the query of `/login?next=%2Finvite%2F<token>`. Excluding `/invite/`
+  from the proxy's access log is not enough: also exclude or strip query strings for `/login`
+  and `/register`, and the `Referer` field if your log format records it (these pages send a
+  `Referer` to the app itself), or restrict who can read the proxy log. Invitations are
+  single-use and expire, which limits the damage of a leaked token.
 
 ### F1.1: local accounts
 

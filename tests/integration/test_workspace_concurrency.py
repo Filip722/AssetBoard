@@ -8,16 +8,15 @@ The second one must see the first one's committed result.
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import event
 
 from assetboard.services import workspaces
 from assetboard.services.context import PermissionDenied, Role
 from assetboard.services.workspaces import LastOwnerError, change_role
+from tests.tenant.serialize import serialize_at_checkpoint
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -32,47 +31,7 @@ def run_serialized(
     first: Callable[[], None],
     second: Callable[[], None],
 ) -> dict[str, BaseException | None]:
-    first_inside, release_first, second_at_begin = (threading.Event() for _ in range(3))
-
-    def checkpoint(_name: str) -> None:
-        if not first_inside.is_set():
-            first_inside.set()
-            assert release_first.wait(timeout=20)
-
-    monkeypatch.setattr(workspaces, "_checkpoint", checkpoint)
-
-    @event.listens_for(db.engine, "before_cursor_execute")
-    def watch_begin(_conn: object, _cursor: object, statement: str, *_args: object) -> None:
-        if statement == "BEGIN IMMEDIATE" and first_inside.is_set():
-            second_at_begin.set()
-
-    outcomes: dict[str, BaseException | None] = {}
-
-    def run(name: str, call: Callable[[], None]) -> None:
-        try:
-            call()
-            outcomes[name] = None
-        except BaseException as exc:  # noqa: BLE001 - reported to the test
-            outcomes[name] = exc
-
-    threads = {
-        "first": threading.Thread(target=run, args=("first", first)),
-        "second": threading.Thread(target=run, args=("second", second)),
-    }
-    try:
-        threads["first"].start()
-        assert first_inside.wait(timeout=20), "first writer never reached the checkpoint"
-        threads["second"].start()
-        assert second_at_begin.wait(timeout=20), "second writer never reached BEGIN IMMEDIATE"
-        assert threads["second"].is_alive()  # waiting for the write lock
-        release_first.set()
-        for thread in threads.values():
-            thread.join(timeout=20)
-            assert not thread.is_alive()
-    finally:
-        release_first.set()
-        event.remove(db.engine, "before_cursor_execute", watch_begin)
-    return outcomes
+    return serialize_at_checkpoint(db.engine, monkeypatch, workspaces, first, second)
 
 
 def test_concurrent_mutual_demotions_keep_one_owner(

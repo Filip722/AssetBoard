@@ -4,6 +4,7 @@ import io
 import logging
 from typing import TYPE_CHECKING
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.responses import Response
@@ -11,7 +12,7 @@ from starlette.responses import Response
 from assetboard.app import create_app
 from assetboard.config import Settings
 from assetboard.logging import configure_logging
-from assetboard.middleware import RequestIdMiddleware
+from assetboard.middleware import RequestIdMiddleware, redact_path
 
 if TYPE_CHECKING:
     from conftest import WebHarness
@@ -123,3 +124,18 @@ def test_unhandled_exception_logs_traceback_and_returns_request_id(web: WebHarne
     assert "status_code=500" in output.getvalue()
     assert "Traceback (most recent call last)" in output.getvalue()
     assert "synthetic route failure" in output.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("path", "logged"),
+    [
+        ("/invite/" + "a" * 43, "/invite/[redacted]"),
+        ("/invite/" + "a" * 43 + "/register", "/invite/[redacted]/register"),
+        ("/invite/short", "/invite/[redacted]"),
+        ("/prefix/invite/tok/accept", "/prefix/invite/[redacted]/accept"),
+        ("/workspace/invitations", "/workspace/invitations"),
+        ("/login", "/login"),
+    ],
+)
+def test_request_log_redacts_invitation_tokens(path: str, logged: str) -> None:
+    assert redact_path(path) == logged

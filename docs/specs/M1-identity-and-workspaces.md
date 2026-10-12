@@ -96,6 +96,19 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - Removing a member does not revoke their sessions: the Context checks membership on every
   request.
 - Backlog: workspace deletion and ownership transfer.
+- B2 (invitations), see ADR-0013:
+  - Tokens are 256-bit, stored as SHA-256, single use; expiry is 1, 7 (default) or 30 days;
+    at most 50 pending invitations per workspace.
+  - Invitation sign-up works even when open registration is off and never creates an own
+    workspace.
+  - Owner invitations require an email lock. The locked address is never displayed or
+    pre-filled. A wrong email is counted per invitation (`failed_email_attempts`) and the
+    invitation is revoked after 5. The lock is not proof of ownership.
+  - An existing member is told so; the role is unchanged and the invitation not consumed.
+  - Invalid links (expired, revoked, used, unknown or malformed) all look the same.
+  - The token is in the URL path. The request log redacts it, uvicorn's access log is off, and
+    invite, sign-in and registration pages send `Referrer-Policy: same-origin`, and every page
+    sends `Cache-Control: no-store`.
 
 **Agent prompt**
 ```

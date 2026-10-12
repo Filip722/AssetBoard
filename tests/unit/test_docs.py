@@ -99,6 +99,7 @@ def test_deployment_guide_covers_proxy_rate_limits_and_trusted_proxies() -> None
     first_paragraphs = section.split("\n\n", maxsplit=3)[:3]
     assert any("ASSETBOARD_TRUSTED_PROXIES" in part for part in first_paragraphs)
     assert "/login" in section and "/register" in section and "rate limit" in section.lower()
+    assert "/invite/" in section
     assert "client_max_body_size" in section  # body-size cap at the proxy
     assert "## Upgrading" in text and "TRUSTED_PROXIES" in text.split("## Upgrading", 1)[1]
     assert "https" in text and "BASE_URL" in text
@@ -126,3 +127,24 @@ def test_architecture_doc_has_new_model_section() -> None:
     adr = (docs / "adr" / "0003-workspaces-and-tenant-isolation.md").read_text(encoding="utf-8")
     assert "## Amendment (2026-10-12)" in adr
     assert "with_loader_criteria" in adr and "deferred" in adr
+
+
+def test_adr_0013_exists_and_upgrading_mentions_the_access_log() -> None:
+    adr_dir = DEPLOYMENT.parents[0] / "adr"
+    adr = (adr_dir / "0013-invitation-links.md").read_text(encoding="utf-8")
+    assert "0013-invitation-links.md" in (adr_dir / "README.md").read_text(encoding="utf-8")
+    for required in (
+        "SHA-256",
+        "same-origin",
+        "Origin: null",
+        "access log",
+        "not proof of ownership",
+        "5 wrong",
+    ):
+        assert required in adr
+    assert "burn it with 5 wrong attempts" in adr
+    upgrading = DEPLOYMENT.read_text(encoding="utf-8").split("## Upgrading", 1)[1]
+    assert "access log is off" in upgrading.lower()
+    assert "[redacted]" in upgrading
+    # Excluding /invite/ from the proxy log is not enough: /login?next= carries the token too.
+    assert "is not enough" in upgrading and "/login?next=" in upgrading

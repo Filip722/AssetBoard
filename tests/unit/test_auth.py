@@ -1172,12 +1172,12 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
     for table, model_table in mapped.items():
         if table == "audit_events":
             assert model_table.c.workspace_id.nullable
-        elif table == "memberships":
+        elif table in {"memberships", "invitations"}:
             assert model_table.c.workspace_id.nullable is False
         else:
             assert "workspace_id" not in model_table.c
             assert table in expected_global
-    assert set(mapped) == set(expected_global) | {"audit_events", "memberships"}
+    assert set(mapped) == set(expected_global) | {"audit_events", "memberships", "invitations"}
 
 
 def test_change_password_wrong_attempts_use_the_account_throttle(

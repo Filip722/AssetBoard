@@ -43,7 +43,17 @@ def serve(
     except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
-    uvicorn.run(application, host=host, port=port, **proxy_header_options(settings))
+    uvicorn.run(application, host=host, port=port, **server_options(settings))
+
+
+def server_options(settings: Settings) -> dict[str, Any]:
+    """Uvicorn options for ``serve``.
+
+    The access log is off: the application's own ``request_complete`` line covers every request
+    and redacts invitation tokens, while uvicorn's access log would print full URLs, including
+    query strings such as ``/login?next=/invite/<token>`` (ADR-0013).
+    """
+    return {"access_log": False, **proxy_header_options(settings)}
 
 
 def proxy_header_options(settings: Settings) -> dict[str, Any]:

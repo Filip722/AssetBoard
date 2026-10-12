@@ -18,8 +18,11 @@ from assetboard.services.workspaces import (
     LastOwnerError,
     SelfRemovalError,
     change_role,
+    create_invitation,
+    list_invitations,
     list_members,
     remove_member,
+    revoke_invitation,
     update_settings,
     workspace_settings,
 )
@@ -66,6 +69,11 @@ SERVICE_CALLS: dict[str, ServiceCall] = {
     "remove_member": lambda db, ctx: remove_member(
         db.factory, ctx, membership_id=db.memberships["vic"]
     ),
+    "list_invitations": lambda db, ctx: list_invitations(db.factory, ctx),
+    "create_invitation": lambda db, ctx: create_invitation(
+        db.factory, ctx, role=Role.EDITOR, email=None, expires_in_days=7
+    ),
+    "revoke_invitation": lambda db, ctx: revoke_invitation(db.factory, ctx, invitation_id=uuid4()),
 }
 
 
@@ -107,7 +115,7 @@ def test_service_writes_recheck_the_role_in_the_transaction(
     else:
         remove_member(team.factory, ed, membership_id=team.memberships["olga"])
     roles_before, events_before = team.roles(), _events(team)
-    if name in {"workspace_settings", "list_members"}:
+    if name in {"workspace_settings", "list_members", "list_invitations"}:
         SERVICE_CALLS[name](team, olga)  # reads use the request's Context
         return
     with pytest.raises(PermissionDenied):

@@ -134,3 +134,19 @@ document.addEventListener("change", (event) => {
     target.form?.requestSubmit();
   }
 });
+
+// Buttons marked data-copy-target copy the referenced input's value (invitation links).
+document.addEventListener("click", async (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest("[data-copy-target]");
+  if (!(button instanceof HTMLElement)) return;
+  const input = document.getElementById(button.dataset.copyTarget ?? "");
+  if (!(input instanceof HTMLInputElement)) return;
+  input.select();
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch {
+    // Without clipboard access the selected text can still be copied by hand.
+  }
+});

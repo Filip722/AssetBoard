@@ -50,6 +50,10 @@ class MembershipRepository(ScopedRepository[Membership]):
         statement = self._scoped_select().where(Membership.user_id == user_id)
         return self._session.scalars(statement).one_or_none()
 
+    def add_member(self, *, user_id: UUID, role: str) -> Membership:
+        """Add a user to this workspace (invitation acceptance)."""
+        return self.add(Membership(user_id=user_id, role=role))
+
     def count_owners(self) -> int:
         statement = (
             select(func.count())

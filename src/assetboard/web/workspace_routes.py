@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.engine import run_immediate
+from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.i18n import gettext
 from assetboard.services.context import Role, WorkspaceNotAvailable, select_workspace
 from assetboard.services.workspace_options import (
@@ -24,13 +25,22 @@ from assetboard.services.workspace_options import (
     timezone_names,
 )
 from assetboard.services.workspaces import (
+    DEFAULT_INVITATION_EXPIRY_DAYS,
+    INVITATION_EXPIRY_DAYS,
+    MAX_PENDING_INVITATIONS,
     MAX_WORKSPACE_NAME_LENGTH,
+    CreatedInvitation,
+    InvalidInvitation,
     InvalidWorkspaceSettings,
+    TooManyInvitations,
     WorkspaceError,
     WorkspaceSettings,
     change_role,
+    create_invitation,
+    list_invitations,
     list_members,
     remove_member,
+    revoke_invitation,
     update_settings,
     workspace_settings,
 )
@@ -59,6 +69,15 @@ SETTINGS_ERRORS = {
 MEMBER_ERRORS = {
     "last_owner": _("A workspace needs at least one owner. Make another member an owner first."),
     "self_removal": _("You cannot remove yourself from the workspace."),
+}
+INVITATION_ERRORS = {
+    "invalid_email": _("Enter a valid email address."),
+    "owner_requires_email": _("Owner invitations must be locked to an email address."),
+    "invalid_expiry": _("Choose how long the link stays valid."),
+    "invalid_role": _("Choose a role."),
+    "too_many_invitations": _(
+        "This workspace has too many pending invitations. Revoke some before creating more."
+    ),
 }
 MEMBER_ERROR_FALLBACK = _("The change could not be made. Reload the page and try again.")
 ROLE_LABELS = {
@@ -186,18 +205,39 @@ def _members_page(
     ctx: CurrentContext,
     *,
     error: str | None = None,
+    created: CreatedInvitation | None = None,
+    invite_values: dict[str, str] | None = None,
+    invite_errors: dict[str, str] | None = None,
     status_code: int = 200,
 ) -> Response:
-    members = list_members(request.app.state.session_factory, ctx)
+    factory = request.app.state.session_factory
+    members = list_members(factory, ctx)
+    invitations = list_invitations(factory, ctx)
+    base_url = request.app.state.settings.base_url.rstrip("/")
     return render_template(
         request,
         "workspace/members.html",
         context={
             "members": members,
+            "invitations": invitations,
             "current_user_id": ctx.user.id,
             "roles": [(role.value, _t(request, ROLE_LABELS[role])) for role in Role],
             "role_labels": {role.value: _t(request, label) for role, label in ROLE_LABELS.items()},
             "error": _t(request, error) if error else None,
+            "created": created,
+            # Shown once, in this response only: the token is not stored.
+            "created_link": f"{base_url}/invite/{created.token}" if created else None,
+            "expiry_choices": INVITATION_EXPIRY_DAYS,
+            "invite_values": {
+                "role": Role.VIEWER.value,
+                "email": "",
+                "expires_in_days": str(DEFAULT_INVITATION_EXPIRY_DAYS),
+            }
+            | (invite_values or {}),
+            "invite_errors": {
+                field: _t(request, message) for field, message in (invite_errors or {}).items()
+            },
+            "max_pending": MAX_PENDING_INVITATIONS,
         },
         status_code=status_code,
     )
@@ -250,4 +290,58 @@ async def member_remove(request: Request, ctx: CurrentContext, membership_id: st
         )
     except WorkspaceError as exc:
         return await _member_error(request, ctx, exc)
+    return _members_redirect(request)
+
+
+# Invitations
+
+
+@router.post("/workspace/invitations", name="workspace_invitations")
+async def invitation_create(
+    request: Request,
+    ctx: CurrentContext,
+    role: FormStr = "",
+    email: FormStr = "",
+    expires_in_days: FormStr = "",
+) -> Response:
+    values = {"role": role, "email": email, "expires_in_days": expires_in_days}
+    factory = request.app.state.session_factory
+    field, code, status_code = "", "", 400
+    created: CreatedInvitation | None = None
+    if len(email) > MAX_EMAIL_LENGTH:
+        field, code = "email", "invalid_email"
+    elif role not in {r.value for r in Role}:
+        field, code = "role", "invalid_role"
+    else:
+        try:
+            days = int(expires_in_days)
+        except ValueError:  # includes "²" and strings longer than int()'s digit limit
+            days = 0
+        try:
+            created = await run_in_threadpool(
+                lambda: create_invitation(
+                    factory, ctx, role=role, email=email or None, expires_in_days=days
+                )
+            )
+        except InvalidInvitation as exc:
+            field, code = exc.field, exc.code
+        except TooManyInvitations:
+            field, code, status_code = "role", "too_many_invitations", 409
+    if created is not None:
+        shown = created
+        return await run_in_threadpool(lambda: _members_page(request, ctx, created=shown))
+    errors = {field: INVITATION_ERRORS[code]}
+    return await run_in_threadpool(
+        lambda: _members_page(
+            request, ctx, invite_values=values, invite_errors=errors, status_code=status_code
+        )
+    )
+
+
+@router.post("/workspace/invitations/{invitation_id}/revoke", name="workspace_invitation_revoke")
+async def invitation_revoke(request: Request, ctx: CurrentContext, invitation_id: str) -> Response:
+    target = _parse_uuid(invitation_id)
+    await run_in_threadpool(
+        lambda: revoke_invitation(request.app.state.session_factory, ctx, invitation_id=target)
+    )
     return _members_redirect(request)

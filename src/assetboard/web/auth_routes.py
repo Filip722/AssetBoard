@@ -106,7 +106,7 @@ def _t(request: Request, message: str) -> str:
     return gettext(message, request.state.locale)
 
 
-def _too_long(limits: dict[str, tuple[str, int]]) -> str | None:
+def too_long(limits: dict[str, tuple[str, int]]) -> str | None:
     for field, (value, limit) in limits.items():
         if len(value) > limit:
             return field
@@ -121,7 +121,7 @@ def _user_agent(request: Request) -> str | None:
     return request.headers.get("user-agent")
 
 
-def _signed_in_redirect(
+def signed_in_redirect(
     request: Request, target: str, session_id: str, expires_at: datetime
 ) -> Response:
     state = _state(request)
@@ -224,7 +224,7 @@ async def setup_submit(
         "timezone": timezone,
         "workspace_locale": workspace_locale,
     }
-    long_field = _too_long(
+    long_field = too_long(
         {
             "setup_token": (setup_token, MAX_SETUP_TOKEN_LENGTH),
             "email": (email, MAX_EMAIL_LENGTH),
@@ -307,7 +307,7 @@ async def setup_submit(
         )
     )
     state.setup_token = None
-    return _signed_in_redirect(request, "/", session_id, expires_at)
+    return signed_in_redirect(request, "/", session_id, expires_at)
 
 
 # Sign in and out
@@ -372,7 +372,7 @@ async def login_submit(
     expires_at = await run_in_threadpool(session_expiry, state.session_factory, session_id)
     if expires_at is None:
         raise RuntimeError("Session disappeared right after login")
-    return _signed_in_redirect(request, safe_next(next), session_id, expires_at)
+    return signed_in_redirect(request, safe_next(next), session_id, expires_at)
 
 
 @router.post("/logout", name="logout")
@@ -443,7 +443,7 @@ async def register_submit(
     _registration_enabled(request)
     state = _state(request)
     values = {"email": email, "display_name": display_name, "workspace_name": workspace_name}
-    long_field = _too_long(
+    long_field = too_long(
         {
             "email": (email, MAX_EMAIL_LENGTH),
             "display_name": (display_name, MAX_NAME_LENGTH),
@@ -507,7 +507,7 @@ async def register_submit(
             user_agent=_user_agent(request),
         )
     )
-    return _signed_in_redirect(request, "/", session_id, expires_at)
+    return signed_in_redirect(request, "/", session_id, expires_at)
 
 
 # Account security
@@ -546,7 +546,7 @@ async def password_submit(
 ) -> Response:
     current = _require_session(request)
     state = _state(request)
-    long_field = _too_long(
+    long_field = too_long(
         {
             "current_password": (current_password, MAX_PASSWORD_LENGTH),
             "new_password": (new_password, MAX_PASSWORD_LENGTH),

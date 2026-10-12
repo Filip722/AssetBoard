@@ -19,6 +19,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from assetboard.branding import APP_NAME, CLI_NAME
 from assetboard.i18n import gettext
+from assetboard.middleware import route_path
 from assetboard.services.auth import (
     WebSession,
     read_web_session,
@@ -31,14 +32,8 @@ from assetboard.web.security import session_cookie_name
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
 SIGNED_OUT_PATHS = frozenset({"/login", "/register", "/setup"})
-
-
-def _route_path(scope: Scope) -> str:
-    path: str = scope.get("path", "")
-    root_path: str = scope.get("root_path", "")
-    if root_path and path.startswith(root_path):
-        path = path[len(root_path) :] or "/"
-    return path
+# Invitation links work signed out: the invitee may still need to create an account.
+SIGNED_OUT_PREFIXES = ("/invite/",)
 
 
 def _always_open(path: str) -> bool:
@@ -182,7 +177,7 @@ class AccessGateMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        path = _route_path(scope)
+        path = route_path(scope)
         if _always_open(path):
             await self.app(scope, receive, send)
             return
@@ -200,7 +195,11 @@ class AccessGateMiddleware:
             return
         current = await _load_session(request)
         scope.setdefault("state", {})["web_session"] = current
-        if current is None and path not in SIGNED_OUT_PATHS:
+        if (
+            current is None
+            and path not in SIGNED_OUT_PATHS
+            and not path.startswith(SIGNED_OUT_PREFIXES)
+        ):
             target = "/login"
             # ``next`` only for full-page GET navigations: an HTMX fragment's path is not a page
             # to return to, so htmx is sent to plain /login.

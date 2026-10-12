@@ -40,6 +40,7 @@ from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.errors import add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
+from assetboard.web.invite_routes import router as invite_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed
@@ -131,6 +132,7 @@ def create_app(
     app.include_router(web_router)
     app.include_router(auth_router)
     app.include_router(workspace_router)
+    app.include_router(invite_router)
 
     @app.exception_handler(CsrfFailed)
     async def handle_csrf_failure(request: Request, _exc: CsrfFailed) -> Response:

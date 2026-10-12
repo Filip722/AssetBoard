@@ -8,6 +8,11 @@ from assetboard.db.repositories.base import (
     ScopedRepository,
     UnsupportedOperation,
 )
+from assetboard.db.repositories.invitation import (
+    InvitationLocation,
+    InvitationRepository,
+    InvitationTokenReader,
+)
 from assetboard.db.repositories.membership import MembershipRepository, WorkspaceMember
 from assetboard.db.repositories.user_memberships import MembershipView, UserMembershipReader
 from assetboard.db.repositories.workspace import UPDATABLE_FIELDS, CurrentWorkspaceRepository
@@ -17,6 +22,9 @@ __all__ = [
     "AuditEventRepository",
     "CurrentWorkspaceRepository",
     "ForeignWorkspace",
+    "InvitationLocation",
+    "InvitationRepository",
+    "InvitationTokenReader",
     "MembershipRepository",
     "MembershipView",
     "NotFound",

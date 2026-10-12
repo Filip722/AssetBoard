@@ -5,6 +5,7 @@ import socket
 import threading
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 import uvicorn
@@ -148,6 +149,33 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.get_by_role("button", name="Continue").click()
             page.wait_for_url(f"{base}/workspace/members")
             expect(page.locator("li[data-member]", has_text="bea@example.com")).to_have_count(0)
+
+            # Invitation links in a real browser: the forms must pass the Origin check, so the
+            # invite pages may not use "no-referrer" (it makes browsers send Origin: null).
+            page.get_by_label("Email (optional)").fill("")
+            page.get_by_role("button", name="Create invitation link").click()
+            # The link is built from BASE_URL; open its path on this test server.
+            link = base + urlsplit(page.locator("#invitation-link").input_value()).path
+            assert "/invite/" in link
+            guest = browser.new_context(color_scheme="light")
+            guest_page = guest.new_page()
+            invite_response = guest_page.goto(link, wait_until="networkidle")
+            assert invite_response is not None
+            assert invite_response.headers["referrer-policy"] == "same-origin"
+            guest_page.get_by_label("Email").fill("guest@example.com")
+            guest_page.get_by_label("Display name").fill("Guest")
+            guest_page.get_by_label("Password").fill("Another Correct Horse!")
+            guest_page.get_by_role("button", name="Create account and join").click()
+            guest_page.wait_for_url(f"{base}/")
+            expect(guest_page.locator("[data-current-workspace]")).to_have_text("Browser Home")
+            guest.close()
+            # A signed-in member accepting a second link: told they already belong.
+            page.goto(f"{base}/workspace/members", wait_until="networkidle")
+            page.get_by_role("button", name="Create invitation link").click()
+            second_link = base + urlsplit(page.locator("#invitation-link").input_value()).path
+            page.goto(second_link, wait_until="networkidle")
+            page.get_by_role("button", name="Accept invitation").click()
+            expect(page.get_by_text("You are already a member of this workspace.")).to_be_visible()
             page.goto(f"{base}/", wait_until="networkidle")
 
             page.get_by_role("button", name="Toggle dark mode").click()

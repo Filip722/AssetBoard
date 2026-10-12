@@ -148,6 +148,31 @@ msgstr ""
 msgid "The application is starting. Try again in a moment."
 msgstr ""
 
+msgid ""
+"This invitation link is not valid. It may have expired, been used or been"
+" revoked. Ask the workspace owner for a new link."
+msgstr ""
+
+msgid "This invitation was sent to a different email address."
+msgstr ""
+
+msgid ""
+"This invitation was sent to a different email address. It has now been "
+"revoked after too many attempts; ask the workspace owner for a new link."
+msgstr ""
+
+msgid "You are already a member of this workspace."
+msgstr ""
+
+msgid "Owner"
+msgstr ""
+
+msgid "Editor"
+msgstr ""
+
+msgid "Viewer"
+msgstr ""
+
 msgid "Choose a supported currency."
 msgstr ""
 
@@ -166,22 +191,24 @@ msgstr ""
 msgid "You cannot remove yourself from the workspace."
 msgstr ""
 
-msgid "The change could not be made. Reload the page and try again."
+msgid "Owner invitations must be locked to an email address."
 msgstr ""
 
-msgid "Owner"
-msgstr ""
-
-msgid "Editor"
-msgstr ""
-
-msgid "Viewer"
-msgstr ""
-
-msgid "Workspace settings saved."
+msgid "Choose how long the link stays valid."
 msgstr ""
 
 msgid "Choose a role."
+msgstr ""
+
+msgid ""
+"This workspace has too many pending invitations. Revoke some before "
+"creating more."
+msgstr ""
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr ""
+
+msgid "Workspace settings saved."
 msgstr ""
 
 msgid "Home"
@@ -378,6 +405,27 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "Invitation"
+msgstr ""
+
+#, python-format
+msgid "You are invited to join %(workspace)s as %(role)s."
+msgstr ""
+
+msgid ""
+"This invitation can only be accepted with the email address it was sent "
+"to."
+msgstr ""
+
+msgid "Accept invitation"
+msgstr ""
+
+msgid "Sign in to accept"
+msgstr ""
+
+msgid "Create account and join"
+msgstr ""
+
 msgid "People in this workspace"
 msgstr ""
 
@@ -395,6 +443,60 @@ msgid "Remove %(name)s from this workspace?"
 msgstr ""
 
 msgid "Remove"
+msgstr ""
+
+msgid "Invitations"
+msgstr ""
+
+msgid "Invitation link created. Copy it now: it is shown only once."
+msgstr ""
+
+msgid "Invitation link"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
+msgid "Email (optional)"
+msgstr ""
+
+msgid "Valid for"
+msgstr ""
+
+#, python-format
+msgid "%(num)d day"
+msgid_plural "%(num)d days"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"With an email, only an account with that address can accept. Owner "
+"invitations must have one: an owner can change everything, including "
+"members."
+msgstr ""
+
+msgid ""
+"The email is not verified, so share the link only with the person you "
+"mean to invite."
+msgstr ""
+
+msgid "Create invitation link"
+msgstr ""
+
+msgid "Pending invitations"
+msgstr ""
+
+#, python-format
+msgid "Expires %(date)s"
+msgstr ""
+
+msgid "Revoke this invitation link?"
+msgstr ""
+
+msgid "Revoke"
+msgstr ""
+
+msgid "No pending invitations."
 msgstr ""
 
 msgid "General"

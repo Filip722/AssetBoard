@@ -72,6 +72,35 @@ class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False)
 
 
+class Invitation(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """An invitation link. Only the SHA-256 of its token is stored; it can be used once."""
+
+    __tablename__ = "invitations"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_invitations_token_hash"),
+        CheckConstraint("length(token_hash) = 64", name="token_hash_sha256_length"),
+        CheckConstraint("role IN ('owner', 'editor', 'viewer')", name="role_valid"),
+        CheckConstraint("email IS NULL OR email = lower(email)", name="email_lowercase"),
+        CheckConstraint("role != 'owner' OR email IS NOT NULL", name="owner_requires_email"),
+        CheckConstraint("failed_email_attempts >= 0", name="failed_email_attempts_valid"),
+        Index("ix_invitations_workspace_created", "workspace_id", "created_at"),
+    )
+
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    used_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    failed_email_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
     __table_args__ = (

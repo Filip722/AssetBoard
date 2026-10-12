@@ -22,6 +22,27 @@ SECURITY_HEADERS = {
     "x-frame-options": "DENY",
 }
 _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEADERS)
+# Pages whose URL can carry a secret send no Referer to other sites (ADR-0013): invitation pages
+# (``/invite/<token>``), and sign-in and registration, whose ``next`` may be ``/invite/<token>``.
+# "same-origin", not "no-referrer": under "no-referrer" browsers send ``Origin: null`` on form
+# POSTs, which the Origin check (rightly) refuses.
+SAME_ORIGIN_REFERRER_PREFIXES = ("/invite/",)
+SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register"})
+_INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
+
+
+def redact_path(path: str) -> str:
+    """The request path as logged: invitation tokens are replaced with ``[redacted]``."""
+    return _INVITE_TOKEN.sub(r"\1[redacted]", path)
+
+
+def route_path(scope: Scope) -> str:
+    """The request path without the ASGI ``root_path`` (for matching app routes)."""
+    path: str = scope.get("path", "")
+    root_path: str = scope.get("root_path", "")
+    if root_path and path.startswith(root_path):
+        path = path[len(root_path) :] or "/"
+    return path
 
 
 class RequestIdMiddleware:
@@ -52,17 +73,19 @@ class RequestIdMiddleware:
             else:
                 log_level = logging.INFO
             duration_ms = (perf_counter() - started_at) * 1000
+            # Only the path is logged, never the query string (it may carry ``next=/invite/…``).
+            logged_path = redact_path(scope.get("path", ""))
             self.logger.log(
                 log_level,
                 "request_complete method=%s path=%s status_code=%d duration_ms=%.3f",
                 scope.get("method", ""),
-                scope.get("path", ""),
+                logged_path,
                 status_code,
                 duration_ms,
                 extra={
                     "request_id": request_id,
                     "method": scope.get("method", ""),
-                    "path": scope.get("path", ""),
+                    "path": logged_path,
                     "status_code": status_code,
                     "duration_ms": duration_ms,
                 },
@@ -143,6 +166,14 @@ class SecurityHeadersMiddleware:
                     (key.encode("ascii"), value.encode("ascii"))
                     for key, value in SECURITY_HEADERS.items()
                 )
+                path = route_path(scope)
+                if path in SAME_ORIGIN_REFERRER_PATHS or path.startswith(
+                    SAME_ORIGIN_REFERRER_PREFIXES
+                ):
+                    response_headers = [
+                        (name, b"same-origin" if name == b"referrer-policy" else value)
+                        for name, value in response_headers
+                    ]
                 if not scope.get("path", "").startswith("/static/"):
                     response_headers = [
                         (name, value)

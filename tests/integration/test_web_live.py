@@ -3,17 +3,12 @@
 from __future__ import annotations
 
 import re
-import socket
 import threading
-import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
-import uvicorn
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -23,33 +18,10 @@ from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.models.identity import User
 from assetboard.services import auth
+from tests.conftest import live_server
 
 SETUP_RACE = "Setup was already completed, or is being completed. Reload to continue."
 PASSWORD = "Correct Horse Battery!"
-
-
-def _free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
-
-
-@contextmanager
-def live_server(app: Any, **options: Any) -> Iterator[str]:
-    port = _free_port()
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", **options)
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    deadline = time.monotonic() + 20
-    while not server.started:
-        assert time.monotonic() < deadline, "server did not start"
-        time.sleep(0.01)
-    try:
-        yield f"http://127.0.0.1:{port}"
-    finally:
-        server.should_exit = True
-        thread.join(timeout=20)
 
 
 # Forwarded headers come only from TRUSTED_PROXIES

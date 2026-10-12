@@ -10,12 +10,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
-from assetboard.db.models.identity import AuditEvent, Membership, User
+from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
+from assetboard.services.invitations import new_token
 
 
 @dataclass(frozen=True)
@@ -50,7 +52,23 @@ def make_audit_event(session: Session, workspace_id: UUID) -> AuditEvent:
     )
 
 
+def make_invitation(session: Session, workspace_id: UUID) -> Invitation:
+    _token, token_hash = new_token()
+    now = session.info["clock"].now()
+    return Invitation(
+        workspace_id=workspace_id,
+        token_hash=token_hash,
+        role="viewer",
+        email=None,
+        expires_at=now + timedelta(days=7),
+        failed_email_attempts=0,
+        created_by_user_id=_user(session).id,
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     Membership: TenantCase(make_membership, update_values={"role": "editor"}),
     AuditEvent: TenantCase(make_audit_event, unsupported=frozenset({"update", "delete"})),
+    # Invitations change only through named transitions (revoke, mark_used, ...).
+    Invitation: TenantCase(make_invitation, unsupported=frozenset({"update", "delete"})),
 }
