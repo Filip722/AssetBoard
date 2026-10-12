@@ -375,3 +375,26 @@ def test_create_admin_does_not_mask_other_integrity_errors(
     assert result.exit_code != 0
     assert "already exists" not in result.output
     assert isinstance(result.exception, IntegrityError)
+
+
+def test_reset_password_gives_an_oidc_only_user_a_password(tmp_path: Path) -> None:
+    data_dir = tmp_path / "auth-data"
+    env = _auth_env(data_dir)
+    assert _create_admin(env, "sso@example.com").exit_code == 0
+    connection = sqlite3.connect(data_dir / "assetboard.db")
+    try:
+        with connection:
+            connection.execute("UPDATE users SET password_hash = NULL")
+    finally:
+        connection.close()
+    assert _users(data_dir) == [("sso@example.com", None)]
+
+    reset = CliRunner().invoke(
+        cli_app,
+        ["reset-password", "sso@example.com", "--password-stdin"],
+        input="Break Glass Password\n",
+        env=env,
+    )
+    assert reset.exit_code == 0, reset.output
+    [(_email, password_hash)] = _users(data_dir)
+    assert password_hash is not None and password_hash.startswith("$argon2id$")

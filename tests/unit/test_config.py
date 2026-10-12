@@ -192,3 +192,93 @@ def test_settings_reject_idle_timeout_longer_than_absolute_timeout() -> None:
 def test_settings_bound_concurrent_password_hashes(value: int) -> None:
     with pytest.raises(ValueError, match="auth_max_concurrent_hashes"):
         Settings(_env_file=None, auth_max_concurrent_hashes=value)
+
+
+# OIDC (F1.3)
+
+OIDC_BASE = {
+    "env": "prod",
+    "base_url": "https://money.example.test",
+    "oidc_issuer": "https://idp.example.test/application/o/assetboard/",
+    "oidc_client_id": "assetboard",
+}
+
+
+def test_oidc_is_off_by_default(tmp_path: Path) -> None:
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+    assert not settings.oidc_enabled
+    assert settings.oidc_scopes == "openid email profile"
+    assert settings.oidc_provider_name == "SSO"
+    assert settings.oidc_groups_claim == "groups"
+    assert settings.oidc_allowed_domains == []
+    assert not (settings.oidc_link_by_email or settings.oidc_auto_create or settings.oidc_only)
+    assert not (settings.allow_local_admin_login or settings.oidc_rp_logout)
+    assert settings.oidc_client_secret is None and settings.oidc_admin_group is None
+
+
+def test_oidc_settings_from_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in {
+        "OIDC_ISSUER": OIDC_BASE["oidc_issuer"],
+        "OIDC_CLIENT_ID": "assetboard",
+        "OIDC_CLIENT_SECRET": "s3cret-value",
+        "OIDC_SCOPES": "openid  email profile groups",
+        "OIDC_ALLOWED_DOMAINS": " Example.COM, family.example ",
+        "OIDC_ADMIN_GROUP": "",
+        "BASE_URL": "https://money.example.test/",
+        "ENV": "prod",
+    }.items():
+        monkeypatch.setenv(f"{ENV_PREFIX}_{name}", value)
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+    # The issuer is kept exactly, trailing slash included.
+    assert settings.oidc_issuer == "https://idp.example.test/application/o/assetboard/"
+    assert settings.oidc_scopes == "openid email profile groups"
+    assert settings.oidc_allowed_domains == ["example.com", "family.example"]
+    assert settings.oidc_admin_group is None  # blank is unset
+    assert settings.oidc_redirect_uri == "https://money.example.test/auth/oidc/callback"
+    assert settings.oidc_client_secret is not None
+    assert "s3cret-value" not in repr(settings)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"oidc_client_id": None}, "OIDC_CLIENT_ID is required"),
+        ({"oidc_scopes": "email profile"}, "must contain 'openid'"),
+        ({"oidc_issuer": "http://idp.example.test"}, "OIDC_ISSUER must use https"),
+        ({"oidc_issuer": "https://idp.example.test/?x=1"}, "without query"),
+        ({"oidc_issuer": "idp.example.test"}, "absolute URL"),
+        ({"oidc_issuer": "https://idp.example.test/" + "a" * 490}, "at most 512"),
+        ({"base_url": "http://money.example.test"}, "BASE_URL must use https"),
+        ({"base_url": None}, "BASE_URL must be set"),
+        ({"oidc_only": True, "allow_registration": True}, "cannot be combined"),
+        ({"oidc_issuer": None, "oidc_only": True}, "OIDC_ONLY needs OIDC_ISSUER"),
+        ({"oidc_provider_name": " "}, "1 to 40 characters"),
+        ({"oidc_provider_name": "x" * 41}, "1 to 40 characters"),
+        ({"oidc_allowed_domains": "example"}, "domain names"),
+        ({"oidc_allowed_domains": "user@example.com"}, "domain names"),
+        ({"oidc_groups_claim": " "}, "must not be empty"),
+    ],
+)
+def test_oidc_settings_are_validated(
+    tmp_path: Path, overrides: dict[str, object], message: str
+) -> None:
+    values: dict[str, object] = {"data_dir": tmp_path, **OIDC_BASE, **overrides}
+    if overrides.get("base_url", "") is None:
+        del values["base_url"]
+    with pytest.raises(ValueError, match=message):
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+
+
+def test_http_is_allowed_for_oidc_in_dev(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        env="dev",
+        base_url="http://localhost:8000",
+        oidc_issuer="http://localhost:9000/realms/dev",
+        oidc_client_id="assetboard",
+    )
+    assert settings.oidc_enabled
+    assert settings.oidc_redirect_uri == "http://localhost:8000/auth/oidc/callback"

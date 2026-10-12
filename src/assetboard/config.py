@@ -48,6 +48,20 @@ class Settings(BaseSettings):
     registration_ip_limit: int = Field(default=5, ge=1)
     registration_window_minutes: int = Field(default=60, ge=1, le=1440)
     auth_max_concurrent_hashes: int = Field(default=2, ge=1, le=8)
+    # OIDC sign-in (F1.3, ADR-0014): on when ``oidc_issuer`` is set.
+    oidc_issuer: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: SecretStr | None = None
+    oidc_scopes: str = "openid email profile"
+    oidc_provider_name: str = "SSO"
+    oidc_link_by_email: bool = False
+    oidc_auto_create: bool = False
+    oidc_allowed_domains: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    oidc_groups_claim: str = "groups"
+    oidc_admin_group: str | None = None
+    oidc_only: bool = False
+    allow_local_admin_login: bool = False
+    oidc_rp_logout: bool = False
 
     def __init__(self, *, _env_file: str | Path | None = ".env", **values: Any) -> None:
         super().__init__(_env_file=_env_file, **values)
@@ -149,6 +163,112 @@ class Settings(BaseSettings):
                 ) from exc
         return value
 
+    @field_validator("oidc_issuer", "oidc_client_id", "oidc_admin_group", mode="before")
+    @classmethod
+    def blank_is_unset(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("oidc_client_secret", mode="before")
+    @classmethod
+    def blank_secret_is_unset(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("oidc_issuer")
+    @classmethod
+    def validate_oidc_issuer(cls, value: str | None) -> str | None:
+        # Kept exactly as given (trailing slash included): discovery must return the same string.
+        if value is None:
+            return None
+        if len(value) > 512:
+            raise ValueError("OIDC_ISSUER must be at most 512 characters")
+        try:
+            parsed = urlsplit(value)
+            valid = (
+                parsed.scheme in {"http", "https"}
+                and parsed.hostname is not None
+                and not parsed.username
+                and not parsed.password
+                and not parsed.query
+                and not parsed.fragment
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError("OIDC_ISSUER must be an absolute URL without query or fragment")
+        return value
+
+    @field_validator("oidc_scopes")
+    @classmethod
+    def validate_oidc_scopes(cls, value: str) -> str:
+        scopes = value.split()
+        if "openid" not in scopes:
+            raise ValueError("OIDC_SCOPES must contain 'openid'")
+        return " ".join(scopes)
+
+    @field_validator("oidc_provider_name")
+    @classmethod
+    def validate_oidc_provider_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned or len(cleaned) > 40:
+            raise ValueError("OIDC_PROVIDER_NAME must contain 1 to 40 characters")
+        return cleaned
+
+    @field_validator("oidc_groups_claim")
+    @classmethod
+    def validate_oidc_groups_claim(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("OIDC_GROUPS_CLAIM must not be empty")
+        return cleaned
+
+    @field_validator("oidc_allowed_domains", mode="before")
+    @classmethod
+    def split_oidc_allowed_domains(cls, value: list[str] | str) -> list[str]:
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, list):
+            raise ValueError("OIDC_ALLOWED_DOMAINS must be a comma-separated list")
+        domains = [domain.strip().lower().rstrip(".") for domain in value if domain.strip()]
+        for domain in domains:
+            labels = domain.split(".")
+            if len(labels) < 2 or not all(
+                label and len(label) <= 63 and label.replace("-", "").isalnum() for label in labels
+            ):
+                raise ValueError("OIDC_ALLOWED_DOMAINS must contain domain names like example.com")
+        return domains
+
+    @property
+    def oidc_enabled(self) -> bool:
+        return self.oidc_issuer is not None
+
+    @property
+    def oidc_redirect_uri(self) -> str:
+        """Always built from BASE_URL, never from request headers."""
+        return f"{self.base_url}/auth/oidc/callback"
+
+    def _validate_oidc(self) -> None:
+        if not self.oidc_enabled:
+            if self.oidc_only:
+                raise ValueError("OIDC_ONLY needs OIDC_ISSUER")
+            return
+        insecure_allowed = self.env == "dev"
+        if self.oidc_client_id is None:
+            raise ValueError("OIDC_CLIENT_ID is required when OIDC_ISSUER is set")
+        if not insecure_allowed and urlsplit(self.oidc_issuer or "").scheme != "https":
+            raise ValueError("OIDC_ISSUER must use https (http is allowed only with ENV=dev)")
+        if "base_url" not in self.model_fields_set:
+            raise ValueError("BASE_URL must be set when OIDC is enabled")
+        if not insecure_allowed and urlsplit(self.base_url).scheme != "https":
+            raise ValueError(
+                "BASE_URL must use https when OIDC is enabled (http only with ENV=dev)"
+            )
+        if self.oidc_only and self.allow_registration:
+            raise ValueError("OIDC_ONLY cannot be combined with ALLOW_REGISTRATION")
+
     @model_validator(mode="after")
     def finalize_settings(self) -> Settings:
         if self.setup_token is not None:
@@ -161,6 +281,7 @@ class Settings(BaseSettings):
             raise ValueError("SESSION_IDLE_TIMEOUT_DAYS must be <= SESSION_ABSOLUTE_TIMEOUT_DAYS")
         if self.auth_throttle_max_seconds < self.auth_throttle_base_seconds:
             raise ValueError("AUTH_THROTTLE_MAX_SECONDS must be >= AUTH_THROTTLE_BASE_SECONDS")
+        self._validate_oidc()
         if self.database_url is None:
             database_filename = self.data_dir / "assetboard.db"
             self.database_url = f"sqlite:///{database_filename}"

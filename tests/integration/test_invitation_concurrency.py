@@ -9,11 +9,13 @@ import pytest
 from sqlalchemy import select, update
 
 from assetboard.config import Settings
-from assetboard.db.models.identity import Invitation, SetupState, User
+from assetboard.db.models.identity import ExternalIdentity, Invitation, SetupState, User
 from assetboard.db.repositories import NotFound
 from assetboard.services import invitations, workspaces
 from assetboard.services.auth import RegistrationOutcome, register_with_invitation
 from assetboard.services.invitations import InvitationInvalid, accept_invitation
+from assetboard.services.oidc import OidcIdentity
+from assetboard.services.oidc_accounts import OidcSignIn, sign_in_with_oidc
 from assetboard.services.workspaces import (
     MAX_PENDING_INVITATIONS,
     TooManyInvitations,
@@ -123,6 +125,55 @@ def test_sign_up_rolls_back_the_user_when_the_link_was_used_meanwhile(
     outcome = _sign_up(db, settings, token, "second@example.com")
     assert outcome.status == "invitation_invalid"
     assert _users(db) == {"olga@example.com", "first@example.com"}
+
+
+def test_concurrent_oidc_sign_ups_on_one_link_create_one_user(
+    db: WorkspaceDb, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        registration_ip_limit=50,
+        base_url="https://money.example.test",
+        oidc_issuer="https://idp.example.test",
+        oidc_client_id="assetboard",
+    )
+    _close_setup(db)
+    db.add_member("olga", "owner")
+    token = create_invitation(
+        db.factory, db.ctx("olga", "owner"), role="viewer", email=None, expires_in_days=7
+    ).token
+    results: dict[str, OidcSignIn] = {}
+
+    def sign_up(name: str) -> None:
+        who = OidcIdentity(
+            issuer="https://idp.example.test",
+            subject=name,
+            email=f"{name}@example.com",
+            email_verified=True,
+            display_name=name,
+            groups=None,
+        )
+        results[name] = sign_in_with_oidc(
+            db.factory,
+            who,
+            next_path=f"/invite/{token}",
+            settings=settings,
+            clock=db.clock,
+            host="192.0.2.10",
+        )
+
+    outcomes = serialize_at_checkpoint(
+        db.engine, monkeypatch, invitations, lambda: sign_up("first"), lambda: sign_up("second")
+    )
+    assert outcomes == {"first": None, "second": None}
+    assert results["first"].status == "signed_in"
+    assert results["second"].status == "invitation_invalid"
+    # The second user and identity were rolled back with the failed invitation use.
+    assert _users(db) == {"olga@example.com", "first@example.com"}
+    with db.factory() as session:
+        assert session.scalars(select(ExternalIdentity.subject)).all() == ["first"]
+    assert db.roles() == {"olga": "owner", "first": "viewer"}
 
 
 # Revoke versus accept

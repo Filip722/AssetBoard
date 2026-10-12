@@ -33,6 +33,19 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_REGISTRATION_IP_LIMIT` | `5` | App | Registration attempts (successful or not) allowed per client address within the registration window. |
 | `ASSETBOARD_REGISTRATION_WINDOW_MINUTES` | `60` | App | Window for the registration attempt limit. |
 | `ASSETBOARD_AUTH_MAX_CONCURRENT_HASHES` | `2` | App | Password hashes (Argon2id, about 64 MiB of memory each) computed at the same time, 1 to 8. At most 16 further sign-in requests wait in total; when 16 are already waiting, or a wait exceeds 10 seconds, they get HTTP 503 with `Retry-After`. Health checks are not affected. |
+| `ASSETBOARD_OIDC_ISSUER` | unset | App | OIDC provider's issuer URL, exactly as its discovery document states it (trailing slash included). Setting it turns OIDC sign-in on; it must be `https://` unless `ASSETBOARD_ENV=dev`, and `ASSETBOARD_BASE_URL` must then be set explicitly (and `https://` outside dev). See [docs/auth/oidc.md](auth/oidc.md). |
+| `ASSETBOARD_OIDC_CLIENT_ID` | unset | App | Client ID registered at the provider. Required with `OIDC_ISSUER`. The redirect URI to register is `<BASE_URL>/auth/oidc/callback`. |
+| `ASSETBOARD_OIDC_CLIENT_SECRET` | unset | App | Client secret; never logged. Unset means a public client that relies on PKCE alone. |
+| `ASSETBOARD_OIDC_SCOPES` | `openid email profile` | App | Space-separated scopes; must contain `openid`. Add your provider's groups scope when using `OIDC_ADMIN_GROUP`. |
+| `ASSETBOARD_OIDC_PROVIDER_NAME` | `SSO` | App | Label on the sign-in button (1 to 40 characters). |
+| `ASSETBOARD_OIDC_LINK_BY_EMAIL` | `false` | App | Link a first OIDC sign-in to an existing account with the same email, only when the provider says `email_verified` and after that account's password is entered once. |
+| `ASSETBOARD_OIDC_AUTO_CREATE` | `false` | App | Create an account (with its own workspace) for an unknown identity with a verified email. Invitation links create accounts without it. |
+| `ASSETBOARD_OIDC_ALLOWED_DOMAINS` | empty | App | Comma-separated email domains allowed to sign in with OIDC (exact match, verified email required). Empty allows any. Checked at every sign-in. |
+| `ASSETBOARD_OIDC_GROUPS_CLAIM` | `groups` | App | Claim holding the user's groups; only read when `OIDC_ADMIN_GROUP` is set. |
+| `ASSETBOARD_OIDC_ADMIN_GROUP` | unset | App | Members of this group become instance administrators at OIDC sign-in, and non-members lose it (never the last active one). A missing or malformed groups claim changes nothing. |
+| `ASSETBOARD_OIDC_ONLY` | `false` | App | Hide password sign-in and registration. Needs `OIDC_ISSUER`; refuses to start with `ALLOW_REGISTRATION`. |
+| `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN` | `false` | App | Break-glass: with `OIDC_ONLY`, keep password sign-in at `/login/local` for instance administrators. No effect otherwise. |
+| `ASSETBOARD_OIDC_RP_LOGOUT` | `false` | App | Signing out of an OIDC session also signs out at the provider (RP-initiated logout), if it publishes an `end_session_endpoint`. Register `<BASE_URL>/login` as the post-logout redirect URI. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -155,7 +168,8 @@ request was addressed to (scheme plus `Host`), and never when the browser report
 request. Make sure the proxy passes the original `Host` header and scheme.
 
 **Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login`,
-`POST /register` and `/invite/` (invitation sign-up) at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
+`POST /register`, `/invite/` (invitation sign-up) and `/auth/oidc/` (OIDC sign-in, which can
+create accounts) at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
 middleware, or a Caddy rate-limit module), such as a few requests per minute per client address.
 This keeps password-guessing floods from reaching the app at all. Also cap the request body size
 at the proxy (for example nginx `client_max_body_size 1m;`, the Traefik `Buffering` middleware's
@@ -176,6 +190,24 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### F1.3: OIDC sign-in
+
+- **Nothing changes until `ASSETBOARD_OIDC_ISSUER` is set.** The migration adds the
+  `external_identities` table and a `user_sessions.auth_method` column; existing sessions are
+  recorded as password sign-ins.
+- **New runtime dependencies:** Authlib and joserfc (with cryptography). With OIDC on, the
+  container needs outbound HTTPS access to the provider; a private CA is trusted through
+  `SSL_CERT_FILE` (see [docs/auth/oidc.md](auth/oidc.md)).
+- **Settings that refuse to start:** `OIDC_ONLY` without `OIDC_ISSUER`, `OIDC_ONLY` with
+  `ALLOW_REGISTRATION`, and OIDC without an explicit `BASE_URL` (or with an `http://` issuer or
+  `BASE_URL` outside `ENV=dev`).
+- **Before turning on `OIDC_ONLY`**, sign in once as an administrator through the provider, or
+  set `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN=true` to keep `/login/local`.
+- **Reverse-proxy logs record the callback query.** `/auth/oidc/callback?code=…&state=…` carries
+  a one-time authorization code. It is useless without the browser's flow cookie and the PKCE
+  verifier and expires within minutes, but exclude `/auth/oidc/` query strings from proxy logs
+  if you can.
 
 ### F1.2: workspaces and invitations
 

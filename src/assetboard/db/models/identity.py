@@ -50,6 +50,27 @@ class User(IdMixin, TimestampMixin, Base):
         return normalize_email(value)
 
 
+class ExternalIdentity(IdMixin, TimestampMixin, Base):
+    """An identity at an OIDC provider, linked to a user (F1.3, ADR-0014).
+
+    ``provider`` is the issuer URL, so subjects of different issuers never collide.
+    ``email_at_link`` records the provider's email when the identity was linked; the user's own
+    email does not follow later changes at the provider.
+    """
+
+    __tablename__ = "external_identities"
+    __table_args__ = (
+        UniqueConstraint("provider", "subject", name="uq_external_identities_provider_subject"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(512), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    email_at_link: Mapped[str | None] = mapped_column(String(320), nullable=True)
+
+
 class Workspace(IdMixin, TimestampMixin, Base):
     __tablename__ = "workspaces"
 
@@ -106,6 +127,7 @@ class UserSession(Base):
     __table_args__ = (
         Index("ix_user_sessions_user_expires", "user_id", "expires_at"),
         CheckConstraint("length(id_hash) = 64", name="id_hash_sha256_length"),
+        CheckConstraint("auth_method IN ('password', 'oidc')", name="auth_method_valid"),
     )
 
     id_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -117,6 +139,10 @@ class UserSession(Base):
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
     ip_prefix: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # How the session was started; RP-initiated logout applies to "oidc" sessions only.
+    auth_method: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="password", server_default="password"
+    )
     # The workspace chosen with the switcher; NULL means "the oldest membership" (F1.2).
     current_workspace_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),

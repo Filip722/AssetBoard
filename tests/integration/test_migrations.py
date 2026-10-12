@@ -38,6 +38,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "audit_events",
         "auth_throttles",
+        "external_identities",
         "invitations",
         "memberships",
         "setup_state",
@@ -191,6 +192,49 @@ def test_0004_round_trip(tmp_path: Path) -> None:
         assert "invitations" not in inspect(engine).get_table_names()
         upgrade_database(settings)
         assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0005_round_trip_keeps_sessions_as_password_logins(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f13.db'}"
+    )
+    upgrade_database(settings)
+    script = ScriptDirectory.from_config(alembic_config(settings))
+    revision = script.get_revision("0005_f13")
+    assert revision is not None and revision.down_revision == "0004_f12"
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        unique = {
+            item["name"] for item in inspect(engine).get_unique_constraints("external_identities")
+        }
+        assert "uq_external_identities_provider_subject" in unique
+        command.downgrade(alembic_config(settings), "0004_f12")
+        inspector = inspect(engine)
+        assert "external_identities" not in inspector.get_table_names()
+        # OIDC-only users need no schema change: the column was nullable from the start.
+        password = {c["name"]: c for c in inspector.get_columns("users")}["password_hash"]
+        assert password["nullable"] is True
+        with engine.begin() as connection:
+            user_id = "00000000000000000000000000000001"
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, locale, theme, is_active, "
+                "is_instance_admin, created_at, updated_at) VALUES (?, 'a@example.com', 'A', "
+                "'en', 'system', 1, 0, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (user_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO user_sessions (id_hash, user_id, created_at, last_seen_at, "
+                "expires_at) VALUES (?, ?, '2026-01-01 00:00:00', '2026-01-01 00:00:00', "
+                "'2026-02-01 00:00:00')",
+                ("a" * 64, user_id),
+            )
+        upgrade_database(settings)
+        with engine.connect() as connection:
+            methods = connection.exec_driver_sql("SELECT auth_method FROM user_sessions")
+            assert methods.scalars().all() == ["password"]
         check_database_migrations(settings)
     finally:
         engine.dispose()

@@ -1163,6 +1163,7 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
 def test_workspace_table_scope_allowlist_for_f12() -> None:
     expected_global = {
         "auth_throttles": "global authentication controls keyed by account/IP",
+        "external_identities": "OIDC identities belong to global users",
         "setup_state": "singleton instance setup state",
         "user_sessions": "sessions belong to global users, independent of workspace selection",
         "users": "global identities can belong to multiple workspaces",

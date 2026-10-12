@@ -63,6 +63,19 @@ def isolate_application_data_dir(
         "REGISTRATION_IP_LIMIT",
         "REGISTRATION_WINDOW_MINUTES",
         "AUTH_MAX_CONCURRENT_HASHES",
+        "OIDC_ISSUER",
+        "OIDC_CLIENT_ID",
+        "OIDC_CLIENT_SECRET",
+        "OIDC_SCOPES",
+        "OIDC_PROVIDER_NAME",
+        "OIDC_LINK_BY_EMAIL",
+        "OIDC_AUTO_CREATE",
+        "OIDC_ALLOWED_DOMAINS",
+        "OIDC_GROUPS_CLAIM",
+        "OIDC_ADMIN_GROUP",
+        "OIDC_ONLY",
+        "ALLOW_LOCAL_ADMIN_LOGIN",
+        "OIDC_RP_LOGOUT",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}_{name}", raising=False)
 

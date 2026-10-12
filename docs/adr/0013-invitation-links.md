@@ -70,3 +70,21 @@ account otherwise. A link that grants access is a bearer secret: it must not lea
   documented under "Upgrading" in `docs/deployment.md`.
 - Sign-up through an invitation discloses whether an email is already registered, as open
   registration does (ADR-0012).
+
+## Amendment (2026-10-12): invitations through OIDC (F1.3)
+
+An invitee may also continue with the configured OIDC provider (ADR-0014). The same rules
+apply, with one stricter point:
+
+- A signed-in visitor (whatever the sign-in method) accepts on the invite page; the email lock
+  compares the account's email.
+- A visitor without an account gets one that joins only the invitation's workspace, even when
+  `ASSETBOARD_OIDC_AUTO_CREATE` is off, under the same per-address registration limit. Creating
+  the user, linking the identity and using the invitation are one transaction, so a link used
+  meanwhile rolls everything back.
+- **The provider's email must be verified** to create an account. The email lock then compares
+  that email; a mismatch is counted per invitation (5 revoke it). An unverified email is refused
+  before the lock is compared and is not counted. So, unlike a local sign-up, an OIDC sign-up
+  does prove control of the locked address, as far as the provider verifies it.
+- If the email already belongs to an account and linking is off, the visitor is told the
+  account exists and should sign in with it; the invitation stays unused.

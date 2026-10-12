@@ -91,3 +91,19 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
     addressed to, so a rebinding page could post same-origin forms; it would still need a valid
     CSRF token, and host-scoped cookies (no `Domain`, `__Host-` on https) are never sent to the
     attacker's name, which limits the impact to signed-out forms.
+
+## Amendment (2026-10-12): OIDC sign-in (F1.3)
+
+ADR-0014 adds OIDC sign-in. For local authentication this means:
+
+- **Users without a password.** Accounts created through OIDC have `password_hash` NULL. Sign-in
+  treats them like unknown users (dummy verify, the same generic error), so no password works,
+  not even an empty one. Changing the password reports that there is none, without counting an
+  attempt. `assetboard reset-password` can still set one (break-glass).
+- **Local sign-in can be turned off.** `ASSETBOARD_OIDC_ONLY` hides password sign-in and
+  registration; `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN` keeps `/login/local` for instance
+  administrators.
+- **Password confirmation.** Linking an OIDC identity to an account that has a password needs
+  that password once. The check reuses login's per-account and per-address throttle and dummy
+  verify; F1.5 reuses it for sensitive profile actions.
+- **Sessions record how they started** (`auth_method`: `password` or `oidc`).

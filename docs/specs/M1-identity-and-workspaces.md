@@ -134,6 +134,31 @@ Also add a short docs/architecture.md section "How to add a new workspace-owned 
 - Tests use a fake in-process IdP (no network): happy path, wrong nonce/state, unverified email, domain restriction, account linking rules.
 - Docs: `docs/auth/oidc.md` with setup notes for Authentik, Keycloak, Authelia (generic checklist; do not claim version-specific details you did not verify).
 
+**Delivery and decisions (2026-10-12)**, see ADR-0014:
+- Split into two PRs. **Part A:** settings, `ExternalIdentity` and `user_sessions.auth_method`,
+  the OIDC client, the signed flow and pending-link payloads, account mapping, password
+  confirmation, the fake provider and service tests. **Part B:** routes, templates,
+  `OIDC_ONLY`/break-glass, RP logout, translations, the browser test and `docs/auth/oidc.md`.
+- Linking by email needs the flag and the existing account's password, entered once (login
+  throttle, dummy verify, generic error), and revokes that account's other sessions. Accounts without a
+  password are never linked by email; the visitor is told the account exists.
+- Apart from signing in with an already linked identity, OIDC needs a verified email, checked
+  before any local account is looked at (an unverified claim cannot probe for accounts).
+  Creating an account (auto-create or invitation) uses the registration throttle. An invitation creates the account even without
+  `OIDC_AUTO_CREATE`. The domain allow-list needs a verified email and is checked at every
+  sign-in.
+- `email_verified` counts only as `true` or `"true"`; userinfo claims are used only when its
+  `sub` equals the ID token's.
+- `OIDC_ADMIN_GROUP` maps one group to instance administrator (grant and revoke); a missing or
+  malformed claim changes nothing; the last active administrator is never demoted. Workspace
+  roles are not mapped.
+- Flow state is a signed cookie with `iat`/`exp` checked by the server (10 minutes), not a
+  table. The provider is reached with the standard library (no new HTTP client).
+- `BASE_URL` must be set and `https://` (as must the issuer and every discovered endpoint)
+  unless `ENV=dev`. `OIDC_ONLY` refuses to start with `ALLOW_REGISTRATION`.
+- `/auth/oidc/*` sends `Referrer-Policy: no-referrer` and `Cache-Control: no-store` and has no
+  forms; the password confirmation page is under `/login/`.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

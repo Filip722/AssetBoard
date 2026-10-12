@@ -148,3 +148,25 @@ def test_adr_0013_exists_and_upgrading_mentions_the_access_log() -> None:
     assert "[redacted]" in upgrading
     # Excluding /invite/ from the proxy log is not enough: /login?next= carries the token too.
     assert "is not enough" in upgrading and "/login?next=" in upgrading
+
+
+def test_adr_0014_records_the_oidc_decisions_and_risks() -> None:
+    adr_dir = DEPLOYMENT.parents[0] / "adr"
+    adr = (adr_dir / "0014-oidc-sign-in.md").read_text(encoding="utf-8")
+    for required in (
+        "PKCE (S256)",
+        "that account's password entered",
+        "No back-channel logout",
+        "orphans identities",
+        "`email_verified` false",
+        "Referrer-Policy: no-referrer",
+        "form-action 'self'",
+        "SSL_CERT_FILE",
+        "assetboard reset-password <email>",
+        "cannot probe for accounts",
+    ):
+        assert required in adr, required
+    for amended in ("0012-local-authentication.md", "0013-invitation-links.md"):
+        assert "## Amendment (2026-10-12): " in (adr_dir / amended).read_text(encoding="utf-8")
+    upgrading = DEPLOYMENT.read_text(encoding="utf-8").split("### F1.3", 1)[1].split("###")[0]
+    assert "callback query" in upgrading and "OIDC_ONLY" in upgrading

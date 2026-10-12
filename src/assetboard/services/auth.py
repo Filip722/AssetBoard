@@ -55,6 +55,7 @@ from assetboard.services.workspace_options import WorkspaceOptions, validate_wor
 
 ActorType = Literal["user", "cli", "system"]
 ThrottleScope = Literal["account", "ip", "setup", "register"]
+AuthMethod = Literal["password", "oidc"]
 
 MIN_PASSWORD_LENGTH = 10
 MAX_PASSWORD_LENGTH = 1024
@@ -169,7 +170,9 @@ class LoginOutcome:
         return self.user is not None and self.session_id is not None
 
 
-PasswordChangeStatus = Literal["changed", "invalid_current", "invalid_new", "throttled"]
+PasswordChangeStatus = Literal[
+    "changed", "invalid_current", "invalid_new", "throttled", "no_password"
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -784,7 +787,7 @@ def authenticate_with_factory(
     )
 
 
-def _gate_verifier(gate: HashGate) -> Verifier:
+def gate_verifier(gate: HashGate) -> Verifier:
     """From a worker thread, run each verification through the event loop's hash gate."""
 
     def verify(password_hash: str, password: str) -> bool:
@@ -816,7 +819,7 @@ async def authenticate_user_async(
 
     Raises ``HashGateBusy`` (after releasing the reserved attempt) when hashing is saturated.
     """
-    verify, hasher = _gate_verifier(gate), _gate_hasher(gate)
+    verify, hasher = gate_verifier(gate), _gate_hasher(gate)
     return await anyio.to_thread.run_sync(
         lambda: authenticate_with_factory(
             factory,
@@ -841,6 +844,7 @@ def create_user_session(
     clock: Clock,
     host: str | None,
     user_agent: str | None = None,
+    auth_method: AuthMethod = "password",
 ) -> str:
     session_id = secrets.token_urlsafe(32)
     now = clock.now()
@@ -853,6 +857,7 @@ def create_user_session(
             expires_at=now + timedelta(days=settings.session_absolute_timeout_days),
             user_agent=user_agent[:200] if user_agent else None,
             ip_prefix=client_ip_prefix(host),
+            auth_method=auth_method,
         )
     )
     session.flush()
@@ -979,14 +984,21 @@ def _change_password_flow(
             return None
         return Candidate(reserved, user.password_hash, user.email, user.display_name)
 
-    def blocked(session: Session) -> bool:
+    def blocked(session: Session) -> bool | None:
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
+        if user.password_hash is None:
+            return None
         return _is_blocked(_find_throttle(session, "account", user.email), clock.now())
 
     # Deferred read first; ``reserve`` checks again under the write lock.
-    if run.read(blocked):
+    is_blocked = run.read(blocked)
+    if is_blocked is None:
+        # A user without a password (OIDC, F1.3) has nothing to change: no attempt is counted.
+        # Setting a first password is the CLI's ``reset-password`` (F1.5 adds a page).
+        return PasswordChangeOutcome(status="no_password")
+    if is_blocked:
         return PasswordChangeOutcome(status="throttled")
     candidate = run(reserve)
     if candidate is None:
@@ -1118,7 +1130,7 @@ async def change_password_async(
     host: str | None = None,
     user_agent: str | None = None,
 ) -> PasswordChangeOutcome:
-    verify, hasher = _gate_verifier(gate), _gate_hasher(gate)
+    verify, hasher = gate_verifier(gate), _gate_hasher(gate)
     return await anyio.to_thread.run_sync(
         lambda: change_password_with_factory(
             factory,
@@ -1181,7 +1193,7 @@ def _create_user_records(
     *,
     email: str,
     display_name: str,
-    password: str,
+    password: str | None,
     workspace_name: str | None,
     options: WorkspaceOptions | None,
     settings: Settings,
@@ -1191,14 +1203,17 @@ def _create_user_records(
     """Create a user and, when ``options`` is given, a workspace they own.
 
     ``password_hash`` lets the caller hash outside the transaction; the policy is checked here
-    either way.
+    either way. ``password=None`` creates a user without a password (OIDC, F1.3).
     """
     clean_display_name = _clean_name(
         display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
     )
     normalized_email = normalize_email(email)
-    validate_password(password, normalized_email, clean_display_name)
-    password_hash = password_hash or argon2_hash(password)
+    if password is not None:
+        validate_password(password, normalized_email, clean_display_name)
+        password_hash = password_hash or argon2_hash(password)
+    else:
+        password_hash = None
     user = User(
         email=normalized_email,
         display_name=clean_display_name,
@@ -1440,6 +1455,43 @@ def create_admin_cli(
     return user, workspace
 
 
+def _registration_blocked(session: Session, key: str, settings: Settings, clock: Clock) -> bool:
+    if setup_is_open(session):
+        raise RegistrationDisabled
+    row = _find_throttle(session, "register", key)
+    window = timedelta(minutes=settings.registration_window_minutes)
+    return _current_count(row, clock.now(), window) >= settings.registration_ip_limit
+
+
+def _reserve_registration(
+    session: Session, key: str, settings: Settings, clock: Clock
+) -> tuple[ReservedAttempt, ...] | None:
+    if _registration_blocked(session, key, settings, clock):
+        return None
+    window = timedelta(minutes=settings.registration_window_minutes)
+    row = _count_attempt(
+        session, "register", key, now=clock.now(), window=window, free=None, settings=settings
+    )
+    prune_auth_throttles(session, clock)
+    return (ReservedAttempt("register", key, row.window_started_at, None),)
+
+
+def reserve_registration_attempt(
+    factory: sessionmaker[Session], *, host: str | None, settings: Settings, clock: Clock
+) -> bool:
+    """Count one account creation against the per-address registration limit.
+
+    For account creation outside ``register_user`` (OIDC, F1.3). False when the limit is
+    reached; raises ``RegistrationDisabled`` while first-run setup is open. The attempt stays
+    counted whatever happens next, as for registration.
+    """
+    run = ImmediateTransactions(factory)
+    key = _ip_key(host)
+    if run.read(lambda session: _registration_blocked(session, key, settings, clock)):
+        return False
+    return run(lambda session: _reserve_registration(session, key, settings, clock)) is not None
+
+
 @dataclass(frozen=True, slots=True)
 class _RegistrationInput:
     email: str
@@ -1486,23 +1538,12 @@ def _register_flow(
     if invitation is None and not settings.allow_registration:
         raise RegistrationDisabled
     key = _ip_key(host)
-    window = timedelta(minutes=settings.registration_window_minutes)
 
     def throttled(session: Session) -> bool:
-        if setup_is_open(session):
-            raise RegistrationDisabled
-        row = _find_throttle(session, "register", key)
-        return _current_count(row, clock.now(), window) >= settings.registration_ip_limit
+        return _registration_blocked(session, key, settings, clock)
 
     def reserve(session: Session) -> tuple[ReservedAttempt, ...] | None:
-        if throttled(session):
-            return None
-        now = clock.now()
-        row = _count_attempt(
-            session, "register", key, now=now, window=window, free=None, settings=settings
-        )
-        prune_auth_throttles(session, clock)
-        return (ReservedAttempt("register", key, row.window_started_at, None),)
+        return _reserve_registration(session, key, settings, clock)
 
     # A deferred read first; ``reserve`` checks again under the write lock.
     if run.read(throttled):
@@ -1781,6 +1822,230 @@ async def register_with_invitation_async(
     )
 
 
+# Building blocks for other sign-in methods (OIDC, F1.3)
+
+
+def record_auth_event(
+    session: Session,
+    clock: Clock,
+    *,
+    action: str,
+    entity_id: str | None,
+    actor_user_id: UUID | None = None,
+    host: str | None = None,
+    user_agent: str | None = None,
+    data: dict[str, str | int | bool] | None = None,
+) -> None:
+    """An instance-level auth event about a user (``workspace_id`` NULL)."""
+    _audit(
+        session,
+        clock,
+        action=action,
+        entity_type="user",
+        entity_id=entity_id,
+        actor_type="user" if actor_user_id else "system",
+        actor_user_id=actor_user_id,
+        host=host,
+        user_agent=user_agent,
+        data=data,
+    )
+
+
+def default_workspace_options(settings: Settings) -> WorkspaceOptions:
+    """The instance defaults, for a workspace created without a form."""
+    return _workspace_options(
+        settings, base_currency=None, country_code=None, timezone=None, workspace_locale=None
+    )
+
+
+def create_passwordless_user(
+    session: Session,
+    *,
+    email: str,
+    display_name: str,
+    own_workspace: bool,
+    settings: Settings,
+    is_admin: bool,
+) -> tuple[User, Workspace | None]:
+    """A user who signs in elsewhere (OIDC): no password, optionally an own workspace."""
+    return _create_user_records(
+        session,
+        email=email,
+        display_name=display_name,
+        password=None,
+        workspace_name=None,
+        options=default_workspace_options(settings) if own_workspace else None,
+        settings=settings,
+        is_admin=is_admin,
+    )
+
+
+def revoke_all_sessions(session: Session, user_id: UUID) -> int:
+    return _delete_sessions_except(session, user_id, None)
+
+
+@dataclass(frozen=True, slots=True)
+class _ConfirmCandidate:
+    reserved: tuple[ReservedAttempt, ...]
+    email: str
+    password_hash: str | None
+
+
+def _confirm_password_flow[T](
+    run: TransactionRunner,
+    *,
+    user_id: UUID,
+    password: str,
+    purpose: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None,
+    verify: Verifier | None,
+    on_success: Callable[[Session, User], T],
+) -> T | None:
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return None
+
+    def slots(email: str) -> tuple[ThrottleSlot, ...]:
+        return (
+            ThrottleSlot("account", email, None, settings.auth_account_free_failures),
+            ThrottleSlot(
+                "ip",
+                _ip_key(host),
+                timedelta(minutes=settings.auth_ip_window_minutes),
+                settings.auth_ip_free_failures,
+            ),
+        )
+
+    def blocked(session: Session) -> bool:
+        user = session.get(User, user_id)
+        if user is None:
+            return True
+        now = clock.now()
+        return any(
+            _is_blocked(_find_throttle(session, slot.scope, slot.key), now)
+            for slot in slots(user.email)
+        )
+
+    def reserve(session: Session) -> _ConfirmCandidate | None:
+        user = session.get(User, user_id)
+        if user is None:
+            return None
+        reserved = reserve_attempts(session, slots(user.email), clock.now(), settings)
+        if reserved is None:
+            return None
+        return _ConfirmCandidate(reserved, user.email, user.password_hash)
+
+    # As for login: a deferred read first, then the reservation under the write lock.
+    if run.read(blocked):
+        return None
+    candidate = run(reserve)
+    if candidate is None:
+        return None
+    try:
+        # A user without a password costs the same dummy verify and fails like a wrong one.
+        verified = (verify or verify_password)(candidate.password_hash or _dummy_hash(), password)
+    except BaseException:
+        run(lambda session: release_attempts(session, candidate.reserved))
+        raise
+
+    def finish(session: Session) -> T | None:
+        user = session.get(User, user_id)
+        if (
+            not verified
+            or user is None
+            or not user.is_active
+            or user.password_hash is None
+            or user.password_hash != candidate.password_hash
+        ):
+            # The reservation stays: it is this failure's count.
+            prune_auth_throttles(session, clock)
+            _audit(
+                session,
+                clock,
+                action="auth.password_confirm_failure",
+                entity_type="user",
+                entity_id=str(user_id),
+                actor_type="user",
+                actor_user_id=user.id if user else None,
+                host=host,
+                user_agent=user_agent,
+                data={"purpose": purpose},
+            )
+            return None
+        _reset_account(session, candidate.email, clock.now())
+        release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
+        return on_success(session, user)
+
+    return run(finish)
+
+
+def confirm_password_with_factory[T](
+    factory: sessionmaker[Session],
+    *,
+    user_id: UUID,
+    password: str,
+    purpose: str,
+    settings: Settings,
+    clock: Clock,
+    on_success: Callable[[Session, User], T],
+    host: str | None = None,
+    user_agent: str | None = None,
+    verify: Verifier | None = None,
+) -> T | None:
+    """Re-check a known user's password, then run ``on_success`` in the same transaction.
+
+    Used to link an OIDC identity to an account that has a password (F1.3) and meant for F1.5's
+    sensitive profile actions. It shares login's throttle (the user's account bucket and the
+    client address) and its dummy verify. Every failure is the same ``None``: wrong password,
+    no password, inactive user, throttled, or a password changed meanwhile.
+    """
+    return _confirm_password_flow(
+        ImmediateTransactions(factory),
+        user_id=user_id,
+        password=password,
+        purpose=purpose,
+        settings=settings,
+        clock=clock,
+        host=host,
+        user_agent=user_agent,
+        verify=verify,
+        on_success=on_success,
+    )
+
+
+async def confirm_password_async[T](
+    factory: sessionmaker[Session],
+    gate: HashGate,
+    *,
+    user_id: UUID,
+    password: str,
+    purpose: str,
+    settings: Settings,
+    clock: Clock,
+    on_success: Callable[[Session, User], T],
+    host: str | None = None,
+    user_agent: str | None = None,
+) -> T | None:
+    """Web entry point: verifies through the hashing limit (``HashGateBusy`` when saturated)."""
+    verify = gate_verifier(gate)
+    return await anyio.to_thread.run_sync(
+        lambda: confirm_password_with_factory(
+            factory,
+            user_id=user_id,
+            password=password,
+            purpose=purpose,
+            settings=settings,
+            clock=clock,
+            on_success=on_success,
+            host=host,
+            user_agent=user_agent,
+            verify=verify,
+        )
+    )
+
+
 # Web sessions
 
 
@@ -1797,6 +2062,7 @@ class WebSession:
     expires_at: datetime
     needs_touch: bool
     current_workspace_id: UUID | None = None
+    auth_method: str = "password"
 
 
 def read_web_session(
@@ -1823,6 +2089,7 @@ def read_web_session(
         expires_at=row.expires_at,
         needs_touch=now - row.last_seen_at >= SESSION_TOUCH_INTERVAL,
         current_workspace_id=row.current_workspace_id,
+        auth_method=row.auth_method,
     )
 
 
