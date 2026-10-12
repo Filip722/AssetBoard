@@ -220,8 +220,9 @@ when you intend to upload the image and its release tags.
 - **Reverse-proxy logs may still record invitation tokens.** A token can appear in the
   `/invite/<token>` path and in the query of `/login?next=%2Finvite%2F<token>`. Excluding `/invite/`
   from the proxy's access log is not enough: also exclude or strip query strings for `/login`
-  and `/register`, and the `Referer` field if your log format records it (these pages send a
-  `Referer` to the app itself), or restrict who can read the proxy log. Invitations are
+  and `/register`, and the `Referer` field if your log format records it (form submissions and
+  links from these pages send a `Referer` to the app itself; their static files do not), or
+  restrict who can read the proxy log. Invitations are
   single-use and expire, which limits the damage of a leaked token.
 
 ### F1.1: local accounts

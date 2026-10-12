@@ -6,12 +6,16 @@
   <meta name="color-scheme" content="light dark">
   <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}' />
   {% if web_session %}<meta name="csrf-token" content="{{ csrf_token(request) }}">{% endif %}
+  {# Subresources never carry the page URL (it may hold an invitation token, ADR-0013). The page
+     policy stays same-origin so form POSTs keep their Origin. The icon is a data: URL, so the
+     browser makes no implicit /favicon.ico request. #}
+  <link rel="icon" href="data:,">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}">
-  <script src="{{ static_url(request, 'js/theme.js') }}"></script>
-  <script defer src="{{ static_url(request, 'vendor/htmx.min.js') }}"></script>
-  <script defer src="{{ static_url(request, 'vendor/alpinejs-csp.min.js') }}"></script>
-  <script defer src="{{ static_url(request, 'js/app.js') }}"></script>
+  <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}" referrerpolicy="no-referrer">
+  <script src="{{ static_url(request, 'js/theme.js') }}" referrerpolicy="no-referrer"></script>
+  <script defer src="{{ static_url(request, 'vendor/htmx.min.js') }}" referrerpolicy="no-referrer"></script>
+  <script defer src="{{ static_url(request, 'vendor/alpinejs-csp.min.js') }}" referrerpolicy="no-referrer"></script>
+  <script defer src="{{ static_url(request, 'js/app.js') }}" referrerpolicy="no-referrer"></script>
 </head>
 <body class="min-h-full">
   {% from "macros/components.html" import confirm_dialog, flashes %}

@@ -37,10 +37,12 @@ account otherwise. A link that grants access is a bearer secret: it must not lea
   - `/invite/*`, `/login` and `/register` responses send `Referrer-Policy: same-origin` (also as
     a meta tag); sign-in and registration can carry `next=/invite/<token>`. No other site
     receives a `Referer` from these pages. Every page is `Cache-Control: no-store`.
-  - Not `no-referrer`: under it, browsers send `Origin: null` on form POSTs, and the Origin
-    check (ADR-0012) refuses those. Same-origin requests still carry a `Referer` to our own
-    server, which the app never logs. A reverse proxy that logs `Referer` (for example nginx's
-    `combined` format) can record these URLs; it already logs them as request lines.
+  - Not `no-referrer` for the page: under it, browsers send `Origin: null` on form POSTs, and
+    the Origin check (ADR-0012) refuses those. Instead, every stylesheet and script tag carries
+    `referrerpolicy="no-referrer"` and the icon is inline, so loading a page sends no `Referer`
+    at all. Only navigations and form submissions from these pages to our own server carry
+    one, which the app never logs. A reverse proxy that logs `Referer` (for example nginx's
+    `combined` format) can record those; it already logs the same URLs as request lines.
   - Reverse-proxy logs remain outside our control; that is an accepted risk.
 - **Invitation-only sign-up.** On `/invite/<token>`, a signed-out visitor can sign in (and is
   returned to the invitation) or create an account. That account is created even when open

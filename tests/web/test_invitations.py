@@ -321,7 +321,18 @@ def test_invalid_invitations_look_the_same(roomy: OwnerApp, state: str) -> None:
             assert _alert(response.text) == reference
 
 
-def test_invite_pages_keep_referrers_same_origin_and_no_store(roomy: OwnerApp) -> None:
+def _assert_no_subresource_referrers(html: str) -> None:
+    tags = re.findall(r"<(?:link|script)\b[^>]*>", html)
+    assert tags
+    for tag in tags:
+        if 'href="data:' in tag:
+            continue
+        assert 'referrerpolicy="no-referrer"' in tag, tag
+
+
+def test_invite_pages_keep_page_referrers_same_origin_subresources_none_and_no_store(
+    roomy: OwnerApp,
+) -> None:
     token = create_link(roomy)
     with anonymous(roomy) as client:
         responses = [
@@ -333,9 +344,17 @@ def test_invite_pages_keep_referrers_same_origin_and_no_store(roomy: OwnerApp) -
         assert response.headers["referrer-policy"] == "same-origin"
         assert response.headers["cache-control"] == "no-store"
         assert '<meta name="referrer" content="same-origin">' in response.text
+        _assert_no_subresource_referrers(response.text)
+    _assert_no_subresource_referrers(roomy.client.get("/invite/" + "Y" * 43).text)
+    # The full layout (signed-in error pages, which can render at an invite URL) does the same.
+    home = roomy.client.get("/")
+    assert "/static/vendor/htmx.min.js" in home.text
+    _assert_no_subresource_referrers(home.text)
 
 
-def test_sign_in_and_registration_pages_keep_referrers_same_origin(web: WebHarness) -> None:
+def test_sign_in_and_registration_pages_keep_page_referrers_same_origin_subresources_none(
+    web: WebHarness,
+) -> None:
     # Their "next" can carry an invitation token.
     app = web.app(allow_registration=True)
     with TestClient(app) as client:
@@ -354,6 +373,7 @@ def test_sign_in_and_registration_pages_keep_referrers_same_origin(web: WebHarne
     for response in pages:
         assert response.headers["referrer-policy"] == "same-origin", response.request.url
         assert '<meta name="referrer" content="same-origin">' in response.text
+        _assert_no_subresource_referrers(response.text)
     assert other.headers["referrer-policy"] == "strict-origin-when-cross-origin"
 
 

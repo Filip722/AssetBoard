@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="referrer" content="{% block referrer %}same-origin{% endblock %}">
+  {# Subresources never carry the page URL (it may hold an invitation token, ADR-0013). The page
+     policy stays same-origin so form POSTs keep their Origin. The icon is a data: URL, so the
+     browser makes no implicit /favicon.ico request. #}
+  <link rel="icon" href="data:,">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}">
-  <script src="{{ static_url(request, 'js/theme.js') }}"></script>
+  <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}" referrerpolicy="no-referrer">
+  <script src="{{ static_url(request, 'js/theme.js') }}" referrerpolicy="no-referrer"></script>
 </head>
 <body class="min-h-full bg-canvas dark:bg-slate-950">
   <main id="main-content" class="flex min-h-screen items-center justify-center px-4 py-10">

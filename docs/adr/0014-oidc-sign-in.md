@@ -91,8 +91,9 @@ need the provider at startup.
   `form-action 'self'` to redirects that follow a form POST. No ID token is stored, so no
   `id_token_hint` is sent.
 - **Leaks.** `/auth/oidc/*` responses send `Referrer-Policy: no-referrer` and `Cache-Control:
-  no-store`; they contain no forms (under `no-referrer` browsers send `Origin: null` on POSTs,
-  see ADR-0013). The password confirmation form lives under `/login/` with `same-origin`. The
+  no-store`; they contain no forms (under `no-referrer` browsers send `Origin: null` on POSTs:
+  see ADR-0013 for why pages with forms use `same-origin`, and ADR-0012 for the Origin check
+  that refuses `null`). The password confirmation form lives under `/login/` with `same-origin`. The
   callback redirects to a clean URL, and the request log never records query strings.
 
 ## Consequences

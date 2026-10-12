@@ -5,7 +5,7 @@ import socket
 import threading
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import pytest
 import uvicorn
@@ -159,9 +159,27 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             assert "/invite/" in link
             guest = browser.new_context(color_scheme="light")
             guest_page = guest.new_page()
+            # Static files loaded by pages whose URL holds the token never carry it as Referer.
+            static_requests: list[tuple[str, str | None]] = []
+            guest_page.on(
+                "request",
+                lambda request: (
+                    static_requests.append((request.url, request.all_headers().get("referer")))
+                    if "/static/" in request.url
+                    else None
+                ),
+            )
+            login_next = f"{base}/login?next=" + quote(urlsplit(link).path, safe="")
+            guest_page.goto(login_next, wait_until="networkidle")
             invite_response = guest_page.goto(link, wait_until="networkidle")
             assert invite_response is not None
             assert invite_response.headers["referrer-policy"] == "same-origin"
+            assert len(static_requests) >= 4, static_requests  # css + js on both pages
+            # Absent or empty (Chromium reports "" for files served from its memory cache):
+            # either way no URL, so no token, reaches the server.
+            token = urlsplit(link).path.rsplit("/", 1)[1]
+            assert all(not referer for _url, referer in static_requests), static_requests
+            assert all(token not in (referer or "") for _url, referer in static_requests)
             guest_page.get_by_label("Email").fill("guest@example.com")
             guest_page.get_by_label("Display name").fill("Guest")
             guest_page.get_by_label("Password").fill("Another Correct Horse!")

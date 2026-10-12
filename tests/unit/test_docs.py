@@ -136,6 +136,7 @@ def test_adr_0013_exists_and_upgrading_mentions_the_access_log() -> None:
     for required in (
         "SHA-256",
         "same-origin",
+        'referrerpolicy="no-referrer"',
         "Origin: null",
         "access log",
         "not proof of ownership",
