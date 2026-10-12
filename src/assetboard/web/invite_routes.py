@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy.exc import OperationalError
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
@@ -41,7 +41,7 @@ from assetboard.web.auth_routes import (
     too_long,
 )
 from assetboard.web.rendering import render_template
-from assetboard.web.security import client_host, require_csrf, web_session
+from assetboard.web.security import client_host, oidc_start_url, require_csrf, web_session
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -83,6 +83,7 @@ def _invite_page(
     status_code: int = 200,
 ) -> Response:
     signed_in = web_session(request) is not None
+    settings = request.app.state.settings
     return render_template(
         request,
         "invite/show.html",
@@ -92,6 +93,9 @@ def _invite_page(
             "role_name": _t(request, ROLE_NAMES[preview.role]) if preview else "",
             "signed_in": signed_in,
             "login_url": "/login?next=" + quote(f"/invite/{token}", safe=""),
+            "local_sign_up": not settings.oidc_only,
+            "oidc_provider": settings.oidc_provider_name if settings.oidc_enabled else None,
+            "oidc_start_url": oidc_start_url(f"/invite/{token}"),
             "error": _t(request, error) if error else None,
             "notice": _t(request, notice) if notice else None,
             "values": values or {"email": "", "display_name": ""},
@@ -180,9 +184,11 @@ async def invite_register(
     display_name: FormStr = "",
     password: FormStr = "",
 ) -> Response:
+    state = request.app.state
+    if state.settings.oidc_only:
+        raise HTTPException(status_code=404)  # sign-up goes through the provider (ADR-0014)
     if web_session(request) is not None:
         return RedirectResponse(request.url_for("invite", token=token).path, status_code=303)
-    state = request.app.state
     values = {"email": email, "display_name": display_name}
     preview = await _preview(request, token)
     if preview is None:

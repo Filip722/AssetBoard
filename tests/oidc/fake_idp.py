@@ -56,6 +56,9 @@ class _Grant:
 class FakeIdp:
     clock: FixedClock
     issuer: str = ISSUER
+    # Where the endpoints live (the issuer unless a test breaks it) and the client's callback.
+    base: str = ISSUER
+    redirect_uri: str = REDIRECT_URI
     client_id: str = CLIENT_ID
     client_secret: str | None = CLIENT_SECRET
     key: RSAKey = field(
@@ -87,11 +90,11 @@ class FakeIdp:
     def discovery(self) -> dict[str, Any]:
         document: dict[str, Any] = {
             "issuer": self.issuer,
-            "authorization_endpoint": f"{ISSUER}/auth",
-            "token_endpoint": f"{ISSUER}/token",
-            "jwks_uri": f"{ISSUER}/certs",
-            "userinfo_endpoint": f"{ISSUER}/userinfo",
-            "end_session_endpoint": f"{ISSUER}/logout",
+            "authorization_endpoint": f"{self.base}/auth",
+            "token_endpoint": f"{self.base}/token",
+            "jwks_uri": f"{self.base}/certs",
+            "userinfo_endpoint": f"{self.base}/userinfo",
+            "end_session_endpoint": f"{self.base}/logout",
             "token_endpoint_auth_methods_supported": self.auth_methods,
             "code_challenge_methods_supported": ["S256"],
             "id_token_signing_alg_values_supported": ["RS256"],
@@ -115,13 +118,13 @@ class FakeIdp:
     ) -> HttpResponse:
         path = urlsplit(url)._replace(query="").geturl()
         self.requests.append((method, path))
-        if path == f"{ISSUER.rstrip('/')}/.well-known/openid-configuration":
+        if path == f"{self.base.rstrip('/')}/.well-known/openid-configuration":
             return _json(self.discovery_status, self.discovery())
-        if path == f"{ISSUER}/certs":
+        if path == f"{self.base}/certs":
             return _json(200, self.jwks())
-        if path == f"{ISSUER}/token" and method == "POST":
+        if path == f"{self.base}/token" and method == "POST":
             return self._token(headers, dict(data or {}))
-        if path == f"{ISSUER}/userinfo":
+        if path == f"{self.base}/userinfo":
             if headers.get("Authorization") != "Bearer fake-access-token":
                 return _json(401, {"error": "invalid_token"})
             return _json(200, self.userinfo if self.userinfo is not None else {})
@@ -132,10 +135,10 @@ class FakeIdp:
     def authorize(self, url: str, *, state: str | None = None, **extra: str) -> dict[str, str]:
         """Check the authorization request and return the callback query parameters."""
         query = {name: values[0] for name, values in parse_qs(urlsplit(url).query).items()}
-        assert url.startswith(f"{ISSUER}/auth?")
+        assert url.startswith(f"{self.base}/auth?")
         assert query["client_id"] == self.client_id
         assert query["response_type"] == "code"
-        assert query["redirect_uri"] == REDIRECT_URI
+        assert query["redirect_uri"] == self.redirect_uri
         assert query["code_challenge_method"] == "S256"
         assert "openid" in query["scope"].split()
         code = secrets.token_urlsafe(16)

@@ -497,3 +497,45 @@ def test_provider_text_cannot_forge_log_lines(
     assert "request_complete" in messages[0]  # kept, but inside the one line
     assert error.value.detail == "access_denied"
     assert OidcError("x", "a\nb\x1b").detail == "a b"
+
+
+def test_the_urllib_transport_honours_proxy_variables_and_never_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import urllib.request
+
+    from assetboard.services.oidc import UrllibTransport
+
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.internal:3128")
+    transport = UrllibTransport()
+    opener: Any = transport._opener  # pyright: ignore[reportPrivateUsage]
+    handlers: list[object] = list(opener.handlers)
+    proxies: list[Any] = [h for h in handlers if isinstance(h, urllib.request.ProxyHandler)]
+    assert proxies and proxies[0].proxies.get("https") == "http://proxy.internal:3128"
+    redirects = [h for h in handlers if isinstance(h, urllib.request.HTTPRedirectHandler)]
+    assert len(redirects) == 1 and type(redirects[0]).__name__ == "_NoRedirects"
+
+
+def test_errors_before_the_provider_accepted_the_code_are_not_auditable(
+    tmp_path: Path, idp: FakeIdp, clock: StepClock
+) -> None:
+    client = make_client(tmp_path, idp, clock)
+    request = client.begin()
+    params = idp.authorize(request.url)
+    cases = [
+        {**params, "state": "forged"},
+        {**params, "iss": "https://evil.test"},
+        {"state": request.state, "error": "access_denied"},
+        {"state": request.state},
+        {**params, "code": "junk"},  # the token endpoint answers invalid_grant
+    ]
+    for case in cases:
+        with pytest.raises(OidcError) as error:
+            complete(client, request, case)
+        assert not error.value.auditable, case
+    assert len(idp.token_requests) == 1  # only the junk code reached the provider
+    assert idp.token_requests[0]["data"]["code"] == "junk"
+    idp.id_token_overrides = {"aud": "someone-else"}
+    with pytest.raises(OidcError) as late:
+        complete(client, request, params)
+    assert late.value.reason == "id_token_invalid" and late.value.auditable

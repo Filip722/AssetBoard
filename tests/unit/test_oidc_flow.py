@@ -12,6 +12,7 @@ from assetboard.services.oidc_flow import (
     FLOW_LIFETIME,
     FLOW_PURPOSE,
     LINK_PURPOSE,
+    ConsumedStates,
     FlowState,
     PendingLink,
     seal,
@@ -86,3 +87,51 @@ def test_missing_fields_are_refused() -> None:
 def test_oversized_payloads_cannot_be_sealed() -> None:
     with pytest.raises(ValueError):
         seal(KEY, FLOW_PURPOSE, {"next": "x" * 4000}, now=NOW, lifetime=FLOW_LIFETIME)
+
+
+def test_the_largest_realistic_pending_link_fits_in_a_cookie() -> None:
+    # The settings and the callback cap every field; anything larger would take the "failed"
+    # path (test_an_oversized_pending_link_is_a_failure_page_not_a_500), never a 500.
+    pending = PendingLink(
+        user_id=uuid4(),
+        issuer="https://idp.example.test/" + "i" * (512 - 25),
+        subject="\U0001f600" * 255,  # 4 bytes each in UTF-8
+        email=("e" * 64 + "@" + "d" * 251 + ".test")[:320],
+        admin=False,
+        next_path="/" + "n" * 511,
+    )
+    assert len(pending.issuer) == 512 and len(pending.subject) == 255
+    assert len(pending.email) == 320 and len(pending.next_path) == 512
+    value = pending.seal(KEY, now=NOW)
+    assert len(value) <= 3800
+    assert PendingLink.unseal(KEY, value, now=NOW) == pending
+
+
+def test_a_state_can_be_consumed_once() -> None:
+    consumed = ConsumedStates()
+    assert consumed.consume("state-a", now=NOW)
+    assert not consumed.consume("state-a", now=NOW + timedelta(minutes=9))
+    assert consumed.consume("state-b", now=NOW)
+
+
+def test_consumed_states_expire_with_the_flow() -> None:
+    consumed = ConsumedStates()
+    consumed.consume("state-a", now=NOW)
+    later = NOW + FLOW_LIFETIME
+    # By then the cookie that carried it has expired, so the entry can go.
+    assert consumed.consume("state-b", now=later)
+    assert "state-a" not in consumed and len(consumed) == 1
+
+
+def test_consumed_states_are_bounded_and_evict_the_oldest() -> None:
+    consumed = ConsumedStates(max_entries=3)
+    for name in ("a", "b", "c", "d"):
+        assert consumed.consume(name, now=NOW)
+    assert len(consumed) == 3
+    assert "a" not in consumed and all(name in consumed for name in "bcd")
+
+
+def test_consumed_states_store_only_hashes() -> None:
+    consumed = ConsumedStates()
+    consumed.consume("raw-state-value", now=NOW)
+    assert "raw-state-value" not in repr(vars(consumed))

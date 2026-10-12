@@ -171,3 +171,34 @@ def test_adr_0014_records_the_oidc_decisions_and_risks() -> None:
         assert "## Amendment (2026-10-12): " in (adr_dir / amended).read_text(encoding="utf-8")
     upgrading = DEPLOYMENT.read_text(encoding="utf-8").split("### F1.3", 1)[1].split("###")[0]
     assert "callback query" in upgrading and "OIDC_ONLY" in upgrading
+
+
+def test_oidc_guide_covers_providers_and_operations() -> None:
+    guide = (DEPLOYMENT.parent / "auth" / "oidc.md").read_text(encoding="utf-8")
+    for section in (
+        "## Checklist",
+        "### Authentik",
+        "### Keycloak",
+        "### Authelia",
+        "## Administrators from a group",
+        "## Network: proxies and private certificate authorities",
+        "## When the issuer URL changes",
+    ):
+        assert section in guide, section
+    for term in (
+        "/auth/oidc/callback",
+        "<BASE_URL>/login",
+        "email_verified",
+        "groups scope",
+        "HTTPS_PROXY",
+        "SSL_CERT_FILE",
+        "assetboard reset-password <email>",
+        "/login/local",
+        "ASSETBOARD_OIDC_ONLY",
+    ):
+        assert term in guide, term
+    # Every OIDC setting in the guide is a real setting.
+    names = set(re.findall(r"ASSETBOARD_(OIDC_[A-Z_]+|ALLOW_LOCAL_ADMIN_LOGIN)", guide))
+    fields = {field.upper() for field in Settings.model_fields}
+    assert names and names <= fields, names - fields
+    assert "](auth/oidc.md)" in DEPLOYMENT.read_text(encoding="utf-8")

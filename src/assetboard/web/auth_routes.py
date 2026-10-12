@@ -33,6 +33,7 @@ from assetboard.services.auth import (
     run_initial_setup_async,
     session_expiry,
     setup_is_open,
+    user_has_password,
     verify_setup_token,
 )
 from assetboard.services.workspace_options import (
@@ -47,6 +48,7 @@ from assetboard.web.security import (
     clear_csrf_cookie,
     clear_session_cookie,
     client_host,
+    oidc_start_url,
     require_csrf,
     safe_next,
     session_cookie_name,
@@ -320,7 +322,11 @@ def _login_page(
     next_path: str = "",
     error: bool = False,
     status: int = 200,
+    break_glass: bool = False,
 ) -> Response:
+    settings = _state(request).settings
+    # Break-glass shows only the password form; OIDC_ONLY shows only the provider's button.
+    oidc = settings.oidc_enabled and not break_glass
     return render_template(
         request,
         "auth/login.html",
@@ -328,7 +334,11 @@ def _login_page(
             "email": email,
             "next_path": safe_next(next_path, default=""),
             "error": _t(request, LOGIN_FAILED) if error else None,
-            "registration_enabled": _state(request).settings.allow_registration,
+            "registration_enabled": settings.allow_registration and not break_glass,
+            "password_login": break_glass or not settings.oidc_only,
+            "form_action": "login_local" if break_glass else "login",
+            "oidc_provider": settings.oidc_provider_name if oidc else None,
+            "oidc_start_url": oidc_start_url(safe_next(next_path, default="")) if oidc else None,
         },
         status_code=status,
     )
@@ -341,18 +351,19 @@ async def login_form(request: Request, next: str = "") -> Response:  # noqa: A00
     return _login_page(request, next_path=next)
 
 
-@router.post("/login")
-async def login_submit(
-    request: Request,
-    email: FormStr = "",
-    password: FormStr = "",
-    next: FormStr = "",  # noqa: A002
+async def _password_sign_in(
+    request: Request, email: str, password: str, next_path: str, *, break_glass: bool
 ) -> Response:
     state = _state(request)
     if len(email) > MAX_EMAIL_LENGTH or len(password) > MAX_PASSWORD_LENGTH:
         # Cannot be valid; same response as any failed login, without hashing or queries.
         return _login_page(
-            request, email=email[:MAX_EMAIL_LENGTH], next_path=next, error=True, status=401
+            request,
+            email=email[:MAX_EMAIL_LENGTH],
+            next_path=next_path,
+            error=True,
+            status=401,
+            break_glass=break_glass,
         )
     existing = request.cookies.get(session_cookie_name(state.settings))
     outcome = await authenticate_user_async(
@@ -365,20 +376,77 @@ async def login_submit(
         host=client_host(request),
         user_agent=_user_agent(request),
         existing_session_id=existing,
+        require_instance_admin=break_glass,
     )
     if not outcome.succeeded or outcome.session_id is None:
-        return _login_page(request, email=email, next_path=next, error=True, status=401)
+        return _login_page(
+            request,
+            email=email,
+            next_path=next_path,
+            error=True,
+            status=401,
+            break_glass=break_glass,
+        )
     session_id = outcome.session_id
     expires_at = await run_in_threadpool(session_expiry, state.session_factory, session_id)
     if expires_at is None:
         raise RuntimeError("Session disappeared right after login")
-    return signed_in_redirect(request, safe_next(next), session_id, expires_at)
+    return signed_in_redirect(request, safe_next(next_path), session_id, expires_at)
+
+
+@router.post("/login")
+async def login_submit(
+    request: Request,
+    email: FormStr = "",
+    password: FormStr = "",
+    next: FormStr = "",  # noqa: A002
+) -> Response:
+    if _state(request).settings.oidc_only:
+        raise HTTPException(status_code=404)
+    return await _password_sign_in(request, email, password, next, break_glass=False)
+
+
+# Break-glass password sign-in for instance administrators under OIDC_ONLY (ADR-0014). Not
+# linked from any page; same throttle, dummy verify and generic error as /login.
+
+
+def _require_break_glass(request: Request) -> None:
+    settings = _state(request).settings
+    if not (settings.oidc_only and settings.allow_local_admin_login):
+        raise HTTPException(status_code=404)
+
+
+@router.get("/login/local", name="login_local")
+async def login_local_form(request: Request, next: str = "") -> Response:  # noqa: A002
+    _require_break_glass(request)
+    if web_session(request) is not None:
+        return RedirectResponse(safe_next(next), status_code=303)
+    return _login_page(request, next_path=next, break_glass=True)
+
+
+@router.post("/login/local")
+async def login_local_submit(
+    request: Request,
+    email: FormStr = "",
+    password: FormStr = "",
+    next: FormStr = "",  # noqa: A002
+) -> Response:
+    _require_break_glass(request)
+    return await _password_sign_in(request, email, password, next, break_glass=True)
 
 
 @router.post("/logout", name="logout")
 async def logout(request: Request) -> Response:
     state = _state(request)
     session_id = request.cookies.get(session_cookie_name(state.settings))
+    current = web_session(request)
+    # RP-initiated logout (ADR-0014): only for sessions that started at the provider.
+    provider_logout = (
+        state.oidc is not None
+        and state.settings.oidc_rp_logout
+        and current is not None
+        and current.auth_method == "oidc"
+    )
     if session_id:
         await run_in_threadpool(
             run_immediate,
@@ -391,7 +459,24 @@ async def logout(request: Request) -> Response:
                 user_agent=_user_agent(request),
             ),
         )
-    response = RedirectResponse("/login", status_code=303)
+    # Computed only after the local session is gone: a slow or failing provider never keeps
+    # anyone signed in here.
+    provider_logout_url: str | None = None
+    if provider_logout and state.oidc is not None:
+        provider_logout_url = await run_in_threadpool(state.oidc.end_session_url)
+    if provider_logout_url is not None:
+        # A page, not a redirect: Chromium applies CSP form-action to redirects after a form
+        # POST, and the provider is another origin. The local session is already gone.
+        response = render_template(
+            request,
+            "auth/oidc_logout.html",
+            context={
+                "provider": state.settings.oidc_provider_name,
+                "logout_url": provider_logout_url,
+            },
+        )
+    else:
+        response = RedirectResponse("/login", status_code=303)
     clear_session_cookie(response, state.settings)
     return response
 
@@ -513,19 +598,30 @@ async def register_submit(
 # Account security
 
 
-def _password_page(
+NO_PASSWORD = _(
+    "This account has no password: it signs in with your identity provider. An administrator "
+    "can set one with the reset-password command."
+)
+
+
+async def _password_page(
     request: Request,
     *,
     errors: dict[str, str] | None = None,
     notice: str | None = None,
     status_code: int = 200,
 ) -> Response:
+    current = _require_session(request)
+    has_password = await run_in_threadpool(
+        user_has_password, _state(request).session_factory, current.user_id
+    )
     return render_template(
         request,
         "auth/password.html",
         context={
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
+            "no_password": None if has_password else _t(request, NO_PASSWORD),
         },
         status_code=status_code,
     )
@@ -534,7 +630,7 @@ def _password_page(
 @router.get("/account/password", name="account_password")
 async def password_form(request: Request) -> Response:
     _require_session(request)
-    return _password_page(request)
+    return await _password_page(request)
 
 
 @router.post("/account/password")
@@ -554,11 +650,11 @@ async def password_submit(
         }
     )
     if long_field:
-        return _password_page(
+        return await _password_page(
             request, errors={long_field: ERROR_MESSAGES["too_long"]}, status_code=400
         )
     if new_password != confirm_password:
-        return _password_page(
+        return await _password_page(
             request,
             errors={"confirm_password": ERROR_MESSAGES["password_mismatch"]},
             status_code=400,
@@ -578,21 +674,23 @@ async def password_submit(
     )
     if outcome.status == "changed":
         notice = _t(request, _("Your password was changed. Other devices were signed out."))
-        return _password_page(request, notice=notice)
+        return await _password_page(request, notice=notice)
+    if outcome.status == "no_password":
+        return await _password_page(request, status_code=400)
     if outcome.status == "throttled":
-        return _password_page(
+        return await _password_page(
             request,
             errors={"current_password": _("Too many attempts. Try again later.")},
             status_code=429,
         )
     if outcome.status == "invalid_new":
         code = outcome.error.code if outcome.error else ""
-        return _password_page(
+        return await _password_page(
             request,
             errors={"new_password": ERROR_MESSAGES.get(code, ERROR_MESSAGES["invalid"])},
             status_code=400,
         )
-    return _password_page(
+    return await _password_page(
         request,
         errors={"current_password": ERROR_MESSAGES["current_password_invalid"]},
         status_code=400,
@@ -621,4 +719,4 @@ async def logout_others(request: Request) -> Response:
     }
     if is_htmx_fragment_request(request):
         return render_template(request, "auth/notice_fragment.html", context={"notice": notice})
-    return _password_page(request, notice=notice)
+    return await _password_page(request, notice=notice)

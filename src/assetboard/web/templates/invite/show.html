@@ -1,5 +1,5 @@
 {% extends "auth_base.html" %}
-{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% from "macros/components.html" import field, csrf_input, primary_button, link_button with context %}
 {% block title %}{{ _("Invitation") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Invitation") }}{% endblock %}
 {% block content %}
@@ -18,7 +18,11 @@
   {{ primary_button(_("Accept invitation")) }}
 </form>
 {% else %}
+{% if oidc_provider %}
+<div class="mt-6" data-oidc-sign-in>{{ link_button(_("Continue with %(provider)s", provider=oidc_provider), oidc_start_url) }}</div>
+{% endif %}
 <p class="mt-6 text-sm">{{ _("Already have an account?") }} <a class="font-semibold text-accent" href="{{ login_url }}" rel="noreferrer">{{ _("Sign in to accept") }}</a></p>
+{% if local_sign_up %}
 <h2 class="mt-6 text-base font-semibold">{{ _("Create an account") }}</h2>
 <form method="post" action="{{ scoped_url(request, 'invite_register', token=token) }}" class="mt-4 space-y-4" novalidate>
   {{ csrf_input() }}
@@ -27,6 +31,7 @@
   {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 10 characters. Common passwords are not accepted.")) }}
   {{ primary_button(_("Create account and join")) }}
 </form>
+{% endif %}
 {% endif %}
 {% endif %}
 {% endblock %}

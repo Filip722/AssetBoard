@@ -15,7 +15,8 @@ from httpx import Response
 from sqlalchemy import select, update
 from sqlalchemy.exc import OperationalError
 
-from assetboard.db.models.identity import Invitation, Membership, User
+from assetboard.db.models.identity import AuthThrottle, Invitation, Membership, User
+from assetboard.services.hash_gate import HashGateBusy
 from assetboard.services.invitations import MAX_FAILED_EMAIL_ATTEMPTS, AlreadyMember, hash_token
 from assetboard.web import invite_routes
 from tests.conftest import ADMIN_PASSWORD, OwnerApp, WebHarness
@@ -480,3 +481,33 @@ def test_invite_forms_pass_the_origin_check_with_a_browser_origin(roomy: OwnerAp
             f"/invite/{token}/accept", data={"csrf_token": csrf}, headers={"Origin": "null"}
         )
         assert null_origin.status_code == 403  # what "no-referrer" pages would trigger
+
+
+def test_busy_hashing_on_invite_sign_up_is_503_and_releases_the_attempt(roomy: OwnerApp) -> None:
+    """``HashGateBusy`` goes through the app-wide 503 handler here too (F1.3 review)."""
+    token = create_link(roomy)
+
+    class BusyGate:
+        async def run(self, _operation: object) -> object:
+            raise HashGateBusy
+
+    real_gate = roomy.app.state.hash_gate
+    roomy.app.state.hash_gate = BusyGate()
+    try:
+        with anonymous(roomy) as client:
+            response = register(client, roomy.web, token)
+    finally:
+        roomy.app.state.hash_gate = real_gate
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
+    assert "The server is busy" in response.text
+    with roomy.app.state.session_factory() as session:
+        invitation = session.scalars(
+            select(Invitation).where(Invitation.token_hash == hash_token(token))
+        ).one()
+        attempts = session.scalars(
+            select(AuthThrottle).where(AuthThrottle.key_type == "register")
+        ).all()
+        assert session.scalars(select(User).where(User.email == "newbie@example.com")).all() == []
+    assert invitation.used_at is None
+    assert [row.failure_count for row in attempts] in ([], [0])  # the attempt was released

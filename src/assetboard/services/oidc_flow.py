@@ -16,6 +16,8 @@ import base64
 import hashlib
 import hmac
 import json
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, cast
@@ -54,7 +56,11 @@ def seal(
 ) -> str:
     issued = int(now.timestamp())
     data = {**payload, "iat": issued, "exp": issued + int(lifetime.total_seconds())}
-    body = _b64(json.dumps(data, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    # UTF-8, not \\uXXXX escapes: a non-ASCII subject then costs at most 4 bytes per character,
+    # which keeps the worst case (255-character subject, 512-character issuer, 320-character
+    # email, 512-character next) under MAX_COOKIE_LENGTH.
+    text = json.dumps(data, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+    body = _b64(text.encode("utf-8"))
     value = f"{body}.{_mac(key, purpose, body)}"
     if len(value) > MAX_COOKIE_LENGTH:
         raise ValueError("payload too large for a cookie")
@@ -173,3 +179,46 @@ class PendingLink:
         except ValueError:
             return None
         return cls(user_id, issuer, subject, email, admin, next_path)
+
+
+MAX_CONSUMED_STATES = 10_000
+
+
+class ConsumedStates:
+    """Flow states already used by a callback, so a replayed callback is refused.
+
+    Checked right after the flow cookie is unsealed, before any provider call or database write.
+    Only the SHA-256 of each state is kept, for ``FLOW_LIFETIME`` (after which the cookie itself
+    has expired). Bounded: past ``max_entries`` the oldest entries are evicted, so a flood of
+    callbacks could let an old state be replayed early; the provider's single-use code still
+    refuses it. In memory, per process: a restart forgets it (ADR-0014; one worker, ADR-0012).
+    """
+
+    def __init__(self, *, max_entries: int = MAX_CONSUMED_STATES) -> None:
+        self._max_entries = max_entries
+        self._seen: OrderedDict[str, datetime] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def __len__(self) -> int:
+        return len(self._seen)
+
+    def consume(self, state: str, *, now: datetime) -> bool:
+        """True the first time ``state`` is seen; False for a replay."""
+        key = hashlib.sha256(state.encode("utf-8")).hexdigest()
+        with self._lock:
+            while self._seen:
+                oldest, expires = next(iter(self._seen.items()))
+                if expires > now:
+                    break
+                del self._seen[oldest]
+            if key in self._seen:
+                return False
+            self._seen[key] = now + FLOW_LIFETIME
+            while len(self._seen) > self._max_entries:
+                self._seen.popitem(last=False)
+            return True
+
+    def __contains__(self, state: object) -> bool:
+        if not isinstance(state, str):
+            return False
+        return hashlib.sha256(state.encode("utf-8")).hexdigest() in self._seen

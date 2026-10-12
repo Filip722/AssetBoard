@@ -31,9 +31,10 @@ from assetboard.web.security import session_cookie_name
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
-SIGNED_OUT_PATHS = frozenset({"/login", "/register", "/setup"})
-# Invitation links work signed out: the invitee may still need to create an account.
-SIGNED_OUT_PREFIXES = ("/invite/",)
+SIGNED_OUT_PATHS = frozenset({"/login", "/register", "/setup", "/login/link", "/login/local"})
+# Invitation links work signed out: the invitee may still need to create an account. OIDC
+# sign-in (start, callback and its failure pages) happens before there is a session.
+SIGNED_OUT_PREFIXES = ("/invite/", "/auth/oidc/")
 
 
 def _always_open(path: str) -> bool:

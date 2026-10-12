@@ -35,6 +35,10 @@
 <button type="submit" class="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark focus:outline-none focus:ring-2 focus:ring-accent/40">{{ label }}</button>
 {%- endmacro %}
 
+{% macro link_button(label, href) -%}
+<a href="{{ href }}" rel="noreferrer" class="flex w-full justify-center rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{{ label }}</a>
+{%- endmacro %}
+
 {% macro flashes(messages=[]) -%}
 {% if messages %}
 <div class="space-y-2" role="status" aria-live="polite">

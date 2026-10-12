@@ -258,15 +258,22 @@ def test_oidc_settings_from_the_environment(
         ({"oidc_provider_name": "x" * 41}, "1 to 40 characters"),
         ({"oidc_allowed_domains": "example"}, "domain names"),
         ({"oidc_allowed_domains": "user@example.com"}, "domain names"),
+        ({"oidc_allowed_domains": "bücher.example"}, "ASCII domain names"),
+        ({"oidc_allowed_domains": "-bad.example"}, "ASCII domain names"),
+        ({"oidc_allowed_domains": "xn--bcher-kva.example"}, None),
+        ({"oidc_issuer": "https://idp.bücher.example"}, "ASCII"),
         ({"oidc_groups_claim": " "}, "must not be empty"),
     ],
 )
 def test_oidc_settings_are_validated(
-    tmp_path: Path, overrides: dict[str, object], message: str
+    tmp_path: Path, overrides: dict[str, object], message: str | None
 ) -> None:
     values: dict[str, object] = {"data_dir": tmp_path, **OIDC_BASE, **overrides}
     if overrides.get("base_url", "") is None:
         del values["base_url"]
+    if message is None:  # a valid value among the invalid ones
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+        return
     with pytest.raises(ValueError, match=message):
         Settings(_env_file=None, **values)  # type: ignore[arg-type]
 

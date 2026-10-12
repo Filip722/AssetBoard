@@ -111,6 +111,11 @@ msgstr ""
 msgid "This email address cannot be registered."
 msgstr ""
 
+msgid ""
+"This account has no password: it signs in with your identity provider. An"
+" administrator can set one with the reset-password command."
+msgstr ""
+
 msgid "Your password was changed. Other devices were signed out."
 msgstr ""
 
@@ -171,6 +176,60 @@ msgid "Editor"
 msgstr ""
 
 msgid "Viewer"
+msgstr ""
+
+msgid ""
+"This sign-in expired, or another sign-in was started in a different tab. "
+"Start over."
+msgstr ""
+
+#, python-format
+msgid "Sign-in with %(provider)s was cancelled."
+msgstr ""
+
+#, python-format
+msgid ""
+"Sign-in with %(provider)s did not work. Try again; if it keeps failing, "
+"contact your administrator."
+msgstr ""
+
+#, python-format
+msgid "%(provider)s cannot be reached right now. Try again in a few minutes."
+msgstr ""
+
+#, python-format
+msgid ""
+"There is no account for your %(provider)s sign-in. Ask an administrator "
+"for an invitation."
+msgstr ""
+
+msgid ""
+"An account with this email address already exists. Sign in with your "
+"password."
+msgstr ""
+
+#, python-format
+msgid ""
+"%(provider)s did not confirm that your email address is verified. Verify "
+"it there, then try again."
+msgstr ""
+
+msgid "Accounts with your email domain cannot sign in here."
+msgstr ""
+
+msgid "This account is deactivated. Contact your administrator."
+msgstr ""
+
+msgid "Too many accounts were created from your network. Try again later."
+msgstr ""
+
+msgid ""
+"The password is not correct, or there were too many attempts. Try again "
+"later, or start over."
+msgstr ""
+
+#, python-format
+msgid "This confirmation expired. Start over to sign in with %(provider)s."
 msgstr ""
 
 msgid "Choose a supported currency."
@@ -312,19 +371,64 @@ msgid ""
 "items."
 msgstr ""
 
-msgid "Sign in"
+msgid "Link your account"
 msgstr ""
 
-msgid "Email"
+msgid "Start over"
+msgstr ""
+
+#, python-format
+msgid ""
+"An account with the email address %(email)s already exists. Enter its "
+"password once to sign in with %(provider)s from now on."
+msgstr ""
+
+msgid "This signs the account out on all other devices."
 msgstr ""
 
 msgid "Password"
+msgstr ""
+
+msgid "Link and sign in"
+msgstr ""
+
+msgid "Sign in"
+msgstr ""
+
+#, python-format
+msgid "Continue with %(provider)s"
+msgstr ""
+
+msgid "or sign in with your password"
+msgstr ""
+
+msgid "Email"
 msgstr ""
 
 msgid "No account yet?"
 msgstr ""
 
 msgid "Create an account"
+msgstr ""
+
+msgid "Sign-in"
+msgstr ""
+
+msgid "Sign-in did not complete"
+msgstr ""
+
+msgid "Back to sign-in"
+msgstr ""
+
+msgid "Signed out"
+msgstr ""
+
+#, python-format
+msgid "You are signed out here. Signing you out of %(provider)s too…"
+msgstr ""
+
+#, python-format
+msgid "Continue to %(provider)s"
 msgstr ""
 
 msgid "Change password"
@@ -524,5 +628,12 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Personal"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An account with this email address "
+#~ "already exists. Sign in with your "
+#~ "password, then link %(provider)s from "
+#~ "your profile."
 #~ msgstr ""
 

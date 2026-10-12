@@ -158,6 +158,15 @@ Also add a short docs/architecture.md section "How to add a new workspace-owned 
   unless `ENV=dev`. `OIDC_ONLY` refuses to start with `ALLOW_REGISTRATION`.
 - `/auth/oidc/*` sends `Referrer-Policy: no-referrer` and `Cache-Control: no-store` and has no
   forms; the password confirmation page is under `/login/`.
+- Part B: the callback answers every outcome with a 303 to a URL without a query; failures go
+  to `/auth/oidc/failed/<reason>` (fixed messages; `busy` and `unavailable` answer 503 with
+  `Retry-After`). A locked database at the callback therefore shows the busy page after the
+  redirect. `next` is at most 512 ASCII characters. `/login/local` (break-glass) treats a
+  non-administrator's correct password exactly like a wrong one. RP logout ends the local session,
+  then shows a page that continues to the provider (meta refresh and a link).
+- Part B review: failures before the provider accepted the code (token endpoint errors
+  included) are logged, not audited (anyone can craft them); each flow state is accepted once (in-memory, per process, 10 minutes); the
+  "account exists" page no longer mentions the profile until F1.5 adds linking there.
 
 **Agent prompt**
 ```

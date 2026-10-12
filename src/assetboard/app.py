@@ -36,11 +36,14 @@ from assetboard.services.auth import (
 )
 from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import RETRY_AFTER_SECONDS, HashGate, HashGateBusy
+from assetboard.services.oidc import OidcClient, UrllibTransport
+from assetboard.services.oidc_flow import ConsumedStates
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.errors import add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
 from assetboard.web.invite_routes import router as invite_router
+from assetboard.web.oidc_routes import router as oidc_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed
@@ -119,6 +122,13 @@ def create_app(
     app.state.schema_state = None  # decided in the lifespan
     app.state.csrf_key = derive_subkey(secret_key, "csrf")
     app.state.hash_gate = HashGate(settings.auth_max_concurrent_hashes)
+    # OIDC (ADR-0014): None when not configured; tests replace the transport with a fake.
+    app.state.oidc = (
+        OidcClient(settings, UrllibTransport(), clock) if settings.oidc_enabled else None
+    )
+    app.state.oidc_flow_key = derive_subkey(secret_key, "oidc-flow")
+    app.state.oidc_link_key = derive_subkey(secret_key, "oidc-link")
+    app.state.oidc_consumed_states = ConsumedStates()
     app.state.setup_token = None
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.
@@ -133,6 +143,7 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(workspace_router)
     app.include_router(invite_router)
+    app.include_router(oidc_router)
 
     @app.exception_handler(CsrfFailed)
     async def handle_csrf_failure(request: Request, _exc: CsrfFailed) -> Response:

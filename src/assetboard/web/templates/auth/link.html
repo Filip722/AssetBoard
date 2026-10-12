@@ -1,0 +1,22 @@
+{% extends "auth_base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% block title %}{{ _("Link your account") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Link your account") }}{% endblock %}
+{% block content %}
+{% if expired %}
+<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">{{ expired }}</p>
+<p class="mt-6 text-center text-sm"><a class="font-semibold text-accent" href="{{ start_url }}" rel="noreferrer">{{ _("Start over") }}</a></p>
+{% else %}
+{% if error %}
+<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">{{ error }}</p>
+{% endif %}
+<p class="mt-4 text-sm text-muted dark:text-slate-300">{{ _("An account with the email address %(email)s already exists. Enter its password once to sign in with %(provider)s from now on.", email=pending.email, provider=provider) }}</p>
+<p class="mt-2 text-xs text-muted dark:text-slate-400">{{ _("This signs the account out on all other devices.") }}</p>
+<form method="post" action="{{ scoped_url(request, 'oidc_link') }}" class="mt-6 space-y-4" novalidate>
+  {{ csrf_input() }}
+  {{ field("password", _("Password"), type="password", required=true, autocomplete="current-password", maxlength=1024) }}
+  {{ primary_button(_("Link and sign in")) }}
+</form>
+<p class="mt-6 text-center text-sm"><a class="font-semibold text-accent" href="{{ scoped_url(request, 'login') }}">{{ _("Cancel") }}</a></p>
+{% endif %}
+{% endblock %}

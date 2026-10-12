@@ -118,6 +118,13 @@ msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później
 msgid "This email address cannot be registered."
 msgstr "Nie można zarejestrować tego adresu e-mail."
 
+msgid ""
+"This account has no password: it signs in with your identity provider. An"
+" administrator can set one with the reset-password command."
+msgstr ""
+"To konto nie ma hasła: logujesz się przez dostawcę tożsamości. "
+"Administrator może je ustawić poleceniem reset-password."
+
 msgid "Your password was changed. Other devices were signed out."
 msgstr "Hasło zostało zmienione. Inne urządzenia zostały wylogowane."
 
@@ -188,6 +195,74 @@ msgstr "Edytor"
 
 msgid "Viewer"
 msgstr "Przeglądający"
+
+msgid ""
+"This sign-in expired, or another sign-in was started in a different tab. "
+"Start over."
+msgstr ""
+"To logowanie wygasło albo w innej karcie rozpoczęto kolejne logowanie. "
+"Zacznij od nowa."
+
+#, python-format
+msgid "Sign-in with %(provider)s was cancelled."
+msgstr "Logowanie przez %(provider)s zostało anulowane."
+
+#, python-format
+msgid ""
+"Sign-in with %(provider)s did not work. Try again; if it keeps failing, "
+"contact your administrator."
+msgstr ""
+"Logowanie przez %(provider)s nie powiodło się. Spróbuj ponownie, a jeśli "
+"problem się powtarza, skontaktuj się z administratorem."
+
+#, python-format
+msgid "%(provider)s cannot be reached right now. Try again in a few minutes."
+msgstr ""
+"Nie można teraz połączyć się z dostawcą %(provider)s. Spróbuj ponownie za"
+" kilka minut."
+
+#, python-format
+msgid ""
+"There is no account for your %(provider)s sign-in. Ask an administrator "
+"for an invitation."
+msgstr ""
+"Z Twoim logowaniem przez %(provider)s nie jest powiązane żadne konto. "
+"Poproś administratora o zaproszenie."
+
+msgid ""
+"An account with this email address already exists. Sign in with your "
+"password."
+msgstr "Konto z tym adresem e-mail już istnieje. Zaloguj się hasłem."
+
+#, python-format
+msgid ""
+"%(provider)s did not confirm that your email address is verified. Verify "
+"it there, then try again."
+msgstr ""
+"Dostawca %(provider)s nie potwierdził, że Twój adres e-mail jest "
+"zweryfikowany. Zweryfikuj go tam i spróbuj ponownie."
+
+msgid "Accounts with your email domain cannot sign in here."
+msgstr "Konta z Twojej domeny e-mail nie mogą się tutaj logować."
+
+msgid "This account is deactivated. Contact your administrator."
+msgstr "To konto jest dezaktywowane. Skontaktuj się z administratorem."
+
+msgid "Too many accounts were created from your network. Try again later."
+msgstr "Z Twojej sieci utworzono zbyt wiele kont. Spróbuj ponownie później."
+
+msgid ""
+"The password is not correct, or there were too many attempts. Try again "
+"later, or start over."
+msgstr ""
+"Hasło jest nieprawidłowe albo było zbyt wiele prób. Spróbuj ponownie "
+"później lub zacznij od nowa."
+
+#, python-format
+msgid "This confirmation expired. Start over to sign in with %(provider)s."
+msgstr ""
+"To potwierdzenie wygasło. Zacznij od nowa, aby zalogować się przez "
+"%(provider)s."
 
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
@@ -334,20 +409,69 @@ msgstr ""
 "Twój plan miesięczny i aktywność pojawią się tutaj, gdy dodasz pierwsze "
 "pozycje."
 
-msgid "Sign in"
-msgstr "Zaloguj się"
+msgid "Link your account"
+msgstr "Połącz swoje konto"
 
-msgid "Email"
-msgstr "E-mail"
+msgid "Start over"
+msgstr "Zacznij od nowa"
+
+#, python-format
+msgid ""
+"An account with the email address %(email)s already exists. Enter its "
+"password once to sign in with %(provider)s from now on."
+msgstr ""
+"Konto z adresem e-mail %(email)s już istnieje. Podaj jego hasło jeden "
+"raz, aby od teraz logować się przez %(provider)s."
+
+msgid "This signs the account out on all other devices."
+msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
 
 msgid "Password"
 msgstr "Hasło"
+
+msgid "Link and sign in"
+msgstr "Połącz i zaloguj się"
+
+msgid "Sign in"
+msgstr "Zaloguj się"
+
+#, python-format
+msgid "Continue with %(provider)s"
+msgstr "Kontynuuj przez %(provider)s"
+
+msgid "or sign in with your password"
+msgstr "lub zaloguj się hasłem"
+
+msgid "Email"
+msgstr "E-mail"
 
 msgid "No account yet?"
 msgstr "Nie masz jeszcze konta?"
 
 msgid "Create an account"
 msgstr "Utwórz konto"
+
+msgid "Sign-in"
+msgstr "Logowanie"
+
+msgid "Sign-in did not complete"
+msgstr "Logowanie nie zostało ukończone"
+
+msgid "Back to sign-in"
+msgstr "Wróć do logowania"
+
+msgid "Signed out"
+msgstr "Wylogowano"
+
+#, python-format
+msgid "You are signed out here. Signing you out of %(provider)s too…"
+msgstr ""
+"Wylogowano Cię z tej aplikacji. Trwa wylogowywanie także u dostawcy "
+"%(provider)s…"
+
+#, python-format
+msgid "Continue to %(provider)s"
+msgstr "Przejdź do dostawcy %(provider)s"
 
 msgid "Change password"
 msgstr "Zmień hasło"

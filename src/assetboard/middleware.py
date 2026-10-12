@@ -27,7 +27,10 @@ _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEA
 # "same-origin", not "no-referrer": under "no-referrer" browsers send ``Origin: null`` on form
 # POSTs, which the Origin check (rightly) refuses.
 SAME_ORIGIN_REFERRER_PREFIXES = ("/invite/",)
-SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register"})
+SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register", "/login/link", "/login/local"})
+# OIDC pages (ADR-0014) have no forms, so they can send no Referer at all: the callback URL
+# carries an authorization code, and the start URL may carry ``next=/invite/<token>``.
+NO_REFERRER_PREFIXES = ("/auth/oidc/",)
 _INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
 
 
@@ -167,11 +170,16 @@ class SecurityHeadersMiddleware:
                     for key, value in SECURITY_HEADERS.items()
                 )
                 path = route_path(scope)
-                if path in SAME_ORIGIN_REFERRER_PATHS or path.startswith(
+                policy: bytes | None = None
+                if path.startswith(NO_REFERRER_PREFIXES):
+                    policy = b"no-referrer"
+                elif path in SAME_ORIGIN_REFERRER_PATHS or path.startswith(
                     SAME_ORIGIN_REFERRER_PREFIXES
                 ):
+                    policy = b"same-origin"
+                if policy is not None:
                     response_headers = [
-                        (name, b"same-origin" if name == b"referrer-policy" else value)
+                        (name, policy if name == b"referrer-policy" else value)
                         for name, value in response_headers
                     ]
                 if not scope.get("path", "").startswith("/static/"):

@@ -605,6 +605,7 @@ class _LoginCandidate:
     reserved: tuple[ReservedAttempt, ...]
     user_id: UUID | None
     password_hash: str | None
+    is_instance_admin: bool = False
 
 
 def _login_flow(
@@ -619,7 +620,10 @@ def _login_flow(
     existing_session_id: str | None,
     verify: Verifier | None,
     hasher: Hasher | None,
+    require_instance_admin: bool = False,
 ) -> LoginOutcome:
+    """``require_instance_admin`` (break-glass ``/login/local``): a correct password of anyone
+    else fails exactly like a wrong one: same response, same counting, no rehash."""
     if len(password) > MAX_PASSWORD_LENGTH or len(email) > MAX_EMAIL_LENGTH * 2:
         # Cannot be a valid credential; refuse before any database work or hashing.
         return LoginOutcome()
@@ -641,7 +645,10 @@ def _login_flow(
             return None
         user = session.scalar(select(User).where(User.email == lookup))
         return _LoginCandidate(
-            reserved, user.id if user else None, user.password_hash if user else None
+            reserved,
+            user.id if user else None,
+            user.password_hash if user else None,
+            bool(user and user.is_instance_admin),
         )
 
     def blocked(session: Session) -> bool:
@@ -664,6 +671,7 @@ def _login_flow(
         if (
             verified
             and candidate.password_hash is not None
+            and (candidate.is_instance_admin or not require_instance_admin)
             and password_hasher().check_needs_rehash(candidate.password_hash)
         ):
             try:
@@ -678,12 +686,14 @@ def _login_flow(
     def finish(session: Session) -> LoginOutcome:
         now = clock.now()
         user = session.get(User, candidate.user_id) if candidate.user_id else None
+        not_admin = require_instance_admin and not (user is not None and user.is_instance_admin)
         succeeded = (
             verified
             and user is not None
             and user.is_active
             and user.password_hash is not None
             and user.password_hash == candidate.password_hash
+            and not not_admin
         )
         if not succeeded or user is None or user.password_hash is None:
             # The reservation stays: it is this failure's count.
@@ -698,6 +708,8 @@ def _login_flow(
                 actor_user_id=user.id if user else None,
                 host=host,
                 user_agent=user_agent,
+                # Internal only: the response is the same as for a wrong password.
+                data={"reason": "not_instance_admin"} if verified and not_admin else None,
             )
             return LoginOutcome()
         # The account counter resets; the IP counter only takes back this request's attempt
@@ -771,6 +783,7 @@ def authenticate_with_factory(
     existing_session_id: str | None = None,
     verify: Verifier | None = None,
     hasher: Hasher | None = None,
+    require_instance_admin: bool = False,
 ) -> LoginOutcome:
     """Authenticate with the reservation committed before ``verify`` runs (blocking)."""
     return _login_flow(
@@ -784,6 +797,7 @@ def authenticate_with_factory(
         existing_session_id=existing_session_id,
         verify=verify,
         hasher=hasher,
+        require_instance_admin=require_instance_admin,
     )
 
 
@@ -814,6 +828,7 @@ async def authenticate_user_async(
     host: str | None,
     user_agent: str | None = None,
     existing_session_id: str | None = None,
+    require_instance_admin: bool = False,
 ) -> LoginOutcome:
     """Web entry point: database work in a worker thread, hashing through ``gate``.
 
@@ -832,6 +847,7 @@ async def authenticate_user_async(
             existing_session_id=existing_session_id,
             verify=verify,
             hasher=hasher,
+            require_instance_admin=require_instance_admin,
         )
     )
 
@@ -1878,6 +1894,13 @@ def create_passwordless_user(
         settings=settings,
         is_admin=is_admin,
     )
+
+
+def user_has_password(factory: sessionmaker[Session], user_id: UUID) -> bool:
+    """False for accounts that sign in elsewhere (OIDC) and never had a password."""
+    with factory() as session:
+        user = session.get(User, user_id)
+        return user is not None and user.password_hash is not None
 
 
 def revoke_all_sessions(session: Session, user_id: UUID) -> int:

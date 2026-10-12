@@ -10,6 +10,7 @@
      browser makes no implicit /favicon.ico request. #}
   <link rel="icon" href="data:,">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  {% block head_extra %}{% endblock %}
   <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}" referrerpolicy="no-referrer">
   <script src="{{ static_url(request, 'js/theme.js') }}" referrerpolicy="no-referrer"></script>
 </head>

@@ -183,8 +183,10 @@ class Settings(BaseSettings):
         # Kept exactly as given (trailing slash included): discovery must return the same string.
         if value is None:
             return None
-        if len(value) > 512:
-            raise ValueError("OIDC_ISSUER must be at most 512 characters")
+        if len(value) > 512 or not value.isascii():
+            raise ValueError(
+                "OIDC_ISSUER must be at most 512 ASCII characters (use punycode for IDN hosts)"
+            )
         try:
             parsed = urlsplit(value)
             valid = (
@@ -235,10 +237,20 @@ class Settings(BaseSettings):
         domains = [domain.strip().lower().rstrip(".") for domain in value if domain.strip()]
         for domain in domains:
             labels = domain.split(".")
+            # ASCII labels only (str.isalnum also accepts other scripts); IDNs go in as punycode.
             if len(labels) < 2 or not all(
-                label and len(label) <= 63 and label.replace("-", "").isalnum() for label in labels
+                label
+                and len(label) <= 63
+                and label.isascii()
+                and label.replace("-", "").isalnum()
+                and not label.startswith("-")
+                and not label.endswith("-")
+                for label in labels
             ):
-                raise ValueError("OIDC_ALLOWED_DOMAINS must contain domain names like example.com")
+                raise ValueError(
+                    "OIDC_ALLOWED_DOMAINS must contain ASCII domain names like example.com "
+                    "(punycode for internationalized names)"
+                )
         return domains
 
     @property

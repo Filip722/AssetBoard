@@ -9,7 +9,7 @@ from __future__ import annotations
 import ipaddress
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from starlette.requests import Request
 from starlette.responses import Response
@@ -76,6 +76,27 @@ def clear_csrf_cookie(response: Response, settings: Settings) -> None:
     response.delete_cookie(csrf_cookie_name(settings), **_cookie_options(settings))
 
 
+# OIDC (F1.3, ADR-0014): the flow cookie (start -> callback) and the pending-link cookie
+# (callback -> password confirmation). Both hold signed payloads that expire after 10 minutes.
+OIDC_COOKIE_SECONDS = 600
+
+
+def oidc_flow_cookie_name(settings: Settings) -> str:
+    return _cookie_name(settings, "oidc_flow")
+
+
+def oidc_link_cookie_name(settings: Settings) -> str:
+    return _cookie_name(settings, "oidc_link")
+
+
+def set_short_cookie(response: Response, settings: Settings, name: str, value: str) -> None:
+    response.set_cookie(name, value, max_age=OIDC_COOKIE_SECONDS, **_cookie_options(settings))
+
+
+def clear_cookie(response: Response, settings: Settings, name: str) -> None:
+    response.delete_cookie(name, **_cookie_options(settings))
+
+
 def client_host(request: Request) -> str | None:
     """The TCP peer as uvicorn reports it; forwarded headers are never read here.
 
@@ -99,9 +120,9 @@ def client_host(request: Request) -> str | None:
     return host
 
 
-def safe_next(value: str | None, default: str = "/") -> str:
+def safe_next(value: str | None, default: str = "/", *, max_length: int = MAX_NEXT_LENGTH) -> str:
     """Accept only a local absolute path (``/…``); anything else falls back to ``default``."""
-    if not value or len(value) > MAX_NEXT_LENGTH:
+    if not value or len(value) > max_length:
         return default
     decoded = unquote(value)
     for candidate in (value, decoded):
@@ -113,6 +134,25 @@ def safe_next(value: str | None, default: str = "/") -> str:
         if parts.scheme or parts.netloc:
             return default
     return value
+
+
+# Short enough that the OIDC flow and pending-link cookies always fit (their payloads also hold
+# the issuer, subject and email). An invitation path is 51 characters.
+MAX_OIDC_NEXT_LENGTH = 512
+
+
+def oidc_next(value: str | None) -> str:
+    """``safe_next`` for OIDC: a shorter cap and ASCII only, so the signed cookies always fit."""
+    candidate = safe_next(value, max_length=MAX_OIDC_NEXT_LENGTH)
+    return candidate if candidate.isascii() else "/"
+
+
+def oidc_start_url(next_path: str = "") -> str:
+    """The link behind "Continue with <provider>" (a link, never a form: ADR-0014)."""
+    target = oidc_next(next_path)
+    if target == "/":
+        return "/auth/oidc/start"
+    return "/auth/oidc/start?next=" + quote(target, safe="")
 
 
 def web_session(request: Request) -> WebSession | None:

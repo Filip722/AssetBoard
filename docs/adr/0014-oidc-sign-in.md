@@ -45,7 +45,11 @@ need the provider at startup.
   HttpOnly, `SameSite=Lax` cookie (`__Host-` on https) signed with a subkey of `SECRET_KEY`,
   with `iat` and `exp` (10 minutes) inside the signed payload and checked by the server. No
   table is needed and an invitation token in `next` never reaches the database. The callback
-  deletes the cookie, so a flow is used once; the provider's single-use code backs this up.
+  deletes the cookie, and the flow's state is recorded as used right after the cookie is read,
+  before any provider call or database write, so a replayed cookie and callback URL go to
+  "start over". That record lives in memory (only state hashes, for 10 minutes, at most 10,000
+  entries with the oldest evicted first): it is per process and lost on restart, which the
+  single worker (ADR-0012) makes acceptable; the provider's single-use code backs it up.
   Because the cookie binds the callback to the browser that started the flow, a callback URL
   planted by someone else fails (login CSRF). Starting a second flow in another tab replaces
   the cookie, and the first tab's callback then asks the user to start over.
@@ -71,8 +75,13 @@ need the provider at startup.
   Creating an account (4, 5) counts against the per-address registration limit. Accounts
   created through OIDC have no password. Provider display names are cleaned (control and
   format characters removed, whitespace collapsed, at most 120 characters, `User` if nothing
-  is left), and provider text in logs never contains a line break. Each refusal is audited
-  as `auth.oidc_failure` with a reason code, never with tokens, codes or claims.
+  is left), and provider text in logs never contains a line break. Refusals after the
+  provider accepted the code (ID token, userinfo, account mapping) are audited as
+  `auth.oidc_failure` with a reason code, never with tokens, codes or claims. Refusals before
+  the provider accepted the code (token endpoint errors included: missing or replayed flow,
+  state, `iss`, provider `error=` responses, `invalid_grant` for a junk code) can be triggered
+  by anyone with a crafted URL, so they go to the application log only, not the append-only
+  audit table.
 - **Admin group.** With `ASSETBOARD_OIDC_ADMIN_GROUP`, each OIDC sign-in sets
   `is_instance_admin` from the groups claim. A present claim is authoritative, even when empty;
   an absent or malformed claim changes nothing and logs a WARNING. The last active instance
@@ -93,8 +102,14 @@ need the provider at startup.
 - **Leaks.** `/auth/oidc/*` responses send `Referrer-Policy: no-referrer` and `Cache-Control:
   no-store`; they contain no forms (under `no-referrer` browsers send `Origin: null` on POSTs:
   see ADR-0013 for why pages with forms use `same-origin`, and ADR-0012 for the Origin check
-  that refuses `null`). The password confirmation form lives under `/login/` with `same-origin`. The
-  callback redirects to a clean URL, and the request log never records query strings.
+  that refuses `null`). The password confirmation form lives under `/login/` with
+  `same-origin`. The callback never renders a page: every outcome, errors included, is a 303
+  to a URL without a query (`next`, `/login/link` or `/auth/oidc/failed/<reason>`, which shows
+  a fixed message per reason), and the request log never records query strings.
+- **Cookie size.** `next` for OIDC is a local path of at most 512 ASCII characters (anything
+  else becomes `/`), the issuer is ASCII (at most 512 characters) and payloads are UTF-8, so the
+  largest pending link (255-character subject, 320-character email) still fits in a cookie. A
+  payload that did not fit would show the generic failure page, never an error.
 
 ## Consequences
 

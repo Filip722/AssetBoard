@@ -64,6 +64,8 @@ def test_every_state_changing_route_requires_a_valid_csrf_token(
         "/workspace/invitations/{invitation_id}/revoke",
         "/invite/{token}/accept",
         "/invite/{token}/register",
+        "/login/link",
+        "/login/local",
     }
     other_session_token = csrf.mask(csrf.session_token(signed_in.app.state.csrf_key, "f" * 64))  # type: ignore[attr-defined]
     for method, path in routes:
@@ -96,6 +98,8 @@ def test_signed_out_forms_require_the_anonymous_token_and_its_cookie(web: WebHar
             "/setup",
             "/invite/{token}/accept",
             "/invite/{token}/register",
+            "/login/link",
+            "/login/local",
         }
         signed_out_routes = {path for _, path in _unsafe_routes(app)} & expected
         assert signed_out_routes == expected
