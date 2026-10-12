@@ -289,3 +289,107 @@ def test_http_is_allowed_for_oidc_in_dev(tmp_path: Path) -> None:
     )
     assert settings.oidc_enabled
     assert settings.oidc_redirect_uri == "http://localhost:8000/auth/oidc/callback"
+
+
+# Proxy header authentication (F1.4, ADR-0015)
+
+PROXY_BASE: dict[str, object] = {
+    "proxy_auth_enabled": True,
+    "proxy_auth_user_header": "Remote-User",
+    "proxy_auth_email_header": "Remote-Email",
+    "trusted_proxies": "172.20.0.2",
+}
+
+
+def test_proxy_auth_is_off_by_default(tmp_path: Path) -> None:
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+    assert not settings.proxy_auth_enabled
+    assert settings.proxy_auth_user_header is None
+    assert settings.proxy_auth_email_header is None
+    assert settings.proxy_auth_name_header is None
+    assert not (settings.proxy_auth_auto_create or settings.proxy_auth_link_by_email)
+
+
+def test_proxy_auth_settings_from_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name, value in {
+        "PROXY_AUTH_ENABLED": "true",
+        "PROXY_AUTH_USER_HEADER": " Remote-User ",
+        "PROXY_AUTH_EMAIL_HEADER": "X-Forwarded-Email",  # oauth2-proxy's name is allowed
+        "PROXY_AUTH_NAME_HEADER": "",
+        "TRUSTED_PROXIES": "172.20.0.2,fd00:20::2",
+    }.items():
+        monkeypatch.setenv(f"{ENV_PREFIX}_{name}", value)
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+    # Stored lowercase, as ASGI servers deliver header names.
+    assert settings.proxy_auth_user_header == "remote-user"
+    assert settings.proxy_auth_email_header == "x-forwarded-email"
+    assert settings.proxy_auth_name_header is None  # blank is unset
+    assert settings.wide_trusted_proxies() == []
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"trusted_proxies": ""}, "TRUSTED_PROXIES is required"),
+        ({"trusted_proxies": "0.0.0.0/0"}, "too wide"),
+        ({"trusted_proxies": "::/0"}, "too wide"),
+        ({"trusted_proxies": "10.0.0.0/8"}, "too wide"),
+        ({"trusted_proxies": "172.16.0.0/12"}, "too wide"),
+        ({"trusted_proxies": "172.20.0.0/16"}, "too wide"),
+        ({"trusted_proxies": "172.20.0.0/23"}, "too wide"),
+        ({"trusted_proxies": "0.0.0.0/1,128.0.0.0/1"}, "too wide"),
+        ({"trusted_proxies": "172.20.0.2,10.0.0.0/8"}, "10.0.0.0/8 is too wide"),
+        ({"trusted_proxies": "2001:db8::/32"}, "too wide"),
+        ({"trusted_proxies": "2001:db8::/63"}, "too wide"),
+        ({"trusted_proxies": "::ffff:0:0/96"}, "IPv4-mapped"),
+        ({"trusted_proxies": "::ffff:172.20.0.2"}, "IPv4-mapped"),
+        ({"trusted_proxies": "::/64"}, "IPv4-mapped"),
+        ({"trusted_proxies": "172.20.0.0/24"}, None),
+        ({"trusted_proxies": "2001:db8:0:1::/64"}, None),
+        ({"trusted_proxies": "127.0.0.1,::1"}, None),
+        ({"proxy_auth_user_header": None}, "are required"),
+        ({"proxy_auth_email_header": " "}, "are required"),
+        ({"proxy_auth_email_header": "REMOTE-USER"}, "different headers"),
+        ({"proxy_auth_name_header": "remote-email"}, "different headers"),
+        ({"proxy_auth_user_header": "Remote User"}, "HTTP header name"),
+        ({"proxy_auth_user_header": "Remote:User"}, "HTTP header name"),
+        ({"proxy_auth_user_header": "Rémote-User"}, "HTTP header name"),
+        ({"proxy_auth_user_header": "x" * 65}, "HTTP header name"),
+        ({"proxy_auth_user_header": "Cookie"}, "reserved header Cookie"),
+        ({"proxy_auth_user_header": "Host"}, "reserved"),
+        ({"proxy_auth_user_header": "Authorization"}, "reserved"),
+        ({"proxy_auth_email_header": "X-Forwarded-For"}, "reserved"),
+        ({"proxy_auth_email_header": "x-real-ip"}, "reserved"),
+        ({"proxy_auth_name_header": "Sec-Fetch-Site"}, "reserved"),
+        ({"proxy_auth_name_header": "HX-Request"}, "reserved"),
+    ],
+)
+def test_proxy_auth_settings_are_validated(
+    tmp_path: Path, overrides: dict[str, object], message: str | None
+) -> None:
+    values: dict[str, object] = {"data_dir": tmp_path, **PROXY_BASE, **overrides}
+    if message is None:  # a valid value among the invalid ones
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+        return
+    with pytest.raises(ValueError, match=message):
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+
+
+def test_proxy_auth_rules_apply_only_when_enabled(tmp_path: Path) -> None:
+    # Forwarded headers alone keep accepting any CIDR, as before F1.4.
+    settings = Settings(_env_file=None, data_dir=tmp_path, trusted_proxies="10.0.0.0/8")
+    assert settings.trusted_proxies == ["10.0.0.0/8"]
+    # Header names are still checked, so a typo shows up before the feature is turned on.
+    with pytest.raises(ValueError, match="reserved"):
+        Settings(_env_file=None, data_dir=tmp_path, proxy_auth_user_header="Cookie")
+
+
+def test_wide_trusted_proxies_names_every_entry_wider_than_one_address(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        **{**PROXY_BASE, "trusted_proxies": "172.20.0.2,172.20.1.0/24,::1,fd00::/64"},  # type: ignore[arg-type]
+    )
+    assert settings.wide_trusted_proxies() == ["172.20.1.0/24", "fd00::/64"]

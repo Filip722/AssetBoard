@@ -40,6 +40,7 @@ from assetboard.branding import APP_NAME
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.domain.identity import InvalidEmail, normalize_email
+from assetboard.services.external_identity import SignInIdentity
 
 logger = logging.getLogger(f"{APP_NAME.lower()}.oidc")
 
@@ -178,18 +179,6 @@ class AuthorizationRequest:
     state: str
     nonce: str
     code_verifier: str
-
-
-@dataclass(frozen=True, slots=True)
-class OidcIdentity:
-    """What a validated sign-in tells us. ``groups`` is None when the claim is unusable."""
-
-    issuer: str
-    subject: str
-    email: str | None
-    email_verified: bool
-    display_name: str
-    groups: tuple[str, ...] | None
 
 
 def email_verified_claim(value: object) -> bool:
@@ -380,7 +369,7 @@ class OidcClient:
         state: str,
         nonce: str,
         code_verifier: str,
-    ) -> OidcIdentity:
+    ) -> SignInIdentity:
         """Check the callback against the flow cookie's values, then exchange and validate.
 
         Errors raised before the provider accepted the code carry ``auditable=False``: the
@@ -544,7 +533,7 @@ class OidcClient:
 
     def _identity(
         self, metadata: ProviderMetadata, claims: dict[str, Any], access_token: str | None
-    ) -> OidcIdentity:
+    ) -> SignInIdentity:
         subject = cast(str, claims["sub"])
         groups_claim = self._settings.oidc_groups_claim
         wants_groups = self._settings.oidc_admin_group is not None
@@ -584,7 +573,7 @@ class OidcClient:
                     state,
                 )
 
-        return OidcIdentity(
+        return SignInIdentity(
             issuer=self._issuer,
             subject=subject,
             email=email,

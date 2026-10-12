@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import secrets
 import tempfile
-from ipaddress import ip_network
+from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlsplit
@@ -13,6 +14,37 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from assetboard.branding import ENV_PREFIX
+
+# Proxy authentication (F1.4, ADR-0015): the narrowest TRUSTED_PROXIES entries allowed.
+PROXY_AUTH_MIN_PREFIX = {4: 24, 6: 64}
+_IPV4_MAPPED = ip_network("::ffff:0:0/96")
+_HEADER_NAME = re.compile(r"[!#$%&'*+\-.^_`|~0-9a-z]{1,64}")
+# Headers that carry something else (the connection, forwarding, cookies, the browser's own
+# requests); an identity header must never share a name with one of them.
+_RESERVED_PROXY_AUTH_HEADERS = frozenset(
+    {
+        "authorization",
+        "connection",
+        "content-length",
+        "content-type",
+        "cookie",
+        "forwarded",
+        "host",
+        "origin",
+        "proxy-authorization",
+        "referer",
+        "transfer-encoding",
+        "upgrade",
+        "user-agent",
+        "x-forwarded-for",
+        "x-forwarded-host",
+        "x-forwarded-port",
+        "x-forwarded-proto",
+        "x-real-ip",
+        "x-request-id",
+    }
+)
+_RESERVED_PROXY_AUTH_PREFIXES = ("hx-", "sec-")
 
 
 class Settings(BaseSettings):
@@ -62,6 +94,13 @@ class Settings(BaseSettings):
     oidc_only: bool = False
     allow_local_admin_login: bool = False
     oidc_rp_logout: bool = False
+    # Reverse-proxy header authentication (F1.4, ADR-0015): off unless explicitly enabled.
+    proxy_auth_enabled: bool = False
+    proxy_auth_user_header: str | None = None
+    proxy_auth_email_header: str | None = None
+    proxy_auth_name_header: str | None = None
+    proxy_auth_auto_create: bool = False
+    proxy_auth_link_by_email: bool = False
 
     def __init__(self, *, _env_file: str | Path | None = ".env", **values: Any) -> None:
         super().__init__(_env_file=_env_file, **values)
@@ -163,6 +202,26 @@ class Settings(BaseSettings):
                 ) from exc
         return value
 
+    @field_validator(
+        "proxy_auth_user_header",
+        "proxy_auth_email_header",
+        "proxy_auth_name_header",
+        mode="before",
+    )
+    @classmethod
+    def validate_proxy_auth_header(cls, value: str | None) -> str | None:
+        # Stored lowercase: ASGI servers deliver header names lowercased.
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        if not isinstance(value, str):
+            raise ValueError("PROXY_AUTH_*_HEADER must be a header name")
+        name = value.strip().lower()
+        if not _HEADER_NAME.fullmatch(name):
+            raise ValueError("PROXY_AUTH_*_HEADER must be an HTTP header name such as Remote-User")
+        if name in _RESERVED_PROXY_AUTH_HEADERS or name.startswith(_RESERVED_PROXY_AUTH_PREFIXES):
+            raise ValueError(f"PROXY_AUTH_*_HEADER cannot use the reserved header {value.strip()}")
+        return name
+
     @field_validator("oidc_issuer", "oidc_client_id", "oidc_admin_group", mode="before")
     @classmethod
     def blank_is_unset(cls, value: str | None) -> str | None:
@@ -262,6 +321,56 @@ class Settings(BaseSettings):
         """Always built from BASE_URL, never from request headers."""
         return f"{self.base_url}/auth/oidc/callback"
 
+    @property
+    def trusted_proxy_networks(self) -> tuple[IPv4Network | IPv6Network, ...]:
+        return tuple(ip_network(proxy, strict=False) for proxy in self.trusted_proxies)
+
+    def wide_trusted_proxies(self) -> list[str]:
+        """Entries that cover more than one address (logged at startup with proxy auth on)."""
+        return [
+            str(network)
+            for network in self.trusted_proxy_networks
+            if network.prefixlen < network.max_prefixlen
+        ]
+
+    def _validate_proxy_auth(self) -> None:
+        if not self.proxy_auth_enabled:
+            return
+        if self.proxy_auth_user_header is None or self.proxy_auth_email_header is None:
+            raise ValueError(
+                "PROXY_AUTH_USER_HEADER and PROXY_AUTH_EMAIL_HEADER are required when "
+                "PROXY_AUTH_ENABLED is true"
+            )
+        names = [
+            name
+            for name in (
+                self.proxy_auth_user_header,
+                self.proxy_auth_email_header,
+                self.proxy_auth_name_header,
+            )
+            if name is not None
+        ]
+        if len(set(names)) != len(names):
+            raise ValueError("PROXY_AUTH_*_HEADER settings must name different headers")
+        if not self.trusted_proxies:
+            raise ValueError(
+                "TRUSTED_PROXIES is required when PROXY_AUTH_ENABLED is true: list the "
+                "addresses of the reverse proxy that sets the identity headers"
+            )
+        for network in self.trusted_proxy_networks:
+            if network.prefixlen < PROXY_AUTH_MIN_PREFIX[network.version]:
+                raise ValueError(
+                    f"TRUSTED_PROXIES entry {network} is too wide for proxy authentication: "
+                    "use at most /24 for IPv4 and /64 for IPv6, ideally the proxy's own address"
+                )
+            # IPv4-mapped peers (::ffff:a.b.c.d) are compared as IPv4, so such an entry would
+            # never match what it seems to say.
+            if isinstance(network, IPv6Network) and network.overlaps(_IPV4_MAPPED):
+                raise ValueError(
+                    f"TRUSTED_PROXIES entry {network} covers IPv4-mapped IPv6 addresses "
+                    "(::ffff:0:0/96); write IPv4 proxies as IPv4 networks"
+                )
+
     def _validate_oidc(self) -> None:
         if not self.oidc_enabled:
             if self.oidc_only:
@@ -294,6 +403,7 @@ class Settings(BaseSettings):
         if self.auth_throttle_max_seconds < self.auth_throttle_base_seconds:
             raise ValueError("AUTH_THROTTLE_MAX_SECONDS must be >= AUTH_THROTTLE_BASE_SECONDS")
         self._validate_oidc()
+        self._validate_proxy_auth()
         if self.database_url is None:
             database_filename = self.data_dir / "assetboard.db"
             self.database_url = f"sqlite:///{database_filename}"

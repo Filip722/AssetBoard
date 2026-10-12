@@ -11,9 +11,10 @@ import httpx
 import pytest
 from sqlalchemy import event, select
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.types import Scope
 
 from assetboard.app import create_app
-from assetboard.cli import proxy_header_options
+from assetboard.cli import serve_app, server_options
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.models.identity import User
@@ -27,7 +28,7 @@ PASSWORD = "Correct Horse Battery!"
 # Forwarded headers come only from TRUSTED_PROXIES
 
 
-async def echo_client(scope: dict[str, Any], receive: Any, send: Any) -> None:
+async def echo_client(scope: Scope, receive: Any, send: Any) -> None:
     if scope["type"] == "lifespan":
         while True:
             message = await receive()
@@ -51,7 +52,7 @@ def test_forwarded_headers_are_honoured_only_from_trusted_proxies(
     # Uvicorn's own fallback (env FORWARDED_ALLOW_IPS, else 127.0.0.1) must not apply.
     monkeypatch.setenv("FORWARDED_ALLOW_IPS", "*")
     settings = Settings(_env_file=None, data_dir=tmp_path, trusted_proxies=trusted)
-    with live_server(echo_client, **proxy_header_options(settings)) as base_url:
+    with live_server(serve_app(echo_client, settings), **server_options(settings)) as base_url:
         response = httpx.get(base_url, headers={"X-Forwarded-For": "203.0.113.9"})
     assert response.text == expected
 

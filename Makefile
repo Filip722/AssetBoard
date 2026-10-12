@@ -71,4 +71,4 @@ i18n-compile:
 
 dev:
 	$(MAKE) css i18n-compile
-	$(UV) run uvicorn assetboard.app:create_app --factory --reload --host $(DEV_HOST) --port $(DEV_PORT)
+	$(UV) run uvicorn assetboard.cli:dev_app --factory --reload --no-proxy-headers --no-access-log --host $(DEV_HOST) --port $(DEV_PORT)

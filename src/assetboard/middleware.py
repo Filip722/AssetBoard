@@ -3,10 +3,13 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+from collections.abc import Sequence
 from time import perf_counter
+from typing import Any, cast
 
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from assetboard.i18n.locale import resolve_locale
 
@@ -32,6 +35,9 @@ SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register", "/login/link", "/
 # carries an authorization code, and the start URL may carry ``next=/invite/<token>``.
 NO_REFERRER_PREFIXES = ("/auth/oidc/",)
 _INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
+# The TCP peer's address (or None), recorded by ``PeerMiddleware`` before forwarded headers are
+# applied. Proxy authentication trusts only this value (ADR-0015).
+PEER_SCOPE_KEY = "assetboard.peer"
 
 
 def redact_path(path: str) -> str:
@@ -210,3 +216,29 @@ def add_security_headers(response: Response) -> None:
     headers = response.headers
     for name, value in SECURITY_HEADERS.items():
         headers[name] = value
+
+
+class PeerMiddleware:
+    """Outermost wrapper used by ``serve``: record the TCP peer, then apply forwarded headers.
+
+    Forwarded headers are handled by uvicorn's own ``ProxyHeadersMiddleware`` with the same
+    ``TRUSTED_PROXIES`` string ``serve`` used to pass to uvicorn, so ``request.client`` and the
+    scheme behave as before (ADR-0012). The difference is that the peer survives the rewrite
+    under ``PEER_SCOPE_KEY``; uvicorn itself then runs with ``proxy_headers=False``.
+    """
+
+    def __init__(self, app: ASGIApp, trusted_proxies: Sequence[str]) -> None:
+        self.app = app
+        self._forwarded = app
+        if trusted_proxies:
+            # uvicorn and Starlette spell the same ASGI types differently.
+            wrapped = ProxyHeadersMiddleware(
+                cast(Any, app), trusted_hosts=",".join(trusted_proxies)
+            )
+            self._forwarded = cast(ASGIApp, wrapped)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in {"http", "websocket"}:
+            client = scope.get("client")
+            scope[PEER_SCOPE_KEY] = client[0] if client else None
+        await self._forwarded(scope, receive, send)

@@ -16,6 +16,7 @@ from assetboard.branding import ENV_PREFIX
 from assetboard.cli import app as cli_app
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import Membership, User, Workspace
+from assetboard.middleware import PeerMiddleware
 
 
 def test_assetboard_console_script_help_runs() -> None:
@@ -247,13 +248,13 @@ def test_auth_commands_work_with_auto_migrate_off_when_database_is_at_head(tmp_p
     assert [email for email, _ in _users(data_dir)] == ["cli@example.com"]
 
 
-def test_serve_passes_trusted_proxies_to_uvicorn(
+def test_serve_applies_trusted_proxies_in_peer_middleware(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: dict[str, object] = {}
     monkeypatch.setattr(cli, "create_app", lambda settings: "app")
-    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.update(kwargs))
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.update(kwargs, served=app))
 
     monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(
@@ -266,8 +267,25 @@ def test_serve_passes_trusted_proxies_to_uvicorn(
     )
 
     assert result.exit_code == 0, result.output
-    assert calls["forwarded_allow_ips"] == "127.0.0.1,10.20.0.0/16"
-    assert calls["proxy_headers"] is True
+    # Forwarded headers are applied inside PeerMiddleware, never by uvicorn itself (ADR-0015).
+    served = calls["served"]
+    assert isinstance(served, PeerMiddleware) and served.app == "app"
+    assert calls["proxy_headers"] is False
+    assert calls["forwarded_allow_ips"] == ""
+
+
+def test_make_dev_runs_the_app_wired_like_serve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "create_app", lambda settings: "app")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(f"{ENV_PREFIX}_DATA_DIR", str(tmp_path / "data"))
+    served = cli.dev_app()
+    assert isinstance(served, PeerMiddleware) and served.app == "app"
+    makefile = (Path(__file__).resolve().parents[2] / "Makefile").read_text(encoding="utf-8")
+    dev = makefile.split("\ndev:\n", 1)[1].split("\n\n", 1)[0]
+    assert "assetboard.cli:dev_app --factory" in dev
+    assert "--no-proxy-headers" in dev and "--no-access-log" in dev
 
 
 def test_serve_trusts_no_proxy_when_trusted_proxies_is_empty(

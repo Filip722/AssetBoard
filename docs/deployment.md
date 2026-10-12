@@ -46,6 +46,12 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_OIDC_ONLY` | `false` | App | Hide password sign-in and registration. Needs `OIDC_ISSUER`; refuses to start with `ALLOW_REGISTRATION`. |
 | `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN` | `false` | App | Break-glass: with `OIDC_ONLY`, keep password sign-in at `/login/local` for instance administrators. No effect otherwise. |
 | `ASSETBOARD_OIDC_RP_LOGOUT` | `false` | App | Signing out of an OIDC session also signs out at the provider (RP-initiated logout), if it publishes an `end_session_endpoint`. Register `<BASE_URL>/login` as the post-logout redirect URI. |
+| `ASSETBOARD_PROXY_AUTH_ENABLED` | `false` | App | Reverse-proxy header authentication ([ADR-0015](adr/0015-proxy-header-authentication.md)). Requires `PROXY_AUTH_USER_HEADER`, `PROXY_AUTH_EMAIL_HEADER` and `TRUSTED_PROXIES` with no entry wider than IPv4 /24 or IPv6 /64. Settings are validated now; sign-in through the headers arrives with the second part of F1.4. |
+| `ASSETBOARD_PROXY_AUTH_USER_HEADER` | unset | App | Header with the proxy's stable user name (for example `Remote-User`), read only from `TRUSTED_PROXIES` peers. |
+| `ASSETBOARD_PROXY_AUTH_EMAIL_HEADER` | unset | App | Header with the user's email (for example `Remote-Email`). Treated as verified: the proxy must only send verified addresses. |
+| `ASSETBOARD_PROXY_AUTH_NAME_HEADER` | unset | App | Optional header with a display name, used only when an account is created. |
+| `ASSETBOARD_PROXY_AUTH_AUTO_CREATE` | `false` | App | Proxy-authenticated people without an account get one with their own workspace. |
+| `ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL` | `false` | App | A first proxy sign-in whose email matches an existing account with a password links them after that password is entered once. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -190,6 +196,20 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### F1.4: reverse-proxy header authentication (part 1)
+
+- **Forwarded headers are applied inside the app.** `assetboard serve` now runs uvicorn with
+  its own forwarded-header handling off and applies `X-Forwarded-For` and `X-Forwarded-Proto`
+  from `ASSETBOARD_TRUSTED_PROXIES` itself, with uvicorn's same code, so client addresses and
+  the scheme are unchanged. Run the app with `assetboard serve` (as the image does); starting
+  `uvicorn` directly applies uvicorn's own defaults instead.
+- **The migration** widens the allowed `user_sessions.auth_method` values to include `proxy`.
+  Downgrading deletes proxy sessions.
+- **New settings** `ASSETBOARD_PROXY_AUTH_*` are off by default. With
+  `PROXY_AUTH_ENABLED=true` the app refuses to start without both header names, or with
+  `TRUSTED_PROXIES` empty, wider than IPv4 /24 or IPv6 /64, or covering IPv4-mapped IPv6
+  addresses.
 
 ### F1.3: OIDC sign-in
 

@@ -69,12 +69,33 @@ def _source_files() -> list[Path]:
     return sorted((DEPLOYMENT.parents[1] / "src/assetboard").rglob("*.py"))
 
 
+def _reserved_header_names(tree: ast.Module) -> set[int]:
+    """Constants inside config.py's list of names an identity header may not use."""
+    ids: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "_RESERVED_PROXY_AUTH_HEADERS"
+            for target in node.targets
+        ):
+            ids |= {id(child) for child in ast.walk(node)}
+    return ids
+
+
 def test_no_source_reads_forwarded_headers() -> None:
-    """Only request.client.host is used; forwarded headers are uvicorn's job (TRUSTED_PROXIES)."""
+    """No app code reads forwarded headers itself.
+
+    ``PeerMiddleware`` (used by ``serve``) applies them for ``TRUSTED_PROXIES`` through uvicorn's
+    ``ProxyHeadersMiddleware``, after recording the TCP peer; the app then sees only
+    ``request.client``. The one exception here is config.py's list of names that proxy identity
+    headers may not use (F1.4).
+    """
     offenders: list[str] = []
     for path in _source_files():
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        exempt = _reserved_header_names(tree) if path.name == "config.py" else set[int]()
         for node in ast.walk(tree):
+            if id(node) in exempt:
+                continue
             if isinstance(node, ast.Constant) and isinstance(node.value, str | bytes):
                 text = node.value.decode() if isinstance(node.value, bytes) else node.value
                 lowered = text.lower()

@@ -21,6 +21,7 @@ The decisions below are accepted unless noted otherwise.
 | [0012](0012-local-authentication.md) | Local authentication, server-side sessions and first-run setup | Accepted |
 | [0013](0013-invitation-links.md) | Invitation links | Accepted |
 | [0014](0014-oidc-sign-in.md) | OIDC sign-in | Accepted |
+| [0015](0015-proxy-header-authentication.md) | Reverse-proxy header authentication | Accepted |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.

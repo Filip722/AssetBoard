@@ -9,12 +9,12 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from assetboard.config import Settings
+from assetboard.services.external_identity import SignInIdentity
 from assetboard.services.oidc import (
     ALLOWED_ALGORITHMS,
     AuthorizationRequest,
     OidcClient,
     OidcError,
-    OidcIdentity,
     create_s256_code_challenge,
     email_verified_claim,
 )
@@ -59,7 +59,7 @@ def make_client(tmp_path: Path, idp: FakeIdp, clock: StepClock, **overrides: Any
     return OidcClient(make_settings(tmp_path, **overrides), idp, clock)
 
 
-def sign_in(client: OidcClient, idp: FakeIdp, **callback: str) -> OidcIdentity:
+def sign_in(client: OidcClient, idp: FakeIdp, **callback: str) -> SignInIdentity:
     request = client.begin()
     params = idp.authorize(request.url, **callback)
     return complete(client, request, params)
@@ -67,7 +67,7 @@ def sign_in(client: OidcClient, idp: FakeIdp, **callback: str) -> OidcIdentity:
 
 def complete(
     client: OidcClient, request: AuthorizationRequest, params: dict[str, str]
-) -> OidcIdentity:
+) -> SignInIdentity:
     return client.complete(
         params, state=request.state, nonce=request.nonce, code_verifier=request.code_verifier
     )
@@ -100,7 +100,7 @@ def test_begin_uses_pkce_s256_state_nonce_and_the_base_url_redirect(
 
 def test_happy_path_returns_the_identity(tmp_path: Path, idp: FakeIdp, clock: StepClock) -> None:
     identity = sign_in(make_client(tmp_path, idp, clock), idp)
-    assert identity == OidcIdentity(
+    assert identity == SignInIdentity(
         issuer=ISSUER,
         subject="user-123",
         email="ola@example.com",

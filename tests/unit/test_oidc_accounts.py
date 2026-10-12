@@ -29,14 +29,15 @@ from assetboard.services.auth import (
     read_web_session,
     session_id_hash,
 )
+from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 from assetboard.services.invitations import MAX_FAILED_EMAIL_ATTEMPTS, hash_token
-from assetboard.services.oidc import OidcClient, OidcIdentity
+from assetboard.services.oidc import OidcClient
 from assetboard.services.oidc_accounts import (
-    OidcSignIn,
+    SignInOutcome,
     invitation_token,
     link_identity,
     record_oidc_failure,
-    sign_in_with_oidc,
+    sign_in_external,
 )
 from assetboard.services.oidc_flow import PendingLink
 from assetboard.services.workspaces import create_invitation
@@ -68,7 +69,7 @@ def oidc_settings(tmp_path: Path, **overrides: Any) -> Settings:
     return Settings(_env_file=None, **values)
 
 
-def identity(**overrides: Any) -> OidcIdentity:
+def identity(**overrides: Any) -> SignInIdentity:
     values: dict[str, Any] = {
         "issuer": ISSUER,
         "subject": "sub-ola",
@@ -78,18 +79,18 @@ def identity(**overrides: Any) -> OidcIdentity:
         "groups": None,
     }
     values.update(overrides)
-    return OidcIdentity(**values)
+    return SignInIdentity(**values)
 
 
 def sign_in(
     db: WorkspaceDb,
     settings: Settings,
-    who: OidcIdentity,
+    who: SignInIdentity,
     *,
     next_path: str = "/",
     existing_session_id: str | None = None,
-) -> OidcSignIn:
-    return sign_in_with_oidc(
+) -> SignInOutcome:
+    return sign_in_external(
         db.factory,
         who,
         next_path=next_path,
@@ -163,7 +164,7 @@ def user(db: WorkspaceDb, user_id: UUID) -> User:
         return found
 
 
-def pending_for(outcome: OidcSignIn) -> PendingLink:
+def pending_for(outcome: SignInOutcome) -> PendingLink:
     assert outcome.status == "confirm_link" and outcome.pending_link is not None
     return outcome.pending_link
 
@@ -380,7 +381,7 @@ def test_auto_create_makes_a_passwordless_user_with_an_own_workspace(
     ],
 )
 def test_auto_create_needs_a_verified_email(
-    db: WorkspaceDb, tmp_path: Path, who: OidcIdentity, status: str
+    db: WorkspaceDb, tmp_path: Path, who: SignInIdentity, status: str
 ) -> None:
     settings = oidc_settings(tmp_path, oidc_auto_create=True)
     assert sign_in(db, settings, who).status == status
@@ -517,7 +518,9 @@ def test_invitation_token_from_next(next_path: str, token: str | None) -> None:
         (identity(email=None, email_verified=False), False),
     ],
 )
-def test_allowed_domains(db: WorkspaceDb, tmp_path: Path, who: OidcIdentity, allowed: bool) -> None:
+def test_allowed_domains(
+    db: WorkspaceDb, tmp_path: Path, who: SignInIdentity, allowed: bool
+) -> None:
     settings = oidc_settings(tmp_path, oidc_auto_create=True, oidc_allowed_domains="example.com")
     normalized = replace(who, email=who.email.lower() if who.email else None)
     outcome = sign_in(db, settings, normalized)
@@ -754,3 +757,202 @@ def test_awkward_provider_names_never_break_account_creation(
     stored = user(db, outcome.user_id).display_name
     assert stored and stored == stored.strip()
     assert all(character.isprintable() for character in stored)
+
+
+# Proxy identities (F1.4, ADR-0015): the same mapping under the proxy's own policy
+
+
+def proxy_settings(tmp_path: Path, **overrides: Any) -> Settings:
+    """OIDC stays configured, with every OIDC flag on, to show the proxy never uses them."""
+    values: dict[str, Any] = {
+        "oidc_auto_create": True,
+        "oidc_link_by_email": True,
+        "oidc_admin_group": "admins",
+        "proxy_auth_enabled": True,
+        "proxy_auth_user_header": "Remote-User",
+        "proxy_auth_email_header": "Remote-Email",
+        "trusted_proxies": "172.20.0.2",
+    }
+    values.update(overrides)
+    return oidc_settings(tmp_path, **values)
+
+
+def proxy_identity(**overrides: Any) -> SignInIdentity:
+    return identity(**{"issuer": PROXY_PROVIDER, "subject": "ola", **overrides})
+
+
+def link_proxy(db: WorkspaceDb, user_id: UUID, subject: str = "ola") -> None:
+    with db.factory.begin() as session:
+        session.add(
+            ExternalIdentity(
+                user_id=user_id, provider=PROXY_PROVIDER, subject=subject, email_at_link=None
+            )
+        )
+
+
+def test_a_linked_proxy_identity_signs_in_with_a_proxy_session(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    settings = proxy_settings(tmp_path)
+    user_id = add_user(db, "ola@example.com", password=None)
+    link_proxy(db, user_id)
+    existing = open_session(db, settings, user_id)
+    outcome = sign_in(db, settings, proxy_identity(), existing_session_id=existing)
+    assert (outcome.status, outcome.user_id) == ("signed_in", user_id)
+    rows = sessions(db, user_id)
+    assert [row.id_hash for row in rows] == [session_id_hash(outcome.session_id or "")]
+    assert rows[0].auth_method == "proxy"
+    assert events(db, "auth.login_success") == [{"method": "proxy"}]
+
+
+def test_proxy_and_oidc_identities_with_the_same_subject_are_different(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    settings = proxy_settings(tmp_path, proxy_auth_auto_create=False)
+    user_id = add_user(db, "someone@example.com", password=None)
+    link(db, user_id, subject="ola")  # an OIDC identity with subject "ola"
+    outcome = sign_in(db, settings, proxy_identity(email="other@example.com"))
+    assert outcome.status == "no_account"
+    assert events(db, "auth.proxy_failure") == [{"reason": "no_account"}]
+    assert events(db, "auth.oidc_failure") == []
+
+
+@pytest.mark.parametrize("flag", [False, True])
+def test_proxy_auto_create_follows_its_own_flag(
+    db: WorkspaceDb, tmp_path: Path, flag: bool
+) -> None:
+    settings = proxy_settings(
+        tmp_path, proxy_auth_auto_create=flag, oidc_allowed_domains="family.example"
+    )
+    outcome = sign_in(db, settings, proxy_identity())
+    if not flag:
+        assert outcome.status == "no_account"
+        assert events(db, "auth.proxy_failure") == [{"reason": "no_account"}]
+        return
+    # No domain allow-list for the proxy: example.com is outside OIDC's list.
+    assert (outcome.status, outcome.created) == ("signed_in", True)
+    assert outcome.user_id is not None
+    assert identities(db) == [(outcome.user_id, "ola")]
+    with db.factory() as session:
+        provider = session.scalar(select(ExternalIdentity.provider))
+    assert provider == PROXY_PROVIDER
+    assert sessions(db, outcome.user_id)[0].auth_method == "proxy"
+    assert events(db, "auth.register") == [{"via": "proxy"}]
+    assert events(db, "auth.login_success") == [{"method": "proxy", "created": True}]
+
+
+def test_proxy_invitation_sign_up_works_without_auto_create(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    settings = proxy_settings(tmp_path, proxy_auth_auto_create=False)
+    token = invite(db)
+    outcome = sign_in(db, settings, proxy_identity(), next_path=f"/invite/{token}")
+    assert outcome.status == "signed_in" and outcome.joined_workspace_id == db.workspace_id
+    assert invitation(db, token).used_by_user_id == outcome.user_id
+    assert events(db, "auth.register") == [{"via": "proxy_invitation"}]
+
+
+@pytest.mark.parametrize(("flag", "status"), [(False, "account_exists"), (True, "confirm_link")])
+def test_proxy_link_by_email_follows_its_own_flag(
+    db: WorkspaceDb, tmp_path: Path, flag: bool, status: str
+) -> None:
+    settings = proxy_settings(tmp_path, proxy_auth_link_by_email=flag)
+    add_user(db, "ola@example.com")
+    assert sign_in(db, settings, proxy_identity()).status == status
+
+
+def test_linking_a_proxy_identity_needs_the_password(db: WorkspaceDb, tmp_path: Path) -> None:
+    settings = proxy_settings(tmp_path, proxy_auth_link_by_email=True)
+    user_id = add_user(db, "ola@example.com")
+    other_device = open_session(db, settings, user_id)
+    pending = pending_for(sign_in(db, settings, proxy_identity()))
+    assert pending.issuer == PROXY_PROVIDER
+
+    assert do_link(db, settings, pending, "wrong password").status == "failed"
+    result = do_link(db, settings, pending)
+    assert (result.status, result.user_id, result.revoked_sessions) == ("linked", user_id, 1)
+    rows = sessions(db, user_id)
+    assert [row.id_hash for row in rows] == [session_id_hash(result.session_id or "")]
+    assert session_id_hash(other_device) not in {row.id_hash for row in rows}
+    assert rows[0].auth_method == "proxy"
+    assert events(db, "auth.proxy_linked") == [{"other_sessions_revoked": 1}]
+    assert events(db, "auth.oidc_linked") == []
+    assert sign_in(db, settings, proxy_identity()).status == "signed_in"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"proxy_auth_link_by_email": False},
+        {"proxy_auth_enabled": False, "proxy_auth_link_by_email": True},
+    ],
+)
+def test_a_pending_proxy_link_needs_proxy_linking_enabled(
+    db: WorkspaceDb, tmp_path: Path, overrides: dict[str, Any]
+) -> None:
+    user_id = add_user(db, "ola@example.com")
+    pending = PendingLink(
+        user_id=user_id,
+        issuer=PROXY_PROVIDER,
+        subject="ola",
+        email="ola@example.com",
+        admin=None,
+        next_path="/",
+    )
+    # OIDC_LINK_BY_EMAIL is on, but it does not apply to proxy identities.
+    assert do_link(db, proxy_settings(tmp_path, **overrides), pending).status == "disabled"
+    assert identities(db) == []
+
+
+def test_an_inactive_proxy_user_is_refused_and_audited(db: WorkspaceDb, tmp_path: Path) -> None:
+    settings = proxy_settings(tmp_path)
+    user_id = add_user(db, "ola@example.com", password=None, active=False)
+    link_proxy(db, user_id)
+    assert sign_in(db, settings, proxy_identity()).status == "inactive"
+    assert sessions(db, user_id) == []
+    assert events(db, "auth.proxy_failure") == [{"reason": "inactive"}]
+
+
+@pytest.mark.parametrize("admin", [False, True])
+def test_proxy_sign_in_never_changes_instance_admin_status(
+    db: WorkspaceDb, tmp_path: Path, admin: bool
+) -> None:
+    # OIDC_ADMIN_GROUP is set and the identity even carries that group: neither applies.
+    settings = proxy_settings(tmp_path)
+    user_id = add_user(db, "ola@example.com", password=None, admin=admin)
+    link_proxy(db, user_id)
+    outcome = sign_in(db, settings, proxy_identity(groups=("admins",) if not admin else ()))
+    assert outcome.status == "signed_in"
+    assert user(db, user_id).is_instance_admin is admin
+    assert events(db, "auth.instance_admin_granted") == []
+    assert events(db, "auth.instance_admin_revoked") == []
+
+
+def test_a_proxy_identity_without_a_verified_email_signs_in_only_when_linked(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    settings = proxy_settings(tmp_path, proxy_auth_auto_create=True)
+    unverified = proxy_identity(email=None, email_verified=False)
+    assert sign_in(db, settings, unverified).status == "email_unverified"
+    user_id = add_user(db, "ola@example.com", password=None)
+    link_proxy(db, user_id)
+    assert sign_in(db, settings, unverified).status == "signed_in"
+
+
+def test_proxy_account_creation_uses_the_registration_throttle(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    settings = proxy_settings(tmp_path, proxy_auth_auto_create=True, registration_ip_limit=2)
+    for number in range(2):
+        who = proxy_identity(subject=f"s{number}", email=f"u{number}@example.com")
+        assert sign_in(db, settings, who).status == "signed_in"
+    who = proxy_identity(subject="s3", email="u3@example.com")
+    assert sign_in(db, settings, who).status == "throttled"
+    assert events(db, "auth.proxy_failure") == [{"reason": "throttled"}]
+
+
+def test_a_proxy_identity_while_proxy_auth_is_off_is_a_programming_error(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
+    with pytest.raises(ValueError, match="proxy authentication is off"):
+        sign_in(db, oidc_settings(tmp_path), proxy_identity())

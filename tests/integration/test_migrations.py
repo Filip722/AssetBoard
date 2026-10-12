@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from alembic import command
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect
+from sqlalchemy import Connection, inspect
+from sqlalchemy.exc import IntegrityError
 
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
@@ -235,6 +237,62 @@ def test_0005_round_trip_keeps_sessions_as_password_logins(tmp_path: Path) -> No
         with engine.connect() as connection:
             methods = connection.exec_driver_sql("SELECT auth_method FROM user_sessions")
             assert methods.scalars().all() == ["password"]
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0006_round_trip_allows_proxy_sessions_and_drops_them_on_downgrade(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f14.db'}"
+    )
+    upgrade_database(settings)
+    script = ScriptDirectory.from_config(alembic_config(settings))
+    revision = script.get_revision("0006_f14")
+    assert revision is not None and revision.down_revision == "0005_f13"
+    engine = create_database_engine(settings.database_url or "")
+    user_id = "00000000000000000000000000000001"
+
+    def add_session(connection: Connection, id_hash: str, method: str) -> None:
+        connection.exec_driver_sql(
+            "INSERT INTO user_sessions (id_hash, user_id, created_at, last_seen_at, "
+            "expires_at, auth_method) VALUES (?, ?, '2026-01-01 00:00:00', "
+            "'2026-01-01 00:00:00', '2026-02-01 00:00:00', ?)",
+            (id_hash, user_id, method),
+        )
+
+    def methods() -> list[str]:
+        with engine.connect() as connection:
+            rows = connection.exec_driver_sql(
+                "SELECT auth_method FROM user_sessions ORDER BY auth_method"
+            )
+            return list(rows.scalars())
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, locale, theme, is_active, "
+                "is_instance_admin, created_at, updated_at) VALUES (?, 'a@example.com', 'A', "
+                "'en', 'system', 1, 0, '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
+                (user_id,),
+            )
+            add_session(connection, "a" * 64, "password")
+            add_session(connection, "b" * 64, "oidc")
+            add_session(connection, "c" * 64, "proxy")
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            add_session(connection, "d" * 64, "header")
+        assert methods() == ["oidc", "password", "proxy"]
+
+        command.downgrade(alembic_config(settings), "0005_f13")
+        # Proxy sessions do not fit the old constraint; the others survive.
+        assert methods() == ["oidc", "password"]
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            add_session(connection, "c" * 64, "proxy")
+
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
         check_database_migrations(settings)
     finally:
         engine.dispose()

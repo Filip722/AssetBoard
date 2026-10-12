@@ -15,8 +15,10 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from assetboard.branding import CLI_NAME
+from assetboard.middleware import PEER_SCOPE_KEY
 from assetboard.services import csrf
 from assetboard.services.auth import WebSession
+from assetboard.services.proxy_auth import peer_is_trusted
 
 if TYPE_CHECKING:
     from assetboard.config import Settings
@@ -118,6 +120,29 @@ def client_host(request: Request) -> str | None:
             "throttle bucket. Configure the reverse proxy and ASSETBOARD_TRUSTED_PROXIES."
         )
     return host
+
+
+def proxy_peer_trusted(request: Request) -> bool:
+    """Whether proxy identity headers may be read: the TCP peer is in ``TRUSTED_PROXIES``.
+
+    Only the peer that ``PeerMiddleware`` recorded counts, never ``request.client`` (which
+    forwarded headers rewrite). Without that record (the app was not started with ``serve``)
+    nothing is trusted, and one ERROR per process says why.
+    """
+    state = request.app.state
+    settings = state.settings
+    if not settings.proxy_auth_enabled:
+        return False
+    if PEER_SCOPE_KEY not in request.scope:
+        if not getattr(state, "missing_peer_logged", False):
+            state.missing_peer_logged = True
+            state.logger.error(
+                "proxy authentication is on but the TCP peer was not recorded; identity "
+                "headers are ignored. Run the app via '%s serve'.",
+                CLI_NAME,
+            )
+        return False
+    return peer_is_trusted(request.scope[PEER_SCOPE_KEY], settings.trusted_proxy_networks)
 
 
 def safe_next(value: str | None, default: str = "/", *, max_length: int = MAX_NEXT_LENGTH) -> str:

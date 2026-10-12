@@ -64,6 +64,16 @@ def create_app(
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
     settings.ensure_data_dir_writable()
+    if settings.proxy_auth_enabled:
+        # Accepted by validation (at most /24 or /64), but every address in it can sign in as
+        # anyone through the identity headers (ADR-0015).
+        for network in settings.wide_trusted_proxies():
+            logger.warning(
+                "TRUSTED_PROXIES entry %s covers more than one address; with proxy "
+                "authentication every host in it can sign in as anyone. Prefer the proxy's own "
+                "address.",
+                network,
+            )
     # SECRET_KEY, or the key generated once and persisted under DATA_DIR. Only purpose-specific
     # subkeys leave this function; a restart reads the same file, so tokens stay valid.
     secret_key = settings.ensure_secret_key()

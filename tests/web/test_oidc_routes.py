@@ -438,7 +438,7 @@ def test_every_callback_outcome_is_a_303_to_a_clean_url(
             def locked(*_args: object, **_kwargs: object) -> object:
                 raise _locked()
 
-            monkeypatch.setattr(oidc_routes, "sign_in_with_oidc", locked)
+            monkeypatch.setattr(oidc_routes, "sign_in_external", locked)
         response = o.sign_in("/workspace/members", **callback)
         assert response.status_code == 303
         location = response.headers["location"]

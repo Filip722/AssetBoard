@@ -55,7 +55,7 @@ from assetboard.services.workspace_options import WorkspaceOptions, validate_wor
 
 ActorType = Literal["user", "cli", "system"]
 ThrottleScope = Literal["account", "ip", "setup", "register"]
-AuthMethod = Literal["password", "oidc"]
+AuthMethod = Literal["password", "oidc", "proxy"]
 
 MIN_PASSWORD_LENGTH = 10
 MAX_PASSWORD_LENGTH = 1024

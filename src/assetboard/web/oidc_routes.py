@@ -27,10 +27,10 @@ from assetboard.services.auth import MAX_PASSWORD_LENGTH, session_id_hash
 from assetboard.services.context import select_workspace
 from assetboard.services.oidc import OidcClient, OidcError, log_safe
 from assetboard.services.oidc_accounts import (
-    OidcSignIn,
+    SignInOutcome,
     link_identity_async,
     record_oidc_failure,
-    sign_in_with_oidc,
+    sign_in_external,
 )
 from assetboard.services.oidc_flow import FlowState, PendingLink
 from assetboard.web.auth_routes import signed_in_redirect
@@ -248,8 +248,8 @@ async def oidc_callback(request: Request) -> Response:
     next_path = oidc_next(flow.next_path)
     existing = request.cookies.get(session_cookie_name(settings))
     try:
-        outcome: OidcSignIn = await run_in_threadpool(
-            lambda: sign_in_with_oidc(
+        outcome: SignInOutcome = await run_in_threadpool(
+            lambda: sign_in_external(
                 state.session_factory,
                 identity,
                 next_path=next_path,

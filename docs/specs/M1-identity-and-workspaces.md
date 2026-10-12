@@ -191,6 +191,16 @@ Write docs/auth/oidc.md.
 - Startup refuses to run with proxy auth enabled and empty `TRUSTED_PROXIES`.
 - Tests: spoofed headers from untrusted peer are ignored; trusted peer works.
 
+**Implementation notes (agreed in the F1.4 plan, [ADR-0015](../adr/0015-proxy-header-authentication.md))**
+- Extra settings: `PROXY_AUTH_NAME_HEADER` (optional, names new accounts) and
+  `PROXY_AUTH_LINK_BY_EMAIL` (default false). `PROXY_AUTH_AUTO_CREATE` defaults to false. No
+  domain allow-list and no group mapping.
+- The trusted peer is the TCP peer recorded by `PeerMiddleware` before forwarded headers apply.
+  Startup also refuses `TRUSTED_PROXIES` entries wider than IPv4 /24 or IPv6 /64 or covering
+  IPv4-mapped IPv6 addresses, and warns about every entry wider than one address.
+- Delivered in two parts: A (settings and validation, peer capture, shared account mapping,
+  migration 0006) and B (sign-in routes and session binding, logout, templates, user docs).
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

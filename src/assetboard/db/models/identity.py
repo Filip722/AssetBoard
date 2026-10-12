@@ -127,7 +127,7 @@ class UserSession(Base):
     __table_args__ = (
         Index("ix_user_sessions_user_expires", "user_id", "expires_at"),
         CheckConstraint("length(id_hash) = 64", name="id_hash_sha256_length"),
-        CheckConstraint("auth_method IN ('password', 'oidc')", name="auth_method_valid"),
+        CheckConstraint("auth_method IN ('password', 'oidc', 'proxy')", name="auth_method_valid"),
     )
 
     id_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -139,7 +139,8 @@ class UserSession(Base):
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
     ip_prefix: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    # How the session was started; RP-initiated logout applies to "oidc" sessions only.
+    # How the session was started ("password", "oidc" or "proxy", F1.4); RP-initiated logout
+    # applies to "oidc" sessions only.
     auth_method: Mapped[str] = mapped_column(
         String(16), nullable=False, default="password", server_default="password"
     )

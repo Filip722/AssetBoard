@@ -13,9 +13,9 @@ from assetboard.db.models.identity import ExternalIdentity, Invitation, SetupSta
 from assetboard.db.repositories import NotFound
 from assetboard.services import invitations, workspaces
 from assetboard.services.auth import RegistrationOutcome, register_with_invitation
+from assetboard.services.external_identity import SignInIdentity
 from assetboard.services.invitations import InvitationInvalid, accept_invitation
-from assetboard.services.oidc import OidcIdentity
-from assetboard.services.oidc_accounts import OidcSignIn, sign_in_with_oidc
+from assetboard.services.oidc_accounts import SignInOutcome, sign_in_external
 from assetboard.services.workspaces import (
     MAX_PENDING_INVITATIONS,
     TooManyInvitations,
@@ -143,10 +143,10 @@ def test_concurrent_oidc_sign_ups_on_one_link_create_one_user(
     token = create_invitation(
         db.factory, db.ctx("olga", "owner"), role="viewer", email=None, expires_in_days=7
     ).token
-    results: dict[str, OidcSignIn] = {}
+    results: dict[str, SignInOutcome] = {}
 
     def sign_up(name: str) -> None:
-        who = OidcIdentity(
+        who = SignInIdentity(
             issuer="https://idp.example.test",
             subject=name,
             email=f"{name}@example.com",
@@ -154,7 +154,7 @@ def test_concurrent_oidc_sign_ups_on_one_link_create_one_user(
             display_name=name,
             groups=None,
         )
-        results[name] = sign_in_with_oidc(
+        results[name] = sign_in_external(
             db.factory,
             who,
             next_path=f"/invite/{token}",

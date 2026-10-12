@@ -7,6 +7,7 @@ from typing import Any
 import typer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.types import ASGIApp
 
 from assetboard.app import create_app
 from assetboard.branding import APP_NAME, CLI_NAME
@@ -19,6 +20,7 @@ from assetboard.db.migrate import (
     database_is_at_head,
     upgrade_database,
 )
+from assetboard.middleware import PeerMiddleware
 from assetboard.services.auth import EmailAlreadyRegistered, create_admin_cli, reset_user_password
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
@@ -43,7 +45,22 @@ def serve(
     except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
-    uvicorn.run(application, host=host, port=port, **server_options(settings))
+    uvicorn.run(serve_app(application, settings), host=host, port=port, **server_options(settings))
+
+
+def serve_app(application: ASGIApp, settings: Settings) -> ASGIApp:
+    """The application as ``serve`` runs it: ``PeerMiddleware`` outermost (ADR-0015)."""
+    return PeerMiddleware(application, settings.trusted_proxies)
+
+
+def dev_app() -> ASGIApp:
+    """``make dev``'s factory (uvicorn ``--reload`` needs one): wired exactly as ``serve``.
+
+    The Makefile also passes ``--no-proxy-headers`` and ``--no-access-log``, the command-line
+    equivalents of ``server_options``.
+    """
+    settings = Settings()
+    return serve_app(create_app(settings), settings)
 
 
 def server_options(settings: Settings) -> dict[str, Any]:
@@ -52,20 +69,15 @@ def server_options(settings: Settings) -> dict[str, Any]:
     The access log is off: the application's own ``request_complete`` line covers every request
     and redacts invitation tokens, while uvicorn's access log would print full URLs, including
     query strings such as ``/login?next=/invite/<token>`` (ADR-0013).
+
+    Uvicorn's own forwarded-header handling is off too: ``PeerMiddleware`` (``serve_app``)
+    applies forwarded headers from ``TRUSTED_PROXIES`` with uvicorn's ``ProxyHeadersMiddleware``,
+    after recording the TCP peer that proxy authentication checks (ADR-0015). The empty
+    ``forwarded_allow_ips`` keeps uvicorn from falling back to the ``FORWARDED_ALLOW_IPS``
+    environment variable or ``127.0.0.1``.
     """
-    return {"access_log": False, **proxy_header_options(settings)}
-
-
-def proxy_header_options(settings: Settings) -> dict[str, Any]:
-    """Uvicorn's forwarded-header handling, driven only by ``TRUSTED_PROXIES``.
-
-    Empty means no proxy is trusted: forwarded headers are ignored entirely. Passing
-    ``forwarded_allow_ips=None`` instead would make uvicorn fall back to the
-    ``FORWARDED_ALLOW_IPS`` environment variable or ``127.0.0.1``.
-    """
-    if not settings.trusted_proxies:
-        return {"proxy_headers": False, "forwarded_allow_ips": ""}
-    return {"proxy_headers": True, "forwarded_allow_ips": ",".join(settings.trusted_proxies)}
+    del settings  # TRUSTED_PROXIES is applied by serve_app
+    return {"access_log": False, "proxy_headers": False, "forwarded_allow_ips": ""}
 
 
 @app.command()

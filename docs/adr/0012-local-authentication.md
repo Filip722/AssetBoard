@@ -107,3 +107,13 @@ ADR-0014 adds OIDC sign-in. For local authentication this means:
   that password once. The check reuses login's per-account and per-address throttle and dummy
   verify; F1.5 reuses it for sensitive profile actions.
 - **Sessions record how they started** (`auth_method`: `password` or `oidc`).
+
+## Amendment (2026-10-12): proxy header authentication (F1.4)
+
+ADR-0015 adds reverse-proxy header authentication. For local authentication this means:
+
+- **Forwarded headers are applied by `PeerMiddleware`.** `assetboard serve` runs uvicorn with
+  `proxy_headers=False`; `PeerMiddleware` records the TCP peer, then applies forwarded headers
+  from `ASSETBOARD_TRUSTED_PROXIES` with uvicorn's own `ProxyHeadersMiddleware`. The client
+  address used for throttling (`request.client.host`) is unchanged.
+- **Sessions record how they started** (`auth_method`: `password`, `oidc` or `proxy`).
