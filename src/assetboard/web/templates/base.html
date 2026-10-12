@@ -35,11 +35,15 @@
             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-accent dark:bg-emerald-950 dark:text-emerald-300" aria-hidden="true">◉</span>
             <span class="min-w-0">
               <span class="block truncate text-sm font-medium">{{ web_session.display_name if web_session else _("Your account") }}</span>
-              <span class="block text-xs text-muted dark:text-slate-400">{{ _("Personal workspace") }}</span>
+              {% if workspace_nav %}<span class="block truncate text-xs text-muted dark:text-slate-400" data-current-workspace>{{ workspace_nav.current.name }}</span>{% endif %}
             </span>
             <span class="text-xs text-muted" aria-hidden="true">⌃</span>
           </summary>
           <div class="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-xl border border-line bg-white p-1 shadow-card dark:border-slate-700 dark:bg-slate-900">
+            {% if workspace_nav and workspace_nav.role == "owner" %}
+            <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Workspace settings") }}</a>
+            <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Members") }}</a>
+            {% endif %}
             <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Account security") }}</a>
             {% if web_session %}
             <form method="post" action="{{ scoped_url(request, 'logout') }}">
@@ -61,9 +65,24 @@
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-accent">{{ _("Personal finance") }}</p>
             <h1 class="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>
           </div>
+          {% if workspace_nav %}
+          {% if workspace_nav.can_switch %}
+          <form method="post" action="{{ scoped_url(request, 'workspace_switch') }}" class="flex items-center gap-2" data-workspace-switcher>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+            <label for="workspace-switcher" class="text-sm text-muted dark:text-slate-300">{{ _("Workspace") }}</label>
+            <select id="workspace-switcher" name="workspace_id" data-autosubmit class="rounded-full border border-line bg-white px-3.5 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+              {% for choice in workspace_nav.choices %}
+              <option value="{{ choice.id }}" {% if choice.id == workspace_nav.current.id %}selected{% endif %}>{{ choice.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="rounded-full border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-slate-800 dark:hover:bg-slate-800">{{ _("Switch") }}</button>
+          </form>
+          {% else %}
           <div class="rounded-full border border-line bg-white px-3.5 py-2 text-sm text-muted dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-            {{ _("Workspace") }} <span class="px-1 text-slate-300">/</span> {{ _("Personal") }}
+            {{ _("Workspace") }} <span class="px-1 text-slate-300">/</span> {{ workspace_nav.current.name }}
           </div>
+          {% endif %}
+          {% endif %}
         </header>
         {{ flashes() }}
         {% block content %}{% endblock %}

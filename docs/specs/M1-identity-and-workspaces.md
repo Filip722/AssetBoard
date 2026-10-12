@@ -81,6 +81,21 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - Foreign keys between workspace-owned tables must include `workspace_id`.
 - The isolation test also includes a static scan for workspace-owned models used outside
   repositories. See ADR-0003 (amendment 2026-10-12).
+- Part B is split again. **B1:** switcher, workspace settings, members page and the last-owner
+  rule. **B2:** invitations.
+- The switcher is a form in the page header, shown only on workspace pages (those with a
+  Context) when the user has more than one membership. Account, error, "No workspace" and
+  signed-out pages render without workspace parts.
+- Settings, members, role changes and removal are owners-only. Every write re-reads the
+  actor's membership inside its `BEGIN IMMEDIATE` transaction (the request's Context can be
+  stale) and checks the last-owner rule there. Owners cannot remove themselves (leaving a
+  workspace is a later feature). Self-demotion works only when another owner exists.
+- The workspace "default locale" is labelled "Formatting default": it does not change the
+  interface language, which follows the user and the browser.
+- Changing the base currency is allowed for now; M2 must block or convert once amounts exist.
+- Removing a member does not revoke their sessions: the Context checks membership on every
+  request.
+- Backlog: workspace deletion and ownership transfer.
 
 **Agent prompt**
 ```

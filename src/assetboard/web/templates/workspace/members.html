@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Members") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Members") }}{% endblock %}
+{% block content %}
+<section class="panel p-6 sm:p-7" aria-labelledby="members-heading">
+  <h2 id="members-heading" class="text-base font-semibold">{{ _("People in this workspace") }}</h2>
+  {% if error %}
+  <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">{{ error }}</p>
+  {% endif %}
+  <ul class="mt-5 divide-y divide-line dark:divide-slate-800">
+    {% for member in members %}
+    <li class="flex flex-wrap items-center justify-between gap-4 py-4" data-member="{{ member.membership_id }}">
+      <div class="min-w-0">
+        <p class="truncate text-sm font-medium">{{ member.display_name }}{% if member.user_id == current_user_id %} <span class="text-xs text-muted">({{ _("you") }})</span>{% endif %}</p>
+        <p class="truncate text-xs text-muted dark:text-slate-400">{{ member.email }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <form method="post" action="{{ scoped_url(request, 'workspace_member_role', membership_id=member.membership_id|string) }}" class="flex items-center gap-2">
+          {{ csrf_input() }}
+          <label for="role-{{ member.membership_id }}" class="sr-only">{{ _("Role") }}</label>
+          <select id="role-{{ member.membership_id }}" name="role" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+            {% for value, label in roles %}
+            <option value="{{ value }}" {% if value == member.role %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="rounded-xl border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ _("Change role") }}</button>
+        </form>
+        {% if member.user_id != current_user_id %}
+        <form method="post" action="{{ scoped_url(request, 'workspace_member_remove', membership_id=member.membership_id|string) }}" data-confirm="{{ _('Remove %(name)s from this workspace?', name=member.display_name) }}">
+          {{ csrf_input() }}
+          <button type="submit" data-remove-member class="rounded-xl px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950">{{ _("Remove") }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

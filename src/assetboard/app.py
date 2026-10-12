@@ -43,6 +43,7 @@ from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed
+from assetboard.web.workspace_routes import router as workspace_router
 
 # Short lock wait for the best-effort session activity write; a busy database skips it.
 TOUCH_BUSY_TIMEOUT_MS = 250
@@ -129,6 +130,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
     app.include_router(auth_router)
+    app.include_router(workspace_router)
 
     @app.exception_handler(CsrfFailed)
     async def handle_csrf_failure(request: Request, _exc: CsrfFailed) -> Response:

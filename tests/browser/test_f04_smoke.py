@@ -10,9 +10,11 @@ import pytest
 import uvicorn
 from fastapi.responses import HTMLResponse, Response
 from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import select
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.identity import Membership, User, Workspace
 from assetboard.web.rendering import templates_for
 
 pytestmark = pytest.mark.skipif(
@@ -94,9 +96,11 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.get_by_label("Email").fill("admin@example.com")
             page.get_by_label("Display name").fill("Browser Admin")
             page.get_by_label("Password").fill("Correct Horse Battery!")
+            page.get_by_label("Workspace name").fill("Browser Home")
             page.get_by_role("button", name="Create administrator").click()
             page.wait_for_url(f"{base}/")
             expect(page.get_by_text("Browser Admin")).to_be_visible()
+            expect(page.locator("[data-current-workspace]")).to_have_text("Browser Home")
 
             # HTMX sends the CSRF token in a header; a bad token becomes an error toast.
             page.goto(f"{base}/account/password", wait_until="networkidle")
@@ -120,6 +124,31 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.get_by_label("Password").fill("Correct Horse Battery!")
             page.get_by_role("button", name="Sign in").click()
             page.wait_for_url(f"{base}/")
+
+            # Removing a member asks for confirmation through the CSP-safe data-confirm handler.
+            with app.state.session_factory.begin() as session:
+                bea = User(email="bea@example.com", display_name="Bea")
+                session.add(bea)
+                session.flush()
+                home = session.scalars(select(Workspace.id)).one()
+                session.add(Membership(workspace_id=home, user_id=bea.id, role="viewer"))
+            members_response = page.goto(f"{base}/workspace/members", wait_until="networkidle")
+            assert members_response is not None
+            csp = members_response.headers["content-security-policy"]
+            assert "script-src 'self'" in csp and "unsafe-inline" not in csp
+            bea_row = page.locator("li[data-member]", has_text="bea@example.com")
+            bea_row.get_by_role("button", name="Remove").click()
+            confirm = page.locator("#confirm-dialog")
+            expect(confirm).to_be_visible()
+            expect(confirm).to_contain_text("Remove Bea from this workspace?")
+            page.keyboard.press("Escape")
+            expect(confirm).to_be_hidden()
+            expect(bea_row).to_be_visible()
+            bea_row.get_by_role("button", name="Remove").click()
+            page.get_by_role("button", name="Continue").click()
+            page.wait_for_url(f"{base}/workspace/members")
+            expect(page.locator("li[data-member]", has_text="bea@example.com")).to_have_count(0)
+            page.goto(f"{base}/", wait_until="networkidle")
 
             page.get_by_role("button", name="Toggle dark mode").click()
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")

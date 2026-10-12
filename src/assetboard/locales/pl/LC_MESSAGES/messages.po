@@ -159,6 +159,44 @@ msgstr "Uruchamianie"
 msgid "The application is starting. Try again in a moment."
 msgstr "Aplikacja się uruchamia. Spróbuj ponownie za chwilę."
 
+msgid "Choose a supported currency."
+msgstr "Wybierz obsługiwaną walutę."
+
+msgid "Choose a country from the list."
+msgstr "Wybierz kraj z listy."
+
+msgid "Choose a time zone from the list."
+msgstr "Wybierz strefę czasową z listy."
+
+msgid "Choose a supported language."
+msgstr "Wybierz obsługiwany język."
+
+msgid "A workspace needs at least one owner. Make another member an owner first."
+msgstr ""
+"Obszar roboczy musi mieć co najmniej jednego właściciela. Najpierw nadaj "
+"rolę właściciela innemu członkowi."
+
+msgid "You cannot remove yourself from the workspace."
+msgstr "Nie możesz usunąć siebie z obszaru roboczego."
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr "Nie udało się wprowadzić zmiany. Odśwież stronę i spróbuj ponownie."
+
+msgid "Owner"
+msgstr "Właściciel"
+
+msgid "Editor"
+msgstr "Edytor"
+
+msgid "Viewer"
+msgstr "Przeglądający"
+
+msgid "Workspace settings saved."
+msgstr "Zapisano ustawienia obszaru roboczego."
+
+msgid "Choose a role."
+msgstr "Wybierz rolę."
+
 msgid "Home"
 msgstr "Strona główna"
 
@@ -189,8 +227,11 @@ msgstr "Niedostępne"
 msgid "Your account"
 msgstr "Twoje konto"
 
-msgid "Personal workspace"
-msgstr "Przestrzeń osobista"
+msgid "Workspace settings"
+msgstr "Ustawienia obszaru roboczego"
+
+msgid "Members"
+msgstr "Członkowie"
 
 msgid "Account security"
 msgstr "Bezpieczeństwo konta"
@@ -208,10 +249,10 @@ msgid "Your overview"
 msgstr "Podsumowanie"
 
 msgid "Workspace"
-msgstr "Przestrzeń"
+msgstr "Obszar roboczy"
 
-msgid "Personal"
-msgstr "Osobista"
+msgid "Switch"
+msgstr "Przełącz"
 
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
@@ -354,4 +395,41 @@ msgstr "Zamknij"
 
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
+
+msgid "People in this workspace"
+msgstr "Osoby w tym obszarze roboczym"
+
+msgid "you"
+msgstr "ty"
+
+msgid "Role"
+msgstr "Rola"
+
+msgid "Change role"
+msgstr "Zmień rolę"
+
+#, python-format
+msgid "Remove %(name)s from this workspace?"
+msgstr "Usunąć użytkownika %(name)s z tego obszaru roboczego?"
+
+msgid "Remove"
+msgstr "Usuń"
+
+msgid "General"
+msgstr "Ogólne"
+
+msgid "Formatting default"
+msgstr "Domyślne formatowanie"
+
+msgid ""
+"The formatting default is used for numbers and dates where no personal "
+"preference applies. Your interface language follows your account and "
+"browser."
+msgstr ""
+"Domyślne formatowanie dotyczy liczb i dat tam, gdzie nie obowiązują "
+"ustawienia osobiste. Język interfejsu zależy od Twojego konta i "
+"przeglądarki."
+
+msgid "Save settings"
+msgstr "Zapisz ustawienia"
 

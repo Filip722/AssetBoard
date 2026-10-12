@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from datetime import datetime
+from uuid import UUID, uuid4
+
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.repositories.base import ScopedRepository
 
@@ -13,3 +17,27 @@ class AuditEventRepository(ScopedRepository[AuditEvent]):
 
     model = AuditEvent
     unsupported = frozenset({"update", "delete"})
+
+    def record(
+        self,
+        *,
+        actor_user_id: UUID,
+        action: str,
+        entity_type: str,
+        entity_id: str | None,
+        ts: datetime,
+        data: Mapping[str, str | int | bool] | None = None,
+    ) -> AuditEvent:
+        """Append a user action to this workspace's audit log."""
+        return self.add(
+            AuditEvent(
+                id=uuid4(),
+                actor_user_id=actor_user_id,
+                actor_type="user",
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                data=dict(data or {}),
+                ts=ts,
+            )
+        )

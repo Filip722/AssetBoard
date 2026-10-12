@@ -24,6 +24,14 @@ class WorkspaceOptions:
     locale: str
 
 
+class WorkspaceOptionError(ValueError):
+    """A workspace option is not supported; ``field`` names it."""
+
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(message)
+        self.field = field
+
+
 def currency_codes() -> tuple[str, ...]:
     return tuple(sorted(CURRENCY_MINOR_UNITS))
 
@@ -54,16 +62,23 @@ def validate_workspace_options(
     locale: str,
 ) -> WorkspaceOptions:
     currency = base_currency.strip().upper()
-    minor_unit_for(currency)
+    try:
+        minor_unit_for(currency)
+    except ValueError as exc:
+        raise WorkspaceOptionError("base_currency", "Unsupported currency") from exc
     country = (country_code or "").strip().upper() or None
     if country is not None and country not in country_names("en"):
-        raise ValueError("Unsupported country code")
+        raise WorkspaceOptionError("country_code", "Unsupported country code")
     zone = timezone.strip()
     if zone not in timezone_names():
-        raise ValueError("Unsupported time zone")
+        raise WorkspaceOptionError("timezone", "Unsupported time zone")
+    try:
+        language = normalize_locale(locale.strip())
+    except ValueError as exc:
+        raise WorkspaceOptionError("locale", "Unsupported locale") from exc
     return WorkspaceOptions(
         base_currency=currency,
         country_code=country,
         timezone=zone,
-        locale=normalize_locale(locale.strip()),
+        locale=language,
     )

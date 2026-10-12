@@ -54,6 +54,20 @@ toast).
 signed-in user's own memberships, which the Context and the workspace switcher need before a
 workspace is known.
 
+## Owner actions and stale Contexts
+
+A Context is built when a request starts, so its role can be out of date by the time a write
+runs. Services that change workspace settings or memberships (`services/workspaces.py`) run in
+one `BEGIN IMMEDIATE` transaction that:
+
+1. re-reads the actor's membership and requires `owner` there;
+2. checks the last-owner rule (a workspace always keeps at least one owner) there;
+3. makes the change and appends the audit event.
+
+Concurrent owner actions queue at `BEGIN` and each sees the previous one's committed result.
+The workspace row itself is changed only through `CurrentWorkspaceRepository`, which reads and
+updates `ctx.workspace.id` and only the fields in `UPDATABLE_FIELDS`.
+
 ## How to add a new workspace-owned model
 
 1. **Model.** Inherit `WorkspaceScopedMixin`, which adds a non-null, indexed `workspace_id`

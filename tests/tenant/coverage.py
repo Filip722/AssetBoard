@@ -21,9 +21,20 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
 }
 
 # Public methods a subclass adds: (repository class name, method) -> covering test.
-EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {}
+EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
+    ("MembershipRepository", "members"): "test_membership_queries_stay_in_their_workspace",
+    ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
+    ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",
+    ("AuditEventRepository", "record"): "test_audit_record_writes_into_its_own_workspace",
+}
 
 READER_METHOD_COVERAGE: dict[str, str] = {
     "memberships": "test_user_membership_reader_returns_only_its_users_rows",
     "membership_in": "test_user_membership_reader_returns_only_its_users_rows",
+}
+
+# CurrentWorkspaceRepository is not a ScopedRepository (Workspace is the tenant row itself).
+CURRENT_WORKSPACE_METHOD_COVERAGE: dict[str, str] = {
+    "get": "test_current_workspace_repository_touches_only_its_workspace",
+    "update": "test_current_workspace_repository_touches_only_its_workspace",
 }

@@ -148,6 +148,42 @@ msgstr ""
 msgid "The application is starting. Try again in a moment."
 msgstr ""
 
+msgid "Choose a supported currency."
+msgstr ""
+
+msgid "Choose a country from the list."
+msgstr ""
+
+msgid "Choose a time zone from the list."
+msgstr ""
+
+msgid "Choose a supported language."
+msgstr ""
+
+msgid "A workspace needs at least one owner. Make another member an owner first."
+msgstr ""
+
+msgid "You cannot remove yourself from the workspace."
+msgstr ""
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr ""
+
+msgid "Owner"
+msgstr ""
+
+msgid "Editor"
+msgstr ""
+
+msgid "Viewer"
+msgstr ""
+
+msgid "Workspace settings saved."
+msgstr ""
+
+msgid "Choose a role."
+msgstr ""
+
 msgid "Home"
 msgstr ""
 
@@ -178,7 +214,10 @@ msgstr ""
 msgid "Your account"
 msgstr ""
 
-msgid "Personal workspace"
+msgid "Workspace settings"
+msgstr ""
+
+msgid "Members"
 msgstr ""
 
 msgid "Account security"
@@ -199,7 +238,7 @@ msgstr ""
 msgid "Workspace"
 msgstr ""
 
-msgid "Personal"
+msgid "Switch"
 msgstr ""
 
 msgid "Are you sure?"
@@ -339,9 +378,49 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "People in this workspace"
+msgstr ""
+
+msgid "you"
+msgstr ""
+
+msgid "Role"
+msgstr ""
+
+msgid "Change role"
+msgstr ""
+
+#, python-format
+msgid "Remove %(name)s from this workspace?"
+msgstr ""
+
+msgid "Remove"
+msgstr ""
+
+msgid "General"
+msgstr ""
+
+msgid "Formatting default"
+msgstr ""
+
+msgid ""
+"The formatting default is used for numbers and dates where no personal "
+"preference applies. Your interface language follows your account and "
+"browser."
+msgstr ""
+
+msgid "Save settings"
+msgstr ""
+
 #~ msgid "AssetBoard home"
 #~ msgstr ""
 
 #~ msgid "Account settings"
+#~ msgstr ""
+
+#~ msgid "Personal workspace"
+#~ msgstr ""
+
+#~ msgid "Personal"
 #~ msgstr ""
 

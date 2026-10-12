@@ -127,6 +127,36 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
     )
 
 
+@dataclass(frozen=True, slots=True)
+class WorkspaceChoice:
+    id: UUID
+    name: str
+    role: Role
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceNav:
+    """What the page chrome shows about workspaces: the current one and the switcher's list."""
+
+    current: WorkspaceRef
+    role: Role
+    choices: tuple[WorkspaceChoice, ...]
+
+    @property
+    def can_switch(self) -> bool:
+        return len(self.choices) > 1
+
+
+def workspace_nav(session: Session, ctx: Context) -> WorkspaceNav:
+    """The user's own memberships (one query), for the switcher on workspace pages."""
+    memberships = UserMembershipReader(session, ctx.user.id).memberships()
+    choices = tuple(
+        WorkspaceChoice(id=m.workspace_id, name=m.workspace_name, role=Role(m.role))
+        for m in memberships
+    )
+    return WorkspaceNav(current=ctx.workspace, role=ctx.role, choices=choices)
+
+
 def select_workspace(
     session: Session, *, session_hash: str, user_id: UUID, workspace_id: UUID
 ) -> None:

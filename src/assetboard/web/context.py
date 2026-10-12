@@ -7,26 +7,31 @@ from typing import Annotated
 from fastapi import Depends, Request
 from starlette.concurrency import run_in_threadpool
 
-from assetboard.services.context import Context, build_context
+from assetboard.services.context import Context, WorkspaceNav, build_context, workspace_nav
 from assetboard.web.security import web_session
 
 
 async def current_context(request: Request) -> Context:
     """Build the Context from the signed-in session (the access gate guarantees one).
 
-    Raises ``NoWorkspace`` (rendered as a 403 page) when the user has no membership.
+    Raises ``NoWorkspace`` (rendered as a 403 page) when the user has no membership. Also sets
+    ``request.state.workspace_nav`` for the page chrome (workspace name, switcher, owner links).
+    Pages without a Context (account, error and signed-out pages) have no ``workspace_nav``
+    and ``base.html`` renders without the workspace parts.
     """
     signed_in = web_session(request)
     if signed_in is None:
         raise RuntimeError("current_context needs a signed-in request")
     state = request.app.state
 
-    def build() -> Context:
+    def build() -> tuple[Context, WorkspaceNav]:
         with state.session_factory() as session:
-            return build_context(session, signed_in, clock=state.clock)
+            ctx = build_context(session, signed_in, clock=state.clock)
+            return ctx, workspace_nav(session, ctx)
 
-    ctx = await run_in_threadpool(build)
+    ctx, nav = await run_in_threadpool(build)
     request.state.context = ctx
+    request.state.workspace_nav = nav
     return ctx
 
 

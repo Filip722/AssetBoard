@@ -30,7 +30,9 @@ from assetboard.db.base import (
 from assetboard.db.engine import create_database_engine
 from assetboard.db.models.identity import AuditEvent, Membership, User, Workspace
 from assetboard.db.repositories import (
+    UPDATABLE_FIELDS,
     AuditEventRepository,
+    CurrentWorkspaceRepository,
     ForeignWorkspace,
     MembershipRepository,
     ScopedRepository,
@@ -39,6 +41,7 @@ from assetboard.db.repositories import (
 from assetboard.db.repositories.base import models_marked_workspace_owned, repositories_for
 from tests.tenant.coverage import (
     BASE_METHOD_COVERAGE,
+    CURRENT_WORKSPACE_METHOD_COVERAGE,
     EXTRA_METHOD_COVERAGE,
     READER_METHOD_COVERAGE,
 )
@@ -232,6 +235,79 @@ def test_user_membership_reader_returns_only_its_users_rows(
     assert bob_reader.membership_in(ctx_a.workspace.id) is None
 
 
+def _member(session: Session, workspace_id: UUID, email: str, role: str) -> Membership:
+    user = User(email=email, display_name=email.split("@")[0])
+    session.add(user)
+    session.flush()
+    membership = Membership(workspace_id=workspace_id, user_id=user.id, role=role)
+    session.add(membership)
+    session.flush()
+    return membership
+
+
+def test_membership_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    a_owner = _member(db_session, ctx_a.workspace.id, "a-owner@example.com", "owner")
+    a_viewer = _member(db_session, ctx_a.workspace.id, "a-viewer@example.com", "viewer")
+    b_owner = _member(db_session, ctx_b.workspace.id, "b-owner@example.com", "owner")
+    b_owner_two = _member(db_session, ctx_b.workspace.id, "b-owner2@example.com", "owner")
+    in_a, in_b = MembershipRepository(db_session, ctx_a), MembershipRepository(db_session, ctx_b)
+
+    assert {m.membership_id for m in in_a.members()} == {a_owner.id, a_viewer.id}
+    assert {m.membership_id for m in in_b.members()} == {b_owner.id, b_owner_two.id}
+    assert in_a.for_user(a_owner.user_id) is a_owner
+    assert in_a.for_user(b_owner.user_id) is None
+    assert in_b.for_user(a_viewer.user_id) is None
+    assert (in_a.count_owners(), in_b.count_owners()) == (1, 2)
+
+
+def test_audit_record_writes_into_its_own_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    actor = _member(db_session, ctx_a.workspace.id, "actor@example.com", "owner")
+    event = AuditEventRepository(db_session, ctx_a).record(
+        actor_user_id=actor.user_id,
+        action="test.recorded",
+        entity_type="test",
+        entity_id=None,
+        ts=fixed_clock.now(),
+        data={"n": 1},
+    )
+    stored = raw_row(db_session, AuditEvent, event.id)
+    assert stored is not None and stored["workspace_id"] == ctx_a.workspace.id
+    assert AuditEventRepository(db_session, ctx_b).get(event.id) is None
+
+
+def test_current_workspace_repository_touches_only_its_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    a_repo = CurrentWorkspaceRepository(db_session, ctx_a)
+    b_repo = CurrentWorkspaceRepository(db_session, ctx_b)
+    assert a_repo.get().id == ctx_a.workspace.id
+    assert b_repo.get().id == ctx_b.workspace.id
+    before_b = raw_row(db_session, Workspace, ctx_b.workspace.id)
+
+    a_repo.update(name="Renamed A", base_currency="PLN")
+    db_session.expire_all()
+    after_a = raw_row(db_session, Workspace, ctx_a.workspace.id)
+    assert after_a is not None and (after_a["name"], after_a["base_currency"]) == (
+        "Renamed A",
+        "PLN",
+    )
+    assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
+
+    assert {"name", "base_currency", "country_code", "timezone", "locale"} == UPDATABLE_FIELDS
+    for forbidden in ("id", "created_at", "updated_at", "unknown"):
+        with pytest.raises(ValueError):
+            a_repo.update(**{forbidden: ctx_b.workspace.id})
+    db_session.expire_all()
+    assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
+
+
 # Method coverage (#11)
 
 
@@ -244,10 +320,12 @@ def test_every_public_repository_method_is_covered() -> None:
     for repository_name, method in EXTRA_METHOD_COVERAGE:
         assert method in public_methods(names[repository_name]), "stale extra entry"
     assert set(READER_METHOD_COVERAGE) == public_methods(UserMembershipReader)
+    assert set(CURRENT_WORKSPACE_METHOD_COVERAGE) == public_methods(CurrentWorkspaceRepository)
     covering = {
         *BASE_METHOD_COVERAGE.values(),
         *EXTRA_METHOD_COVERAGE.values(),
         *READER_METHOD_COVERAGE.values(),
+        *CURRENT_WORKSPACE_METHOD_COVERAGE.values(),
     }
     for test_name in covering:
         assert callable(getattr(module, test_name, None)), f"no test named {test_name}"

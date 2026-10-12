@@ -126,3 +126,11 @@ document.addEventListener("htmx:configRequest", (event) => {
     event.detail.headers["X-CSRF-Token"] = meta.content;
   }
 });
+
+// Selects marked data-autosubmit submit their form on change (the button stays for no-JS use).
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && target.hasAttribute("data-autosubmit")) {
+    target.form?.requestSubmit();
+  }
+});

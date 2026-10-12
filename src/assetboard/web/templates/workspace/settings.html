@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import field, select, csrf_input, primary_button with context %}
+{% block title %}{{ _("Workspace settings") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Workspace settings") }}{% endblock %}
+{% block content %}
+<section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-settings-heading">
+  <h2 id="workspace-settings-heading" class="text-base font-semibold">{{ _("General") }}</h2>
+  {% if notice %}
+  <p class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status">{{ notice }}</p>
+  {% endif %}
+  <form method="post" action="{{ scoped_url(request, 'workspace_settings') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>
+    {{ csrf_input() }}
+    <div class="sm:col-span-2">{{ field("name", _("Workspace name"), value=values.name, error=errors.get("name"), required=true, maxlength=max_name_length) }}</div>
+    {{ select("base_currency", _("Base currency"), currency_options, selected=values.base_currency, error=errors.get("base_currency")) }}
+    {{ select("country_code", _("Country"), country_options, selected=values.country_code or "", error=errors.get("country_code"), blank=_("Not set")) }}
+    {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone, error=errors.get("timezone")) }}
+    {{ select("locale", _("Formatting default"), locales, selected=values.locale, error=errors.get("locale")) }}
+    <p class="text-xs text-muted dark:text-slate-400 sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
+    <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
+  </form>
+</section>
+{% endblock %}

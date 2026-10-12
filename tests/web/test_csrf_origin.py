@@ -55,6 +55,10 @@ def test_every_state_changing_route_requires_a_valid_csrf_token(
         "/register",
         "/account/password",
         "/account/logout-others",
+        "/workspace/switch",
+        "/workspace/settings",
+        "/workspace/members/{membership_id}/role",
+        "/workspace/members/{membership_id}/remove",
     }
     other_session_token = csrf.mask(csrf.session_token(signed_in.app.state.csrf_key, "f" * 64))  # type: ignore[attr-defined]
     for method, path in routes:

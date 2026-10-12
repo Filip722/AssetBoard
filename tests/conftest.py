@@ -3,13 +3,17 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+from uuid import UUID
 
 import pytest
 from argon2 import profiles
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
+from sqlalchemy import select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -19,8 +23,9 @@ from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import upgrade_database
+from assetboard.db.models.identity import Membership, User, Workspace
 from assetboard.services import auth as auth_service
-from assetboard.services.auth import run_initial_setup
+from assetboard.services.auth import argon2_hash, run_initial_setup
 
 
 @pytest.fixture(autouse=True)
@@ -210,3 +215,90 @@ def argon2_calls(monkeypatch: pytest.MonkeyPatch) -> CountingHasher:
 
     monkeypatch.setattr(auth_service, "password_hasher", Wrapped)
     return counter
+
+
+@dataclass
+class OwnerApp:
+    """An app after first-run setup, with the administrator (owner of "Home") signed in."""
+
+    app: FastAPI
+    client: TestClient
+    web: WebHarness
+
+    def db(self) -> Session:
+        return self.app.state.session_factory()
+
+    @property
+    def admin_id(self) -> UUID:
+        with self.db() as session:
+            return session.scalars(select(User.id).where(User.email == self.web.admin_email)).one()
+
+    @property
+    def home_id(self) -> UUID:
+        with self.db() as session:
+            return session.scalars(select(Workspace.id).where(Workspace.name == "Home")).one()
+
+    def add_user(self, key: str) -> UUID:
+        with self.db() as session, session.begin():
+            user = User(
+                email=f"{key}@example.com",
+                display_name=key.title(),
+                password_hash=argon2_hash(ADMIN_PASSWORD),
+            )
+            session.add(user)
+            session.flush()
+            return user.id
+
+    def add_workspace(self, name: str) -> UUID:
+        with self.db() as session, session.begin():
+            workspace = Workspace(name=name, base_currency="EUR", locale="en", timezone="UTC")
+            session.add(workspace)
+            session.flush()
+            return workspace.id
+
+    def join(self, user_id: UUID, workspace_id: UUID, role: str) -> UUID:
+        with self.db() as session, session.begin():
+            membership = Membership(workspace_id=workspace_id, user_id=user_id, role=role)
+            session.add(membership)
+            session.flush()
+            return membership.id
+
+    def membership_id(self, user_id: UUID, workspace_id: UUID | None = None) -> UUID:
+        with self.db() as session:
+            return session.scalars(
+                select(Membership.id).where(
+                    Membership.user_id == user_id,
+                    Membership.workspace_id == (workspace_id or self.home_id),
+                )
+            ).one()
+
+    def set_admin_role(self, role: str) -> None:
+        with self.db() as session, session.begin():
+            session.execute(
+                update(Membership).where(Membership.user_id == self.admin_id).values(role=role)
+            )
+
+    def roles(self, workspace_id: UUID | None = None) -> dict[str, str]:
+        with self.db() as session:
+            rows = session.execute(
+                select(User.email, Membership.role)
+                .join(User, User.id == Membership.user_id)
+                .where(Membership.workspace_id == (workspace_id or self.home_id))
+            )
+            return {email.split("@")[0]: role for email, role in rows}
+
+    def token(self, path: str = "/") -> str:
+        return self.web.csrf(self.client.get(path).text)
+
+    def post(self, path: str, data: dict[str, str] | None = None, *, token_from: str = "/") -> Any:
+        form = {"csrf_token": self.token(token_from)} | (data or {})
+        return self.client.post(path, data=form, follow_redirects=False)
+
+
+@pytest.fixture
+def owner(web: WebHarness) -> Iterator[OwnerApp]:
+    app = web.app()
+    with TestClient(app) as client:
+        web.complete_setup(app)
+        assert web.sign_in(client).status_code == 303
+        yield OwnerApp(app, client, web)

@@ -12,6 +12,10 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - `BudgetLine(id, workspace_id, month, category_id, planned_minor, currency)`; unique `(workspace_id, month, category_id)`.
 - `MonthState(workspace_id, month, closed_at?, closed_by?)`.
 
+**Carried over from F1.2 (2026-10-12):** owners can change a workspace's base currency on the
+settings page, which is harmless while no amounts exist. Once transactions or budget lines
+exist, M2 must either block the change or convert stored amounts; decide in F2.2's plan.
+
 ---
 
 ## F2.1 Categories
