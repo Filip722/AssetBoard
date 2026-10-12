@@ -258,11 +258,38 @@ msgstr ""
 "Hasło jest nieprawidłowe albo było zbyt wiele prób. Spróbuj ponownie "
 "później lub zacznij od nowa."
 
-#, python-format
-msgid "This confirmation expired. Start over to sign in with %(provider)s."
+msgid "This confirmation expired. Start over to sign in."
+msgstr "To potwierdzenie wygasło. Zacznij od nowa, aby się zalogować."
+
+msgid ""
+"Sign-in through your proxy is not available for this request. Try again; "
+"if it keeps failing, contact your administrator."
 msgstr ""
-"To potwierdzenie wygasło. Zacznij od nowa, aby zalogować się przez "
-"%(provider)s."
+"Logowanie przez serwer proxy nie jest dostępne dla tego żądania. Spróbuj "
+"ponownie, a jeśli problem się powtarza, skontaktuj się z administratorem."
+
+msgid ""
+"There is no account for your sign-in. Ask an administrator for an "
+"invitation."
+msgstr ""
+"Z Twoim logowaniem nie jest powiązane żadne konto. Poproś administratora "
+"o zaproszenie."
+
+msgid ""
+"Your proxy did not send a usable email address, so no account can be "
+"created or linked. Contact your administrator."
+msgstr ""
+"Serwer proxy nie przekazał poprawnego adresu e-mail, więc nie można "
+"utworzyć ani powiązać konta. Skontaktuj się z administratorem."
+
+#, python-format
+msgid ""
+"Your browser did not keep the sign-in. Open this site at its configured "
+"address (%(base_url)s), allow cookies for it, and try again."
+msgstr ""
+"Przeglądarka nie zachowała logowania. Otwórz tę stronę pod "
+"skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
+" spróbuj ponownie."
 
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
@@ -418,10 +445,10 @@ msgstr "Zacznij od nowa"
 #, python-format
 msgid ""
 "An account with the email address %(email)s already exists. Enter its "
-"password once to sign in with %(provider)s from now on."
+"password once to link it to this sign-in method."
 msgstr ""
 "Konto z adresem e-mail %(email)s już istnieje. Podaj jego hasło jeden "
-"raz, aby od teraz logować się przez %(provider)s."
+"raz, aby powiązać je z tą metodą logowania."
 
 msgid "This signs the account out on all other devices."
 msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
@@ -434,6 +461,10 @@ msgstr "Połącz i zaloguj się"
 
 msgid "Sign in"
 msgstr "Zaloguj się"
+
+#, python-format
+msgid "Continue as %(user)s"
+msgstr "Kontynuuj jako %(user)s"
 
 #, python-format
 msgid "Continue with %(provider)s"

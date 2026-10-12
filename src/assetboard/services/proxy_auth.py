@@ -1,8 +1,8 @@
 """Reverse-proxy header authentication: peer trust and identity headers (F1.4, ADR-0015).
 
-Pure functions: the web layer passes the TCP peer recorded by ``PeerMiddleware`` and the raw
-ASGI headers. The identity they produce goes through the shared account mapping
-(``oidc_accounts.sign_in_external``) under the proxy's ``MappingPolicy``.
+The web layer passes the TCP peer recorded by ``PeerMiddleware`` and the raw ASGI headers;
+only ``proxy_identity_owner`` reads the database. The identity they produce goes through the
+shared account mapping (``oidc_accounts.sign_in_external``) under the proxy's ``MappingPolicy``.
 
 What is trusted, and only from a peer inside ``TRUSTED_PROXIES``:
 
@@ -17,19 +17,31 @@ as absent.
 
 from __future__ import annotations
 
+import hashlib
+import threading
 import unicodedata
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from ipaddress import IPv4Network, IPv6Address, IPv6Network
 from typing import Literal
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from assetboard.config import Settings
+from assetboard.db.models.identity import ExternalIdentity
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.services.auth import normalize_client_host
 from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 
 MAX_SUBJECT_LENGTH = 255
 MAX_DISPLAY_NAME_LENGTH = 120
+# Spoofing warnings and audited refusals: once per key in this window, then log only.
+DEDUP_WINDOW = timedelta(minutes=10)
+MAX_DEDUP_ENTRIES = 10_000
 
 ProxyHeaderStatus = Literal["absent", "duplicate", "invalid", "ok"]
 
@@ -150,3 +162,50 @@ def identity_header_names(headers: Iterable[tuple[bytes, bytes]], settings: Sett
         settings.proxy_auth_name_header,
     )
     return [name for name in names if name is not None and _values(raw, name)]
+
+
+def proxy_identity_owner(session: Session, subject: str) -> UUID | None:
+    """The user a proxy subject is linked to (``ExternalIdentity(provider="proxy")``)."""
+    return session.scalar(
+        select(ExternalIdentity.user_id).where(
+            ExternalIdentity.provider == PROXY_PROVIDER, ExternalIdentity.subject == subject
+        )
+    )
+
+
+def hashed(value: str) -> str:
+    """Keys of ``RecentKeys`` that hold a subject keep only its SHA-256."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+class RecentKeys:
+    """Keys seen within ``DEDUP_WINDOW``: the first sighting returns True, repeats False.
+
+    Bounded: past ``max_entries`` the oldest keys are evicted, so a flood can only cause extra
+    log lines or audit rows, never unbounded memory. In memory, per process (ADR-0015).
+    """
+
+    def __init__(
+        self, *, window: timedelta = DEDUP_WINDOW, max_entries: int = MAX_DEDUP_ENTRIES
+    ) -> None:
+        self._window = window
+        self._max_entries = max_entries
+        self._seen: OrderedDict[str, datetime] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def __len__(self) -> int:
+        return len(self._seen)
+
+    def first(self, key: str, *, now: datetime) -> bool:
+        with self._lock:
+            while self._seen:
+                oldest, expires = next(iter(self._seen.items()))
+                if expires > now:
+                    break
+                del self._seen[oldest]
+            if key in self._seen:
+                return False
+            self._seen[key] = now + self._window
+            while len(self._seen) > self._max_entries:
+                self._seen.popitem(last=False)
+            return True

@@ -25,6 +25,7 @@ reason code and nothing from the provider.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
@@ -330,15 +331,25 @@ def sign_in_external(
     host: str | None,
     user_agent: str | None = None,
     existing_session_id: str | None = None,
+    audit_filter: Callable[[str], bool] | None = None,
 ) -> SignInOutcome:
-    """Sign in with an OIDC or proxy identity, under that provider's ``MappingPolicy``."""
+    """Sign in with an OIDC or proxy identity, under that provider's ``MappingPolicy``.
+
+    ``audit_filter(reason)`` decides whether a refusal is audited (the proxy limits repeats,
+    ADR-0015); without it every refusal is.
+    """
     policy = _sign_in_policy(identity, settings)
     request = _Request(settings, policy, clock, host, user_agent, existing_session_id)
     admin = admin_decision(identity, policy)
 
+    def audited(reason: str) -> bool:
+        return audit_filter is None or audit_filter(reason)
+
     def refuse(
         status: SignInStatus, user_id: UUID | None = None, *, revoked: bool = False
     ) -> SignInOutcome:
+        if not audited(status):
+            return SignInOutcome(status=status, invitation_revoked=revoked)
         record_sign_in_failure(
             factory,
             policy.failure_action,
@@ -376,9 +387,10 @@ def sign_in_external(
         def sign_in(session: Session) -> SignInOutcome:
             user = session.get(User, user_id)
             if user is None or not user.is_active:
-                _audit_failure(
-                    session, policy.failure_action, "inactive", clock, host, user_agent, user_id
-                )
+                if audited("inactive"):
+                    _audit_failure(
+                        session, policy.failure_action, "inactive", clock, host, user_agent, user_id
+                    )
                 return SignInOutcome(status="inactive")
             _sync_admin(session, user, admin, request)
             session_id, expires = _start_session(session, user, request, data={})

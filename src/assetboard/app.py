@@ -38,12 +38,14 @@ from assetboard.services.context import NoWorkspace, PermissionDenied, Workspace
 from assetboard.services.hash_gate import RETRY_AFTER_SECONDS, HashGate, HashGateBusy
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
+from assetboard.services.proxy_auth import RecentKeys
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.errors import add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
 from assetboard.web.invite_routes import router as invite_router
 from assetboard.web.oidc_routes import router as oidc_router
+from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed
@@ -139,6 +141,9 @@ def create_app(
     app.state.oidc_flow_key = derive_subkey(secret_key, "oidc-flow")
     app.state.oidc_link_key = derive_subkey(secret_key, "oidc-link")
     app.state.oidc_consumed_states = ConsumedStates()
+    # Proxy authentication (ADR-0015): repeated warnings and audited refusals are limited.
+    app.state.proxy_spoof_warnings = RecentKeys()
+    app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.
@@ -154,6 +159,7 @@ def create_app(
     app.include_router(workspace_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)
+    app.include_router(proxy_router)
 
     @app.exception_handler(CsrfFailed)
     async def handle_csrf_failure(request: Request, _exc: CsrfFailed) -> Response:

@@ -18,6 +18,9 @@
   {{ primary_button(_("Accept invitation")) }}
 </form>
 {% else %}
+{% if proxy_user %}
+<div class="mt-6" data-proxy-sign-in>{{ link_button(_("Continue as %(user)s", user=proxy_user), proxy_start_url) }}</div>
+{% endif %}
 {% if oidc_provider %}
 <div class="mt-6" data-oidc-sign-in>{{ link_button(_("Continue with %(provider)s", provider=oidc_provider), oidc_start_url) }}</div>
 {% endif %}

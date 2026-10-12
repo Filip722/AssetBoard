@@ -41,7 +41,14 @@ from assetboard.web.auth_routes import (
     too_long,
 )
 from assetboard.web.rendering import render_template
-from assetboard.web.security import client_host, oidc_start_url, require_csrf, web_session
+from assetboard.web.security import (
+    client_host,
+    oidc_start_url,
+    proxy_request,
+    proxy_start_url,
+    require_csrf,
+    web_session,
+)
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -84,6 +91,8 @@ def _invite_page(
 ) -> Response:
     signed_in = web_session(request) is not None
     settings = request.app.state.settings
+    proxy = proxy_request(request)
+    proxy_user = proxy.subject if proxy is not None else None
     return render_template(
         request,
         "invite/show.html",
@@ -96,6 +105,8 @@ def _invite_page(
             "local_sign_up": not settings.oidc_only,
             "oidc_provider": settings.oidc_provider_name if settings.oidc_enabled else None,
             "oidc_start_url": oidc_start_url(f"/invite/{token}"),
+            "proxy_user": proxy_user,
+            "proxy_start_url": proxy_start_url(f"/invite/{token}") if proxy_user else None,
             "error": _t(request, error) if error else None,
             "notice": _t(request, notice) if notice else None,
             "values": values or {"email": "", "display_name": ""},

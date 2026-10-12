@@ -63,23 +63,44 @@ request came from the proxy, was lost.
   A proxy session is honoured only while a trusted peer presents the subject whose
   `ExternalIdentity(provider="proxy")` belongs to the session's user. A different subject
   revokes the session and signs in again on GET, and counts as signed out for unsafe methods.
-  An untrusted peer or a missing header counts as signed out for that request, without revoking.
-  Password and OIDC sessions are never affected by proxy headers, so break-glass `/login/local`
-  and OIDC keep working.
+  An untrusted peer, a missing header or repeated or invalid identity headers count as signed
+  out for that request, without revoking; so do all proxy sessions while proxy authentication
+  is off (the rows stay). A subject whose `ExternalIdentity` row was deleted counts as a
+  different subject. Password and OIDC sessions are never affected by proxy headers, so
+  break-glass `/login/local` and OIDC keep working.
+- **Sign-in route.** Signed-out GET and HEAD page loads (and htmx requests, via `HX-Redirect`) from
+  a trusted peer with valid headers are sent to `/auth/proxy?next=…`; `/login` and invitation pages
+  link there ("Continue as <user>", the escaped header value). A browser that already has a proxy
+  session for the same subject is sent on to `next` unchanged; in every other case (no session, a
+  password or OIDC session, another subject) the session is rotated. An untrusted peer, missing
+  headers and repeated or invalid headers all get the same failure page, so the answer tells
+  nothing about which check failed. `/login` and invitation pages can name the proxy's user, so
+  they rely on `Cache-Control: no-store`, which every page sends. Every `/auth/proxy*` route
+  answers 404 while proxy authentication is off, and sends no Referer (`next` can be
+  `/invite/<token>`).
+- **No redirect loop.** A new proxy session is first sent to `/auth/proxy/continue`, which
+  goes on to `next` only if the session cookie came back. A browser that drops the cookie (an
+  `https` `BASE_URL` opened over `http`, blocked cookies) gets one round of redirects and then
+  a page that explains it, with no secret in any URL and no second cookie.
+- **Password confirmation** (`/login/link`) is shared with OIDC and works with proxy
+  authentication alone; its wording names no provider.
 - **Logout** ends the session only; there is no proxy logout call. The proxy usually signs the
   browser straight back in on the next page, which the documentation states.
 - **Spoofing attempts are logged, not audited.** Identity headers from an untrusted peer are
   ignored and logged at WARNING (header name and peer prefix, never the value), at most once
   per peer prefix per 10 minutes. Anyone can send such headers, so they write no audit rows.
   Refusals after a trusted peer presented an identity are audited as `auth.proxy_failure`
-  (rate-limited per subject and reason).
+  once per SHA-256 of the subject and reason per 10 minutes, then logged only; repeated or
+  invalid headers from the trusted proxy are logged at WARNING and audited once per reason per
+  10 minutes. Both limits live in bounded in-memory maps per process (restarts reset them).
 - **Unchanged protections.** CSRF tokens and the Origin check apply to proxy sessions exactly as
   to others. `OIDC_ONLY` and `ALLOW_LOCAL_ADMIN_LOGIN` keep their meaning; proxy sign-in uses
   no password, so the password throttles do not apply, while account creation uses the
   registration throttle and linking uses the password-confirmation throttle.
-- **Delivery.** F1.4 part A implements the settings and startup checks, `PeerMiddleware`, the
-  peer and header parsing, the shared account mapping and migration 0006. Part B adds the
-  sign-in routes, session binding, logout, the spoofing warning and the rate-limited audit.
+- **Delivery.** F1.4 part A implemented the settings and startup checks, `PeerMiddleware`, the
+  peer and header parsing, the shared account mapping and migration 0006. Part B added the
+  sign-in routes, session binding, logout, the spoofing warning, the rate-limited audit and
+  [docs/auth/proxy-auth.md](../auth/proxy-auth.md).
 
 ## Consequences
 

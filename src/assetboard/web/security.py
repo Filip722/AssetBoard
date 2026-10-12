@@ -7,6 +7,7 @@ bodies are parsed once by FastAPI and never inside ``BaseHTTPMiddleware``.
 from __future__ import annotations
 
 import ipaddress
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote, urlsplit
@@ -17,8 +18,13 @@ from starlette.responses import Response
 from assetboard.branding import CLI_NAME
 from assetboard.middleware import PEER_SCOPE_KEY
 from assetboard.services import csrf
-from assetboard.services.auth import WebSession
-from assetboard.services.proxy_auth import peer_is_trusted
+from assetboard.services.auth import WebSession, client_ip_prefix
+from assetboard.services.proxy_auth import (
+    ProxyHeaders,
+    identity_header_names,
+    peer_is_trusted,
+    read_identity_headers,
+)
 
 if TYPE_CHECKING:
     from assetboard.config import Settings
@@ -143,6 +149,73 @@ def proxy_peer_trusted(request: Request) -> bool:
             )
         return False
     return peer_is_trusted(request.scope[PEER_SCOPE_KEY], settings.trusted_proxy_networks)
+
+
+@dataclass(frozen=True, slots=True)
+class ProxyRequest:
+    """What proxy authentication sees in one request (``None`` while it is off)."""
+
+    trusted: bool
+    headers: ProxyHeaders | None = None
+
+    @property
+    def subject(self) -> str | None:
+        """The proxy user name, only from a trusted peer with valid identity headers."""
+        if self.headers is None or self.headers.identity is None:
+            return None
+        return self.headers.identity.subject
+
+
+def proxy_request(request: Request) -> ProxyRequest | None:
+    """Inspect the identity headers once per request; the gate stores the result.
+
+    Identity headers from an untrusted peer are ignored and logged at WARNING with their names
+    and the peer's prefix, never their values, once per prefix per 10 minutes. Anyone can send
+    them, so they are never audited. Duplicate or invalid headers from the trusted proxy point
+    to a misconfiguration and are logged the same way (ADR-0015).
+    """
+    cached = request.scope.get("assetboard.proxy")
+    if cached is not None or not request.app.state.settings.proxy_auth_enabled:
+        return cached
+    state = request.app.state
+    settings = state.settings
+    now = state.clock.now()
+    trusted = proxy_peer_trusted(request)
+    result = ProxyRequest(trusted=trusted)
+    raw_headers = request.scope.get("headers", [])
+    if not trusted:
+        names = identity_header_names(raw_headers, settings)
+        if names:
+            peer = request.scope.get(PEER_SCOPE_KEY)
+            prefix = client_ip_prefix(peer, for_throttle=True) or "unknown"
+            if state.proxy_spoof_warnings.first(f"spoof:{prefix}", now=now):
+                state.logger.warning(
+                    "proxy identity headers from an untrusted peer were ignored: headers=%s "
+                    "peer=%s (only ASSETBOARD_TRUSTED_PROXIES may send them)",
+                    ",".join(names),
+                    prefix,
+                )
+    else:
+        headers = read_identity_headers(raw_headers, settings)
+        result = ProxyRequest(trusted=True, headers=headers)
+        if headers.status in {"duplicate", "invalid"} and state.proxy_spoof_warnings.first(
+            f"{headers.status}:{headers.header}", now=now
+        ):
+            state.logger.warning(
+                "the trusted proxy sent %s identity header %s; the request counts as signed out",
+                "a repeated" if headers.status == "duplicate" else "an invalid",
+                headers.header,
+            )
+    request.scope["assetboard.proxy"] = result
+    return result
+
+
+def proxy_start_url(next_path: str = "") -> str:
+    """The link behind "Continue as <user>" (a link: the proxy's headers are the credential)."""
+    target = oidc_next(next_path)
+    if target == "/":
+        return "/auth/proxy"
+    return "/auth/proxy?next=" + quote(target, safe="")
 
 
 def safe_next(value: str | None, default: str = "/", *, max_length: int = MAX_NEXT_LENGTH) -> str:

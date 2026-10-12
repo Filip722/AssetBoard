@@ -32,8 +32,9 @@ _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEA
 SAME_ORIGIN_REFERRER_PREFIXES = ("/invite/",)
 SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register", "/login/link", "/login/local"})
 # OIDC pages (ADR-0014) have no forms, so they can send no Referer at all: the callback URL
-# carries an authorization code, and the start URL may carry ``next=/invite/<token>``.
-NO_REFERRER_PREFIXES = ("/auth/oidc/",)
+# carries an authorization code, and the start URL may carry ``next=/invite/<token>``. The
+# same holds for proxy sign-in (``/auth/proxy?next=…`` and its pages, ADR-0015).
+NO_REFERRER_PREFIXES = ("/auth/oidc/", "/auth/proxy")
 _INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
 # The TCP peer's address (or None), recorded by ``PeerMiddleware`` before forwarded headers are
 # applied. Proxy authentication trusts only this value (ADR-0015).

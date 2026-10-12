@@ -223,3 +223,29 @@ def test_oidc_guide_covers_providers_and_operations() -> None:
     fields = {field.upper() for field in Settings.model_fields}
     assert names and names <= fields, names - fields
     assert "](auth/oidc.md)" in DEPLOYMENT.read_text(encoding="utf-8")
+
+
+def test_proxy_auth_guide_opens_with_the_warning_and_links_each_proxy() -> None:
+    guide = (DEPLOYMENT.parent / "auth" / "proxy-auth.md").read_text(encoding="utf-8")
+    first_section = guide.split("\n## ", 1)[0]
+    assert "[!WARNING]" in first_section
+    for point in ("ASSETBOARD_TRUSTED_PROXIES", "overwrite or remove", "verified", "logout"):
+        assert point in first_section
+    sections = {
+        "### nginx": "https://nginx.org/",
+        "### Caddy": "https://caddyserver.com/docs/",
+        "### Traefik": "https://doc.traefik.io/",
+        "### Authentik": "https://docs.goauthentik.io/",
+    }
+    references = dict(re.findall(r"^\[([a-z-]+)\]: (\S+)$", guide, re.MULTILINE))
+    for heading, link in sections.items():
+        body = guide.split(heading, 1)[1].split("\n### ", 1)[0].split("\n## ", 1)[0]
+        # Inline links, or reference links resolved through their definitions.
+        targets = re.findall(r"\]\((https?://[^)]+)\)", body) + [
+            references[label] for label in re.findall(r"\]\[([a-z-]+)\]", body)
+        ]
+        assert any(target.startswith(link) for target in targets), heading
+    assert "https://www.authelia.com/" in guide
+    test_it = guide.split("## Test it", 1)[1].split("\n## ", 1)[0]
+    assert "challenged" in test_it and "overwritten" in test_it and "another host" in test_it
+    assert "OIDC_ALLOWED_DOMAINS" in guide and "same accounts" in guide

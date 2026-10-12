@@ -228,8 +228,28 @@ msgid ""
 "later, or start over."
 msgstr ""
 
+msgid "This confirmation expired. Start over to sign in."
+msgstr ""
+
+msgid ""
+"Sign-in through your proxy is not available for this request. Try again; "
+"if it keeps failing, contact your administrator."
+msgstr ""
+
+msgid ""
+"There is no account for your sign-in. Ask an administrator for an "
+"invitation."
+msgstr ""
+
+msgid ""
+"Your proxy did not send a usable email address, so no account can be "
+"created or linked. Contact your administrator."
+msgstr ""
+
 #, python-format
-msgid "This confirmation expired. Start over to sign in with %(provider)s."
+msgid ""
+"Your browser did not keep the sign-in. Open this site at its configured "
+"address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
 msgid "Choose a supported currency."
@@ -380,7 +400,7 @@ msgstr ""
 #, python-format
 msgid ""
 "An account with the email address %(email)s already exists. Enter its "
-"password once to sign in with %(provider)s from now on."
+"password once to link it to this sign-in method."
 msgstr ""
 
 msgid "This signs the account out on all other devices."
@@ -393,6 +413,10 @@ msgid "Link and sign in"
 msgstr ""
 
 msgid "Sign in"
+msgstr ""
+
+#, python-format
+msgid "Continue as %(user)s"
 msgstr ""
 
 #, python-format
@@ -635,5 +659,15 @@ msgstr ""
 #~ "already exists. Sign in with your "
 #~ "password, then link %(provider)s from "
 #~ "your profile."
+#~ msgstr ""
+
+#~ msgid "This confirmation expired. Start over to sign in with %(provider)s."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An account with the email address "
+#~ "%(email)s already exists. Enter its "
+#~ "password once to sign in with "
+#~ "%(provider)s from now on."
 #~ msgstr ""
 

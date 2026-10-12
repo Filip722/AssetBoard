@@ -9,11 +9,13 @@
   ``no-referrer`` browsers send ``Origin: null`` on POSTs, which the Origin check refuses). The
   password confirmation form is ``/login/link``, with ``same-origin`` like ``/login``.
 
-Every route answers 404 while OIDC is not configured.
+Every ``/auth/oidc/*`` route answers 404 while OIDC is not configured; ``/login/link`` while
+neither OIDC nor proxy authentication is.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -47,7 +49,6 @@ from assetboard.web.security import (
     oidc_flow_cookie_name,
     oidc_link_cookie_name,
     oidc_next,
-    oidc_start_url,
     require_csrf,
     session_cookie_name,
     set_short_cookie,
@@ -123,7 +124,7 @@ _PROTOCOL_PAGES = {
 LINK_FAILED = _(
     "The password is not correct, or there were too many attempts. Try again later, or start over."
 )
-LINK_EXPIRED = _("This confirmation expired. Start over to sign in with %(provider)s.")
+LINK_EXPIRED = _("This confirmation expired. Start over to sign in.")
 
 
 def _t(request: Request, message: str) -> str:
@@ -266,16 +267,50 @@ async def oidc_callback(request: Request) -> Response:
         _log(request, "database_locked")
         return _failed(request, "busy")
 
+    response = await finish_external_sign_in(
+        request,
+        outcome,
+        next_path,
+        failed=lambda reason: RedirectResponse(
+            f"/auth/oidc/failed/{reason if reason in FAILURES else 'failed'}", status_code=303
+        ),
+        report=lambda reason: _report(request, reason),
+    )
+    # Every outcome deletes the flow cookie (``_failed`` does the same for earlier failures).
+    clear_cookie(response, settings, oidc_flow_cookie_name(settings))
+    return response
+
+
+async def _report(request: Request, reason: str) -> None:
+    _log(request, reason)
+    await _audit(request, reason)
+
+
+async def finish_external_sign_in(
+    request: Request,
+    outcome: SignInOutcome,
+    next_path: str,
+    *,
+    failed: Callable[[str], Response],
+    report: Callable[[str], Awaitable[None]],
+    landing: Callable[[str], str] = lambda target: target,
+) -> Response:
+    """The response to a mapped OIDC or proxy sign-in (both answer with a 303).
+
+    ``failed(reason)`` builds the failure redirect (the service already audited the refusal),
+    ``report`` logs and audits an unexpected problem, and ``landing(target)`` is where a new
+    session is sent first (the proxy adds a cookie check, ADR-0015).
+    """
+    state = _state(request)
+    settings = state.settings
     if outcome.status == "confirm_link" and outcome.pending_link is not None:
         try:
             sealed = outcome.pending_link.seal(state.oidc_link_key, now=state.clock.now())
         except ValueError:
             # Cannot happen with the caps on next, issuer, subject and email; never a 500.
-            _log(request, "pending_link_too_large")
-            await _audit(request, "pending_link_too_large")
-            return _failed(request, "failed")
+            await report("pending_link_too_large")
+            return failed("failed")
         response = RedirectResponse("/login/link", status_code=303)
-        clear_cookie(response, settings, oidc_flow_cookie_name(settings))
         set_short_cookie(response, settings, oidc_link_cookie_name(settings), sealed)
         return response
 
@@ -284,7 +319,7 @@ async def oidc_callback(request: Request) -> Response:
         reason = outcome.status
         if reason == "email_mismatch" and outcome.invitation_revoked:
             reason = "email_mismatch_revoked"
-        return _failed(request, reason if reason in FAILURES else "failed")
+        return failed(reason)
 
     target = next_path
     session_id = outcome.session_id
@@ -303,10 +338,8 @@ async def oidc_callback(request: Request) -> Response:
         )
         target = "/"
     if outcome.expires_at is None:
-        raise RuntimeError("OIDC sign-in returned a session without an expiry")
-    response = signed_in_redirect(request, target, session_id, outcome.expires_at)
-    clear_cookie(response, settings, oidc_flow_cookie_name(settings))
-    return response
+        raise RuntimeError("external sign-in returned a session without an expiry")
+    return signed_in_redirect(request, landing(target), session_id, outcome.expires_at)
 
 
 @router.get("/auth/oidc/failed/{reason}", name="oidc_failed")
@@ -326,7 +359,14 @@ async def oidc_failed(request: Request, reason: str) -> Response:
     return response
 
 
-# Password confirmation before linking (``/login/link``, same-origin like ``/login``)
+# Password confirmation before linking (``/login/link``, same-origin like ``/login``). Shared
+# by OIDC and proxy sign-in, so it works when either is on; the pending link says which.
+
+
+def _linking_available(request: Request) -> None:
+    settings = _state(request).settings
+    if not (settings.oidc_enabled or settings.proxy_auth_enabled):
+        raise HTTPException(status_code=404)
 
 
 def _pending(request: Request) -> PendingLink | None:
@@ -350,10 +390,10 @@ def _link_page(
         "auth/link.html",
         context={
             "pending": pending,
-            "provider": _state(request).settings.oidc_provider_name,
             "error": _t(request, error) if error else None,
             "expired": _t(request, LINK_EXPIRED) if pending is None else None,
-            "start_url": oidc_start_url(),
+            # The sign-in page offers every method that is on.
+            "start_url": "/login",
         },
         status_code=status_code if pending is not None else 400,
     )
@@ -361,13 +401,13 @@ def _link_page(
 
 @router.get("/login/link", name="oidc_link")
 async def link_form(request: Request) -> Response:
-    _client(request)
+    _linking_available(request)
     return _link_page(request, _pending(request))
 
 
 @router.post("/login/link")
 async def link_submit(request: Request, password: FormStr = "") -> Response:
-    _client(request)
+    _linking_available(request)
     state = _state(request)
     pending = _pending(request)
     if pending is None:

@@ -49,6 +49,8 @@ from assetboard.web.security import (
     clear_session_cookie,
     client_host,
     oidc_start_url,
+    proxy_request,
+    proxy_start_url,
     require_csrf,
     safe_next,
     session_cookie_name,
@@ -327,6 +329,8 @@ def _login_page(
     settings = _state(request).settings
     # Break-glass shows only the password form; OIDC_ONLY shows only the provider's button.
     oidc = settings.oidc_enabled and not break_glass
+    proxy = proxy_request(request)
+    proxy_user = proxy.subject if proxy is not None and not break_glass else None
     return render_template(
         request,
         "auth/login.html",
@@ -339,6 +343,11 @@ def _login_page(
             "form_action": "login_local" if break_glass else "login",
             "oidc_provider": settings.oidc_provider_name if oidc else None,
             "oidc_start_url": oidc_start_url(safe_next(next_path, default="")) if oidc else None,
+            # Shown only when the trusted proxy presents a user right now (ADR-0015).
+            "proxy_user": proxy_user,
+            "proxy_start_url": proxy_start_url(safe_next(next_path, default=""))
+            if proxy_user
+            else None,
         },
         status_code=status,
     )

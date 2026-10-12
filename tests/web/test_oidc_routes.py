@@ -542,7 +542,7 @@ def test_linking_confirms_the_password_on_a_same_origin_page(web: WebHarness) ->
         page = o.client.get("/login/link")
         assert page.status_code == 200
         assert page.headers["referrer-policy"] == "same-origin"
-        assert o.web.admin_email in page.text and "Authentik" in page.text
+        assert o.web.admin_email in page.text and "link it to this sign-in method" in page.text
         token = o.web.csrf(page.text)
         wrong = o.client.post("/login/link", data={"csrf_token": token, "password": "nope"})
         assert wrong.status_code == 401
