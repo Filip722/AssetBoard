@@ -48,7 +48,8 @@ make check
 ```
 
 `make dev` builds local CSS, compiles translations, and starts the reload-enabled server at
-`http://127.0.0.1:8000`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and checks.
+`http://127.0.0.1:8000`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and checks, and
+[docs/architecture.md](docs/architecture.md) for the layers and how workspace data is isolated.
 
 ## Roadmap
 

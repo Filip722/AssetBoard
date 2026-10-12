@@ -106,3 +106,65 @@ def test_identity_migration_is_reversible_and_head_detection_is_read_only(tmp_pa
             assert connection.exec_driver_sql("SELECT count(*) FROM setup_state").scalar_one() == 1
     finally:
         engine.dispose()
+
+
+def test_0003_round_trip(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f12.db'}"
+    )
+    upgrade_database(settings)
+    script = ScriptDirectory.from_config(alembic_config(settings))
+    revision = script.get_revision("0003_f12")
+    assert revision is not None and revision.down_revision == "0002_f11"
+    # Reachable from every head, so later migrations keep it in the chain.
+    for head in script.get_heads():
+        assert "0003_f12" in {rev.revision for rev in script.iterate_revisions(head, "base")}
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        columns = {column["name"] for column in inspect(engine).get_columns("user_sessions")}
+        assert "current_workspace_id" in columns
+        command.downgrade(alembic_config(settings), "0002_f11")
+        columns = {column["name"] for column in inspect(engine).get_columns("user_sessions")}
+        assert "current_workspace_id" not in columns
+        assert "ix_user_sessions_user_expires" in {
+            index["name"] for index in inspect(engine).get_indexes("user_sessions")
+        }
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_session_workspace_is_nulled_on_workspace_delete(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'fk.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    workspace, user = "a" * 32, "b" * 32
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES ('{workspace}', 'W', 'EUR', 'en', 'UTC', "
+                "'2026-01-01 00:00:00', '2026-01-01 00:00:00')"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, locale, theme, is_active, "
+                f"is_instance_admin, created_at, updated_at) VALUES ('{user}', 'u@example.com', "
+                "'U', 'en', 'system', 1, 0, '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO user_sessions (id_hash, user_id, created_at, last_seen_at, "
+                f"expires_at, current_workspace_id) VALUES ('{'c' * 64}', '{user}', "
+                "'2026-01-01 00:00:00', '2026-01-01 00:00:00', '2026-02-01 00:00:00', "
+                f"'{workspace}')"
+            )
+            connection.exec_driver_sql(f"DELETE FROM workspaces WHERE id = '{workspace}'")
+            selected = connection.exec_driver_sql(
+                "SELECT current_workspace_id FROM user_sessions"
+            ).scalar_one()
+        assert selected is None
+    finally:
+        engine.dispose()

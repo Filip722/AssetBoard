@@ -19,6 +19,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine, database_is_ready
 from assetboard.db.migrate import schema_state, upgrade_database
+from assetboard.db.repositories import NotFound
 from assetboard.i18n import gettext
 from assetboard.logging import configure_logging
 from assetboard.middleware import (
@@ -33,6 +34,7 @@ from assetboard.services.auth import (
     setup_is_open,
     setup_token_at_startup,
 )
+from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import RETRY_AFTER_SECONDS, HashGate, HashGateBusy
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.errors import add_error_response_headers, error_response
@@ -147,6 +149,42 @@ def create_app(
             gettext("Busy", locale),
             gettext("The server is busy. Try again in a few seconds.", locale),
             headers={"Retry-After": str(RETRY_AFTER_SECONDS)},
+        )
+
+    @app.exception_handler(NoWorkspace)
+    async def handle_no_workspace(request: Request, _exc: NoWorkspace) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            403,
+            gettext("No workspace", locale),
+            gettext(
+                "Your account is not a member of any workspace. Ask a workspace owner to "
+                "invite you.",
+                locale,
+            ),
+        )
+
+    @app.exception_handler(PermissionDenied)
+    async def handle_permission_denied(request: Request, _exc: PermissionDenied) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            403,
+            gettext("Access denied", locale),
+            gettext("You do not have permission to view this page.", locale),
+        )
+
+    # A row of another workspace looks exactly like a missing one: same 404, no workspace hint.
+    @app.exception_handler(NotFound)
+    @app.exception_handler(WorkspaceNotAvailable)
+    async def handle_not_found(request: Request, _exc: Exception) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            404,
+            gettext("Page not found", locale),
+            gettext("The page you requested could not be found.", locale),
         )
 
     @app.exception_handler(StarletteHTTPException)

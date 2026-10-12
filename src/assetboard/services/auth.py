@@ -1688,6 +1688,7 @@ class WebSession:
     is_instance_admin: bool
     expires_at: datetime
     needs_touch: bool
+    current_workspace_id: UUID | None = None
 
 
 def read_web_session(
@@ -1713,6 +1714,7 @@ def read_web_session(
         is_instance_admin=user.is_instance_admin,
         expires_at=row.expires_at,
         needs_touch=now - row.last_seen_at >= SESSION_TOUCH_INTERVAL,
+        current_workspace_id=row.current_workspace_id,
     )
 
 

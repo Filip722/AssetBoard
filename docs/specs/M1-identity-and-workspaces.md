@@ -65,6 +65,23 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - Workspace settings page (owner): name, base currency, timezone, country, default locale. Members page (owner): list, change role, remove (cannot remove the last owner).
 - Invitations: owner creates an invite link (role, expiry, optional email lock); invitee registers or logs in and accepts; token stored hashed, single use.
 
+**Delivery and decisions (2026-10-12)**
+- Split into two PRs. **Part A:** Context, selected workspace in the session, role guards,
+  `ScopedRepository`, the tenant-isolation test and `docs/architecture.md`. **Part B:**
+  workspace switcher, workspace settings, members page and invitations.
+- The selected workspace is `user_sessions.current_workspace_id`, NULL when a session starts.
+  When it is NULL or no longer a membership, the Context uses the oldest membership (by
+  `created_at`, then `id`) without storing it. Only `select_workspace`, called by the switcher,
+  writes it.
+- A signed-in user with no membership gets a 403 "No workspace" page on workspace pages.
+  Account pages and sign-out keep working.
+- A row of another workspace is a 404 with no workspace hint, the same as a missing row.
+- Audit events are append-only, so their repository has no update or delete. Instance-level
+  events (`workspace_id` NULL) are read only by the instance administrator's audit view (F1.5).
+- Foreign keys between workspace-owned tables must include `workspace_id`.
+- The isolation test also includes a static scan for workspace-owned models used outside
+  repositories. See ADR-0003 (amendment 2026-10-12).
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

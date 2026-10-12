@@ -17,7 +17,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
-from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
+from assetboard.db.base import (
+    AppendOnly,
+    Base,
+    IdMixin,
+    TimestampMixin,
+    WorkspaceOwned,
+    WorkspaceScopedMixin,
+)
 from assetboard.db.types import UtcDateTime
 from assetboard.domain.identity import normalize_email
 
@@ -81,9 +88,21 @@ class UserSession(Base):
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
     ip_prefix: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # The workspace chosen with the switcher; NULL means "the oldest membership" (F1.2).
+    current_workspace_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
 
-class AuditEvent(Base):
+class AuditEvent(AppendOnly, WorkspaceOwned, Base):
+    """Append-only (enforced at flush).
+
+    ``workspace_id`` is NULL for instance-level (auth and admin) events.
+    """
+
     __tablename__ = "audit_events"
     __table_args__ = (
         Index("ix_audit_events_workspace_ts", "workspace_id", "ts"),
@@ -92,7 +111,11 @@ class AuditEvent(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     workspace_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("workspaces.id"), nullable=True, index=True
+        Uuid(as_uuid=True),
+        ForeignKey("workspaces.id"),
+        nullable=True,
+        index=True,
+        active_history=True,
     )
     actor_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True

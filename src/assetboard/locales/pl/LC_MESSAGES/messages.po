@@ -27,6 +27,16 @@ msgstr "Serwer zajęty"
 msgid "The server is busy. Try again in a few seconds."
 msgstr "Serwer jest zajęty. Spróbuj ponownie za kilka sekund."
 
+msgid "No workspace"
+msgstr "Brak obszaru roboczego"
+
+msgid ""
+"Your account is not a member of any workspace. Ask a workspace owner to "
+"invite you."
+msgstr ""
+"Twoje konto nie należy do żadnego obszaru roboczego. Poproś właściciela "
+"obszaru roboczego o zaproszenie."
+
 msgid "Access denied"
 msgstr "Brak dostępu"
 

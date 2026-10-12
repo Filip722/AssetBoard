@@ -108,3 +108,21 @@ def test_adr_0012_exists_and_is_indexed() -> None:
     adr_dir = DEPLOYMENT.parents[0] / "adr"
     assert (adr_dir / "0012-local-authentication.md").is_file()
     assert "0012-local-authentication.md" in (adr_dir / "README.md").read_text(encoding="utf-8")
+
+
+def test_architecture_doc_has_new_model_section() -> None:
+    docs = DEPLOYMENT.parent
+    architecture = (docs / "architecture.md").read_text(encoding="utf-8")
+    section = architecture.split("## How to add a new workspace-owned model\n", maxsplit=1)[1]
+    for required in (
+        "WorkspaceScopedMixin",
+        "ScopedRepository",
+        "TENANT_CASES",
+        "EXTRA_METHOD_COVERAGE",
+        "composite",
+        "test_user_b_cannot_read_update_or_delete_user_a_rows",
+    ):
+        assert required in section
+    adr = (docs / "adr" / "0003-workspaces-and-tenant-isolation.md").read_text(encoding="utf-8")
+    assert "## Amendment (2026-10-12)" in adr
+    assert "with_loader_criteria" in adr and "deferred" in adr

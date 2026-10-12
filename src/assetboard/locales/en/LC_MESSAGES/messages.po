@@ -26,6 +26,14 @@ msgstr ""
 msgid "The server is busy. Try again in a few seconds."
 msgstr ""
 
+msgid "No workspace"
+msgstr ""
+
+msgid ""
+"Your account is not a member of any workspace. Ask a workspace owner to "
+"invite you."
+msgstr ""
+
 msgid "Access denied"
 msgstr ""
 
