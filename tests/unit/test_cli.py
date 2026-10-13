@@ -431,3 +431,27 @@ def test_create_admin_leaves_the_language_to_the_browser(tmp_path: Path) -> None
         connection.close()
     # The workspace keeps its locale; the account has none until the profile sets one (F1.5).
     assert user_locale == (None,) and workspace_locale == ("pl",)
+
+
+def test_cli_audit_events_are_instance_level_about_a_user(tmp_path: Path) -> None:
+    # The instance audit log shows only workspace_id IS NULL events, and its Account column
+    # needs entity_type "user" (F1.5 part C).
+    data_dir = tmp_path / "audit-data"
+    env = _auth_env(data_dir)
+    assert _create_admin(env, "cli@example.com").exit_code == 0
+    reset = CliRunner().invoke(
+        cli_app,
+        ["reset-password", "cli@example.com", "--password-stdin"],
+        input="New CLI Password Strong\n",
+        env=env,
+    )
+    assert reset.exit_code == 0, reset.output
+    connection = sqlite3.connect(data_dir / "assetboard.db")
+    try:
+        rows = connection.execute(
+            "SELECT action, workspace_id, entity_type FROM audit_events "
+            "WHERE action LIKE 'cli.%' ORDER BY ts"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert rows == [("cli.create_admin", None, "user"), ("cli.reset_password", None, "user")]

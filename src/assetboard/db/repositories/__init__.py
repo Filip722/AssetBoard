@@ -1,6 +1,11 @@
 """Repositories. Importing this package registers every ``ScopedRepository`` subclass."""
 
-from assetboard.db.repositories.audit import AuditEventRepository
+from assetboard.db.repositories.audit import (
+    AuditCursor,
+    AuditEventRepository,
+    AuditFilter,
+    InstanceAuditReader,
+)
 from assetboard.db.repositories.base import (
     ForeignWorkspace,
     NotFound,
@@ -19,7 +24,10 @@ from assetboard.db.repositories.workspace import UPDATABLE_FIELDS, CurrentWorksp
 
 __all__ = [
     "UPDATABLE_FIELDS",
+    "AuditCursor",
     "AuditEventRepository",
+    "AuditFilter",
+    "InstanceAuditReader",
     "CurrentWorkspaceRepository",
     "ForeignWorkspace",
     "InvitationLocation",

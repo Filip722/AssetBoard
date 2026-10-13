@@ -225,6 +225,10 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   before anything else and starts without a workspace (it sees the "no workspace" page until
   it is invited). Account creation is not offered under `OIDC_ONLY`.
 - Audit log page (owner/instance admin): filterable list of `AuditEvent`s; auth and membership events appear.
+  Two scopes: the owner sees the current workspace's events; an instance administrator sees
+  instance-level events (`workspace_id IS NULL`) only, never another workspace's. Keyset
+  pages; data rendered only through per-action key allowlists; IP prefixes and the affected
+  account only in the instance scope.
 - Deactivated users cannot log in and their sessions are revoked.
 
 **Agent prompt**

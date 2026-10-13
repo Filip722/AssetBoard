@@ -50,9 +50,11 @@
             {% if workspace_nav and workspace_nav.role == "owner" %}
             <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Workspace settings") }}</a>
             <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Members") }}</a>
+            <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Audit log: workspace") }}</a>
             {% endif %}
             {% if web_session and web_session.is_instance_admin %}
             <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Users") }}</a>
+            <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Audit log: instance") }}</a>
             {% endif %}
             <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Profile") }}</a>
             <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Account security") }}</a>

@@ -26,8 +26,9 @@
         </td>
         <td class="px-5 py-3 text-muted dark:text-slate-400">{{ user.last_login_at.date().isoformat() if user.last_login_at else _("Never") }}</td>
         <td class="px-5 py-3 text-right whitespace-nowrap">
+          <a class="text-accent" href="{{ scoped_url(request, 'audit') }}?scope=instance&amp;account={{ user.id }}" data-audit-history>{{ _("History") }}</a>
           {% if user.id != web_session.user_id %}
-          <a class="text-accent" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='deactivate' if user.is_active else 'activate') }}">{% if user.is_active %}{{ _("Deactivate") }}{% else %}{{ _("Activate") }}{% endif %}</a>
+          · <a class="text-accent" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='deactivate' if user.is_active else 'activate') }}">{% if user.is_active %}{{ _("Deactivate") }}{% else %}{{ _("Activate") }}{% endif %}</a>
           · <a class="text-accent" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='demote' if user.is_instance_admin else 'promote') }}">{% if user.is_instance_admin %}{{ _("Remove administrator") }}{% else %}{{ _("Make administrator") }}{% endif %}</a>
           {% else %}<span class="text-xs text-muted dark:text-slate-400">{{ _("You") }}</span>{% endif %}
         </td>

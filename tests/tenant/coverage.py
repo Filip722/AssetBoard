@@ -26,6 +26,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",
     ("AuditEventRepository", "record"): "test_audit_record_writes_into_its_own_workspace",
+    ("AuditEventRepository", "page"): "test_audit_pages_stay_in_their_scope",
     ("MembershipRepository", "add_member"): "test_membership_queries_stay_in_their_workspace",
     **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
@@ -49,6 +50,12 @@ READER_METHOD_COVERAGE: dict[str, str] = {
 CURRENT_WORKSPACE_METHOD_COVERAGE: dict[str, str] = {
     "get": "test_current_workspace_repository_touches_only_its_workspace",
     "update": "test_current_workspace_repository_touches_only_its_workspace",
+}
+
+# InstanceAuditReader reads only instance-level events (workspace_id IS NULL), never a
+# workspace's (F1.5 part C).
+INSTANCE_AUDIT_READER_METHOD_COVERAGE: dict[str, str] = {
+    "page": "test_audit_pages_stay_in_their_scope",
 }
 
 # InvitationTokenReader is scoped by token hash (the invitee has no Context yet).

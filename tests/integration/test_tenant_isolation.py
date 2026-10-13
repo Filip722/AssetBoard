@@ -33,8 +33,10 @@ from assetboard.db.models.identity import AuditEvent, Invitation, Membership, Us
 from assetboard.db.repositories import (
     UPDATABLE_FIELDS,
     AuditEventRepository,
+    AuditFilter,
     CurrentWorkspaceRepository,
     ForeignWorkspace,
+    InstanceAuditReader,
     InvitationRepository,
     InvitationTokenReader,
     MembershipRepository,
@@ -47,6 +49,7 @@ from tests.tenant.coverage import (
     BASE_METHOD_COVERAGE,
     CURRENT_WORKSPACE_METHOD_COVERAGE,
     EXTRA_METHOD_COVERAGE,
+    INSTANCE_AUDIT_READER_METHOD_COVERAGE,
     READER_METHOD_COVERAGE,
     TOKEN_READER_METHOD_COVERAGE,
 )
@@ -293,6 +296,46 @@ def test_audit_record_writes_into_its_own_workspace(
     assert AuditEventRepository(db_session, ctx_b).get(event.id) is None
 
 
+def test_audit_pages_stay_in_their_scope(
+    db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    actor = _member(db_session, ctx_a.workspace.id, "actor@example.com", "owner")
+    for ctx, action in ((ctx_a, "test.in_a"), (ctx_b, "test.in_b")):
+        AuditEventRepository(db_session, ctx).record(
+            actor_user_id=actor.user_id,
+            action=action,
+            entity_type="test",
+            entity_id=None,
+            ts=fixed_clock.now(),
+        )
+    db_session.add(
+        AuditEvent(
+            id=uuid4(),
+            workspace_id=None,
+            actor_type="system",
+            action="test.instance",
+            entity_type="test",
+            data={},
+            ts=fixed_clock.now(),
+        )
+    )
+    db_session.flush()
+    everything = AuditFilter()
+    assert [
+        e.action for e in AuditEventRepository(db_session, ctx_a).page(everything, limit=10)
+    ] == ["test.in_a"]
+    assert [
+        e.action for e in AuditEventRepository(db_session, ctx_b).page(everything, limit=10)
+    ] == ["test.in_b"]
+    # The instance reader never returns a workspace's events, whatever the filter.
+    assert [e.action for e in InstanceAuditReader(db_session).page(everything, limit=10)] == [
+        "test.instance"
+    ]
+    asked_for_a = AuditFilter(actions=("test.in_a", "test.in_b"))
+    assert InstanceAuditReader(db_session).page(asked_for_a, limit=10) == []
+
+
 def test_current_workspace_repository_touches_only_its_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any]
 ) -> None:
@@ -395,7 +438,9 @@ def test_every_public_repository_method_is_covered() -> None:
     assert set(READER_METHOD_COVERAGE) == public_methods(UserMembershipReader)
     assert set(CURRENT_WORKSPACE_METHOD_COVERAGE) == public_methods(CurrentWorkspaceRepository)
     assert set(TOKEN_READER_METHOD_COVERAGE) == public_methods(InvitationTokenReader)
+    assert set(INSTANCE_AUDIT_READER_METHOD_COVERAGE) == public_methods(InstanceAuditReader)
     covering = {
+        *INSTANCE_AUDIT_READER_METHOD_COVERAGE.values(),
         *TOKEN_READER_METHOD_COVERAGE.values(),
         *BASE_METHOD_COVERAGE.values(),
         *EXTRA_METHOD_COVERAGE.values(),

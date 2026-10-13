@@ -55,6 +55,309 @@ msgstr ""
 msgid "Enter a valid amount."
 msgstr ""
 
+msgid "First administrator created at setup"
+msgstr ""
+
+msgid "Administrator created on the command line"
+msgstr ""
+
+msgid "Password reset on the command line"
+msgstr ""
+
+msgid "Signed in"
+msgstr ""
+
+msgid "Sign-in failed"
+msgstr ""
+
+msgid "Signed out"
+msgstr ""
+
+msgid "Account registered"
+msgstr ""
+
+msgid "Password changed"
+msgstr ""
+
+msgid "Password confirmation failed"
+msgstr ""
+
+msgid "Identity provider sign-in refused"
+msgstr ""
+
+msgid "Proxy sign-in refused"
+msgstr ""
+
+msgid "Identity provider linked"
+msgstr ""
+
+msgid "Proxy sign-in linked"
+msgstr ""
+
+msgid "Identity provider unlinked"
+msgstr ""
+
+msgid "Proxy sign-in unlinked"
+msgstr ""
+
+msgid "Administrator role granted"
+msgstr ""
+
+msgid "Administrator role removed"
+msgstr ""
+
+msgid "Account created by an administrator"
+msgstr ""
+
+msgid "Account activated"
+msgstr ""
+
+msgid "Account deactivated"
+msgstr ""
+
+msgid "Workspace settings changed"
+msgstr ""
+
+msgid "Member role changed"
+msgstr ""
+
+msgid "Member removed"
+msgstr ""
+
+msgid "Invitation created"
+msgstr ""
+
+msgid "Invitation revoked"
+msgstr ""
+
+msgid "Invitation accepted"
+msgstr ""
+
+msgid "Invitation used with another email address"
+msgstr ""
+
+msgid "Other event"
+msgstr ""
+
+msgid "Linking an identity provider failed"
+msgstr ""
+
+msgid "Method"
+msgstr ""
+
+msgid "New account"
+msgstr ""
+
+msgid "Just linked"
+msgstr ""
+
+msgid "Reason"
+msgstr ""
+
+msgid "Scope"
+msgstr ""
+
+msgid "Sessions ended"
+msgstr ""
+
+msgid "Other sessions ended"
+msgstr ""
+
+msgid "Through"
+msgstr ""
+
+msgid "For"
+msgstr ""
+
+msgid "Confirmed with"
+msgstr ""
+
+msgid "Source"
+msgstr ""
+
+msgid "Temporary password"
+msgstr ""
+
+msgid "Fields"
+msgstr ""
+
+msgid "From"
+msgstr ""
+
+msgid "To"
+msgstr ""
+
+msgid "Role"
+msgstr ""
+
+msgid "Email address fixed"
+msgstr ""
+
+msgid "Valid for days"
+msgstr ""
+
+msgid "owner"
+msgstr ""
+
+msgid "editor"
+msgstr ""
+
+msgid "viewer"
+msgstr ""
+
+msgid "not an instance administrator"
+msgstr ""
+
+msgid "no account for this sign-in"
+msgstr ""
+
+msgid "an account with this email address already exists"
+msgstr ""
+
+msgid "email address not verified"
+msgstr ""
+
+msgid "email domain not allowed"
+msgstr ""
+
+msgid "account deactivated"
+msgstr ""
+
+msgid "invitation no longer valid"
+msgstr ""
+
+msgid "email address does not match the invitation"
+msgstr ""
+
+msgid "too many attempts"
+msgstr ""
+
+msgid "the provider's ID token was not valid"
+msgstr ""
+
+msgid "the provider signed with an unknown key"
+msgstr ""
+
+msgid "the provider's keys could not be read"
+msgstr ""
+
+msgid "the sign-in did not match its request"
+msgstr ""
+
+msgid "the provider's user information could not be read"
+msgstr ""
+
+msgid "the provider's user information did not match"
+msgstr ""
+
+msgid "the sign-in data was too large"
+msgstr ""
+
+msgid "the proxy sent an identity header twice"
+msgstr ""
+
+msgid "the proxy sent an invalid identity header"
+msgstr ""
+
+msgid "too many attempts with another email address"
+msgstr ""
+
+msgid "by an owner"
+msgstr ""
+
+msgid "password"
+msgstr ""
+
+msgid "identity provider"
+msgstr ""
+
+msgid "proxy"
+msgstr ""
+
+msgid "the profile"
+msgstr ""
+
+msgid "an invitation"
+msgstr ""
+
+msgid "an invitation, through the identity provider"
+msgstr ""
+
+msgid "an invitation, through the proxy"
+msgstr ""
+
+msgid "a recent sign-in"
+msgstr ""
+
+msgid "other devices"
+msgstr ""
+
+msgid "the identity provider's group"
+msgstr ""
+
+msgid "linking an identity provider"
+msgstr ""
+
+msgid "linking a proxy sign-in"
+msgstr ""
+
+msgid "removing a sign-in method"
+msgstr ""
+
+msgid "signing out other devices"
+msgstr ""
+
+msgid "activating an account"
+msgstr ""
+
+msgid "deactivating an account"
+msgstr ""
+
+msgid "granting the administrator role"
+msgstr ""
+
+msgid "removing the administrator role"
+msgstr ""
+
+msgid "creating an account"
+msgstr ""
+
+msgid "name"
+msgstr ""
+
+msgid "currency"
+msgstr ""
+
+msgid "country"
+msgstr ""
+
+msgid "time zone"
+msgstr ""
+
+msgid "language"
+msgstr ""
+
+msgid "Members"
+msgstr ""
+
+msgid "Invitations"
+msgstr ""
+
+msgid "Workspace settings"
+msgstr ""
+
+msgid "Sign-ins"
+msgstr ""
+
+msgid "Failures"
+msgstr ""
+
+msgid "Linked sign-in methods"
+msgstr ""
+
+msgid "Account administration"
+msgstr ""
+
 msgid "Same as the system"
 msgstr ""
 
@@ -172,6 +475,29 @@ msgid "Enter a valid email address."
 msgstr ""
 
 msgid "An account with this email address already exists."
+msgstr ""
+
+msgid "Command line"
+msgstr ""
+
+msgid "System"
+msgstr ""
+
+msgid "Former member"
+msgstr ""
+
+msgid "yes"
+msgstr ""
+
+msgid "no"
+msgstr ""
+
+msgid "Invalid request"
+msgstr ""
+
+msgid ""
+"The filters or the page position are not valid. Start again from the "
+"first page."
 msgstr ""
 
 msgid "Use at least 10 characters for the password."
@@ -457,13 +783,13 @@ msgstr ""
 msgid "Your account"
 msgstr ""
 
-msgid "Workspace settings"
-msgstr ""
-
-msgid "Members"
+msgid "Audit log: workspace"
 msgstr ""
 
 msgid "Users"
+msgstr ""
+
+msgid "Audit log: instance"
 msgstr ""
 
 msgid "Profile"
@@ -673,10 +999,10 @@ msgstr ""
 msgid "(from the identity provider)"
 msgstr ""
 
-msgid "Temporary password"
+msgid "Never"
 msgstr ""
 
-msgid "Never"
+msgid "History"
 msgstr ""
 
 msgid "Deactivate"
@@ -692,6 +1018,60 @@ msgid "Make administrator"
 msgstr ""
 
 msgid "You"
+msgstr ""
+
+msgid "Audit log"
+msgstr ""
+
+msgid "Events"
+msgstr ""
+
+msgid "All"
+msgstr ""
+
+msgid "From (UTC)"
+msgstr ""
+
+msgid "To (UTC)"
+msgstr ""
+
+msgid "One account only."
+msgstr ""
+
+msgid "Show all accounts"
+msgstr ""
+
+msgid "Filter"
+msgstr ""
+
+msgid "Time"
+msgstr ""
+
+msgid "Event"
+msgstr ""
+
+msgid "By"
+msgstr ""
+
+msgid "Member"
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
+msgid "No events match."
+msgstr ""
+
+msgid "Pages"
+msgstr ""
+
+msgid "Newest"
+msgstr ""
+
+msgid "Older"
 msgstr ""
 
 msgid "Link your account"
@@ -736,9 +1116,6 @@ msgid "Sign-in did not complete"
 msgstr ""
 
 msgid "Back to sign-in"
-msgstr ""
-
-msgid "Signed out"
 msgstr ""
 
 #, python-format
@@ -856,17 +1233,11 @@ msgstr ""
 msgid "you"
 msgstr ""
 
-msgid "Role"
-msgstr ""
-
 msgid "Change role"
 msgstr ""
 
 #, python-format
 msgid "Remove %(name)s from this workspace?"
-msgstr ""
-
-msgid "Invitations"
 msgstr ""
 
 msgid "Invitation link created. Copy it now: it is shown only once."
@@ -974,5 +1345,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Enter a display name of 1 to 120 characters."
+#~ msgstr ""
+
+#~ msgid "Affected account (email)"
 #~ msgstr ""
 

@@ -58,6 +58,309 @@ msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
+msgid "First administrator created at setup"
+msgstr "Pierwszy administrator utworzony podczas konfiguracji"
+
+msgid "Administrator created on the command line"
+msgstr "Administrator utworzony z wiersza poleceń"
+
+msgid "Password reset on the command line"
+msgstr "Hasło zresetowane z wiersza poleceń"
+
+msgid "Signed in"
+msgstr "Zalogowano"
+
+msgid "Sign-in failed"
+msgstr "Logowanie nieudane"
+
+msgid "Signed out"
+msgstr "Wylogowano"
+
+msgid "Account registered"
+msgstr "Zarejestrowano konto"
+
+msgid "Password changed"
+msgstr "Zmieniono hasło"
+
+msgid "Password confirmation failed"
+msgstr "Nieudane potwierdzenie hasłem"
+
+msgid "Identity provider sign-in refused"
+msgstr "Odrzucono logowanie przez dostawcę tożsamości"
+
+msgid "Proxy sign-in refused"
+msgstr "Odrzucono logowanie przez serwer proxy"
+
+msgid "Identity provider linked"
+msgstr "Powiązano dostawcę tożsamości"
+
+msgid "Proxy sign-in linked"
+msgstr "Powiązano logowanie przez proxy"
+
+msgid "Identity provider unlinked"
+msgstr "Usunięto powiązanie z dostawcą tożsamości"
+
+msgid "Proxy sign-in unlinked"
+msgstr "Usunięto powiązanie logowania przez proxy"
+
+msgid "Administrator role granted"
+msgstr "Nadano uprawnienia administratora"
+
+msgid "Administrator role removed"
+msgstr "Odebrano uprawnienia administratora"
+
+msgid "Account created by an administrator"
+msgstr "Konto utworzone przez administratora"
+
+msgid "Account activated"
+msgstr "Aktywowano konto"
+
+msgid "Account deactivated"
+msgstr "Dezaktywowano konto"
+
+msgid "Workspace settings changed"
+msgstr "Zmieniono ustawienia obszaru roboczego"
+
+msgid "Member role changed"
+msgstr "Zmieniono rolę członka"
+
+msgid "Member removed"
+msgstr "Usunięto członka"
+
+msgid "Invitation created"
+msgstr "Utworzono zaproszenie"
+
+msgid "Invitation revoked"
+msgstr "Unieważniono zaproszenie"
+
+msgid "Invitation accepted"
+msgstr "Przyjęto zaproszenie"
+
+msgid "Invitation used with another email address"
+msgstr "Zaproszenia użyto z innym adresem e-mail"
+
+msgid "Other event"
+msgstr "Inne zdarzenie"
+
+msgid "Linking an identity provider failed"
+msgstr "Nieudane powiązanie z dostawcą tożsamości"
+
+msgid "Method"
+msgstr "Metoda"
+
+msgid "New account"
+msgstr "Nowe konto"
+
+msgid "Just linked"
+msgstr "Właśnie powiązano"
+
+msgid "Reason"
+msgstr "Powód"
+
+msgid "Scope"
+msgstr "Zakres"
+
+msgid "Sessions ended"
+msgstr "Zakończone sesje"
+
+msgid "Other sessions ended"
+msgstr "Zakończone inne sesje"
+
+msgid "Through"
+msgstr "Przez"
+
+msgid "For"
+msgstr "Dla"
+
+msgid "Confirmed with"
+msgstr "Potwierdzono przez"
+
+msgid "Source"
+msgstr "Źródło"
+
+msgid "Temporary password"
+msgstr "Hasło tymczasowe"
+
+msgid "Fields"
+msgstr "Pola"
+
+msgid "From"
+msgstr "Z"
+
+msgid "To"
+msgstr "Na"
+
+msgid "Role"
+msgstr "Rola"
+
+msgid "Email address fixed"
+msgstr "Stały adres e-mail"
+
+msgid "Valid for days"
+msgstr "Ważne dni"
+
+msgid "owner"
+msgstr "właściciel"
+
+msgid "editor"
+msgstr "edytor"
+
+msgid "viewer"
+msgstr "obserwator"
+
+msgid "not an instance administrator"
+msgstr "nie jest administratorem instancji"
+
+msgid "no account for this sign-in"
+msgstr "brak konta dla tego logowania"
+
+msgid "an account with this email address already exists"
+msgstr "konto z tym adresem e-mail już istnieje"
+
+msgid "email address not verified"
+msgstr "adres e-mail niezweryfikowany"
+
+msgid "email domain not allowed"
+msgstr "niedozwolona domena e-mail"
+
+msgid "account deactivated"
+msgstr "konto dezaktywowane"
+
+msgid "invitation no longer valid"
+msgstr "zaproszenie jest już nieważne"
+
+msgid "email address does not match the invitation"
+msgstr "adres e-mail nie pasuje do zaproszenia"
+
+msgid "too many attempts"
+msgstr "zbyt wiele prób"
+
+msgid "the provider's ID token was not valid"
+msgstr "token ID od dostawcy był nieprawidłowy"
+
+msgid "the provider signed with an unknown key"
+msgstr "dostawca podpisał nieznanym kluczem"
+
+msgid "the provider's keys could not be read"
+msgstr "nie udało się odczytać kluczy dostawcy"
+
+msgid "the sign-in did not match its request"
+msgstr "logowanie nie pasowało do żądania"
+
+msgid "the provider's user information could not be read"
+msgstr "nie udało się odczytać danych użytkownika od dostawcy"
+
+msgid "the provider's user information did not match"
+msgstr "dane użytkownika od dostawcy się nie zgadzały"
+
+msgid "the sign-in data was too large"
+msgstr "dane logowania były za duże"
+
+msgid "the proxy sent an identity header twice"
+msgstr "serwer proxy wysłał nagłówek tożsamości dwukrotnie"
+
+msgid "the proxy sent an invalid identity header"
+msgstr "serwer proxy wysłał nieprawidłowy nagłówek tożsamości"
+
+msgid "too many attempts with another email address"
+msgstr "zbyt wiele prób z innym adresem e-mail"
+
+msgid "by an owner"
+msgstr "przez właściciela"
+
+msgid "password"
+msgstr "hasło"
+
+msgid "identity provider"
+msgstr "dostawca tożsamości"
+
+msgid "proxy"
+msgstr "serwer proxy"
+
+msgid "the profile"
+msgstr "profil"
+
+msgid "an invitation"
+msgstr "zaproszenie"
+
+msgid "an invitation, through the identity provider"
+msgstr "zaproszenie, przez dostawcę tożsamości"
+
+msgid "an invitation, through the proxy"
+msgstr "zaproszenie, przez serwer proxy"
+
+msgid "a recent sign-in"
+msgstr "niedawne logowanie"
+
+msgid "other devices"
+msgstr "inne urządzenia"
+
+msgid "the identity provider's group"
+msgstr "grupa u dostawcy tożsamości"
+
+msgid "linking an identity provider"
+msgstr "powiązanie dostawcy tożsamości"
+
+msgid "linking a proxy sign-in"
+msgstr "powiązanie logowania przez proxy"
+
+msgid "removing a sign-in method"
+msgstr "usunięcie metody logowania"
+
+msgid "signing out other devices"
+msgstr "wylogowanie innych urządzeń"
+
+msgid "activating an account"
+msgstr "aktywacja konta"
+
+msgid "deactivating an account"
+msgstr "dezaktywacja konta"
+
+msgid "granting the administrator role"
+msgstr "nadanie uprawnień administratora"
+
+msgid "removing the administrator role"
+msgstr "odebranie uprawnień administratora"
+
+msgid "creating an account"
+msgstr "utworzenie konta"
+
+msgid "name"
+msgstr "nazwa"
+
+msgid "currency"
+msgstr "waluta"
+
+msgid "country"
+msgstr "kraj"
+
+msgid "time zone"
+msgstr "strefa czasowa"
+
+msgid "language"
+msgstr "język"
+
+msgid "Members"
+msgstr "Członkowie"
+
+msgid "Invitations"
+msgstr "Zaproszenia"
+
+msgid "Workspace settings"
+msgstr "Ustawienia obszaru roboczego"
+
+msgid "Sign-ins"
+msgstr "Logowania"
+
+msgid "Failures"
+msgstr "Niepowodzenia"
+
+msgid "Linked sign-in methods"
+msgstr "Powiązane metody logowania"
+
+msgid "Account administration"
+msgstr "Administracja kontami"
+
 msgid "Same as the system"
 msgstr "Jak w systemie"
 
@@ -195,6 +498,29 @@ msgstr "Podaj prawidłowy adres e-mail."
 
 msgid "An account with this email address already exists."
 msgstr "Konto z tym adresem e-mail już istnieje."
+
+msgid "Command line"
+msgstr "Wiersz poleceń"
+
+msgid "System"
+msgstr "System"
+
+msgid "Former member"
+msgstr "Były członek"
+
+msgid "yes"
+msgstr "tak"
+
+msgid "no"
+msgstr "nie"
+
+msgid "Invalid request"
+msgstr "Nieprawidłowe żądanie"
+
+msgid ""
+"The filters or the page position are not valid. Start again from the "
+"first page."
+msgstr "Filtry lub pozycja strony są nieprawidłowe. Zacznij od pierwszej strony."
 
 msgid "Use at least 10 characters for the password."
 msgstr "Hasło musi mieć co najmniej 10 znaków."
@@ -527,14 +853,14 @@ msgstr "Niedostępne"
 msgid "Your account"
 msgstr "Twoje konto"
 
-msgid "Workspace settings"
-msgstr "Ustawienia obszaru roboczego"
-
-msgid "Members"
-msgstr "Członkowie"
+msgid "Audit log: workspace"
+msgstr "Dziennik zdarzeń: obszar roboczy"
 
 msgid "Users"
 msgstr "Użytkownicy"
+
+msgid "Audit log: instance"
+msgstr "Dziennik zdarzeń: instancja"
 
 msgid "Profile"
 msgstr "Profil"
@@ -753,11 +1079,11 @@ msgstr "Nie jest administratorem"
 msgid "(from the identity provider)"
 msgstr "(od dostawcy tożsamości)"
 
-msgid "Temporary password"
-msgstr "Hasło tymczasowe"
-
 msgid "Never"
 msgstr "Nigdy"
+
+msgid "History"
+msgstr "Historia"
 
 msgid "Deactivate"
 msgstr "Dezaktywuj"
@@ -773,6 +1099,60 @@ msgstr "Nadaj uprawnienia administratora"
 
 msgid "You"
 msgstr "Ty"
+
+msgid "Audit log"
+msgstr "Dziennik zdarzeń"
+
+msgid "Events"
+msgstr "Zdarzenia"
+
+msgid "All"
+msgstr "Wszystkie"
+
+msgid "From (UTC)"
+msgstr "Od (UTC)"
+
+msgid "To (UTC)"
+msgstr "Do (UTC)"
+
+msgid "One account only."
+msgstr "Tylko jedno konto."
+
+msgid "Show all accounts"
+msgstr "Pokaż wszystkie konta"
+
+msgid "Filter"
+msgstr "Filtruj"
+
+msgid "Time"
+msgstr "Czas"
+
+msgid "Event"
+msgstr "Zdarzenie"
+
+msgid "By"
+msgstr "Kto"
+
+msgid "Member"
+msgstr "Członek"
+
+msgid "Network"
+msgstr "Sieć"
+
+msgid "Details"
+msgstr "Szczegóły"
+
+msgid "No events match."
+msgstr "Brak pasujących zdarzeń."
+
+msgid "Pages"
+msgstr "Strony"
+
+msgid "Newest"
+msgstr "Najnowsze"
+
+msgid "Older"
+msgstr "Starsze"
 
 msgid "Link your account"
 msgstr "Połącz swoje konto"
@@ -819,9 +1199,6 @@ msgstr "Logowanie nie zostało ukończone"
 
 msgid "Back to sign-in"
 msgstr "Wróć do logowania"
-
-msgid "Signed out"
-msgstr "Wylogowano"
 
 #, python-format
 msgid "You are signed out here. Signing you out of %(provider)s too…"
@@ -950,18 +1327,12 @@ msgstr "Osoby w tym obszarze roboczym"
 msgid "you"
 msgstr "ty"
 
-msgid "Role"
-msgstr "Rola"
-
 msgid "Change role"
 msgstr "Zmień rolę"
 
 #, python-format
 msgid "Remove %(name)s from this workspace?"
 msgstr "Usunąć użytkownika %(name)s z tego obszaru roboczego?"
-
-msgid "Invitations"
-msgstr "Zaproszenia"
 
 msgid "Invitation link created. Copy it now: it is shown only once."
 msgstr ""
@@ -1042,4 +1413,7 @@ msgstr "Zapisz ustawienia"
 
 #~ msgid "Enter a display name of at most 120 characters."
 #~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
+
+#~ msgid "Affected account (email)"
+#~ msgstr "Dotyczy konta (e-mail)"
 

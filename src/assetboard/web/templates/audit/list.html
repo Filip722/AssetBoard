@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Audit log") }} · {{ app_name }}{% endblock %}
+{% block heading %}{% if scope == "instance" %}{{ _("Audit log: instance") }}{% else %}{{ _("Audit log: workspace") }}{% endif %}{% endblock %}
+{% block content %}
+<form method="get" action="{{ scoped_url(request, 'audit') }}" class="panel mb-6 flex flex-wrap items-end gap-4 p-5" data-audit-filters>
+  <input type="hidden" name="scope" value="{{ scope }}">
+  <div class="space-y-1.5">
+    <label for="audit-group" class="block text-sm font-medium">{{ _("Events") }}</label>
+    <select id="audit-group" name="group" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+      <option value="">{{ _("All") }}</option>
+      {% for key, label in groups %}<option value="{{ key }}" {% if filters.get("group") == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="space-y-1.5">
+    <label for="audit-from" class="block text-sm font-medium">{{ _("From (UTC)") }}</label>
+    <input id="audit-from" name="from" type="date" value="{{ filters.get('from', '') }}" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+  </div>
+  <div class="space-y-1.5">
+    <label for="audit-to" class="block text-sm font-medium">{{ _("To (UTC)") }}</label>
+    <input id="audit-to" name="to" type="date" value="{{ filters.get('to', '') }}" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+  </div>
+  {% if filters.get("account") %}
+  <input type="hidden" name="account" value="{{ filters.account }}">
+  <p class="text-sm" data-audit-account>{{ _("One account only.") }} <a class="text-accent" href="{{ all_accounts_url }}">{{ _("Show all accounts") }}</a></p>
+  {% endif %}
+  <button type="submit" class="rounded-xl border border-line px-4 py-2 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ _("Filter") }}</button>
+</form>
+<section class="panel overflow-x-auto p-0" aria-label="{{ _('Audit log') }}">
+  {% if rows %}
+  <table class="w-full text-left text-sm" data-audit-rows>
+    <thead class="border-b border-line text-xs uppercase tracking-wide text-muted dark:border-slate-800 dark:text-slate-400">
+      <tr>
+        <th scope="col" class="px-5 py-3">{{ _("Time") }}</th>
+        <th scope="col" class="px-5 py-3">{{ _("Event") }}</th>
+        <th scope="col" class="px-5 py-3">{{ _("By") }}</th>
+        <th scope="col" class="px-5 py-3">{% if scope == "instance" %}{{ _("Account") }}{% else %}{{ _("Member") }}{% endif %}</th>
+        {% if scope == "instance" %}<th scope="col" class="px-5 py-3">{{ _("Network") }}</th>{% endif %}
+        <th scope="col" class="px-5 py-3">{{ _("Details") }}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-line dark:divide-slate-800">
+      {% for row in rows %}
+      <tr data-audit-row>
+        <td class="whitespace-nowrap px-5 py-3 text-muted dark:text-slate-400">{{ row.when }}</td>
+        <td class="px-5 py-3 font-medium">{{ row.label }}</td>
+        <td class="px-5 py-3">{{ row.actor or "–" }}{% if row.actor_email %}<span class="block text-xs text-muted dark:text-slate-400">{{ row.actor_email }}</span>{% endif %}</td>
+        <td class="px-5 py-3" data-audit-target>{{ row.target or "–" }}{% if row.target_email %}<span class="block text-xs text-muted dark:text-slate-400">{{ row.target_email }}</span>{% endif %}</td>
+        {% if scope == "instance" %}<td class="px-5 py-3 font-mono text-xs">{{ row.ip_prefix or "–" }}</td>{% endif %}
+        <td class="px-5 py-3 text-xs">{% for key, value in row.details %}<span class="block">{{ key }}: {{ value }}</span>{% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="p-6 text-sm text-muted dark:text-slate-400" data-audit-empty>{{ _("No events match.") }}</p>
+  {% endif %}
+</section>
+<nav class="mt-6 flex gap-4 text-sm" aria-label="{{ _('Pages') }}">
+  {% if paged %}<a class="text-accent" href="{{ first_url }}" data-audit-first>{{ _("Newest") }}</a>{% endif %}
+  {% if next_url %}<a class="text-accent" href="{{ next_url }}" data-audit-next>{{ _("Older") }}</a>{% endif %}
+</nav>
+{% endblock %}

@@ -199,6 +199,11 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### F1.5: profile (part 3)
+
+- **Audit log pages** at "Audit log: workspace" (workspace owners) and "Audit log: instance"
+  (instance administrators); see [docs/accounts.md](accounts.md#audit-log). No migration.
+
 ### F1.5: profile (part 2)
 
 - **Account administration** at "Users" (instance administrators): activate, deactivate,
