@@ -49,6 +49,9 @@ SIGNED_OUT_PATHS = frozenset(
 # sign-in (start, callback and its failure pages) happens before there is a session.
 SIGNED_OUT_PREFIXES = ("/invite/", "/auth/oidc/", "/auth/proxy/")
 SAFE_NAVIGATION = frozenset({"GET", "HEAD"})
+# What a password session with a temporary password may still reach (static files and the health
+# endpoints are always open).
+TEMPORARY_PASSWORD_PATHS = frozenset({"/account/password", "/logout"})
 
 
 def _always_open(path: str) -> bool:
@@ -178,6 +181,22 @@ def is_page_navigation(request: Request) -> bool:
     return "text/html" in headers.get("accept", "").lower()
 
 
+def _temporary_password_response(request: Request) -> Response:
+    if request.method in SAFE_NAVIGATION or is_htmx_fragment_request(request):
+        return _redirect(request, "/account/password")
+    locale = request.state.locale
+    return error_response(
+        request,
+        403,
+        gettext("Change your password first", locale),
+        gettext(
+            "Your account has a temporary password. Choose a new password before doing "
+            "anything else.",
+            locale,
+        ),
+    )
+
+
 async def _load_session(request: Request, proxy: ProxyRequest | None) -> WebSession | None:
     """The signed-in session, if any. Proxy sessions are bound to the proxy (ADR-0015).
 
@@ -275,6 +294,16 @@ class AccessGateMiddleware:
                 accept_language=request.headers.get("accept-language", ""),
                 default_locale=app.state.settings.default_locale,
             )
+        if (
+            current is not None
+            and current.must_change_password
+            and current.auth_method == "password"
+            and path not in TEMPORARY_PASSWORD_PATHS
+        ):
+            # A temporary password (F1.5): this password session can only change it or sign
+            # out. OIDC and proxy sessions are not affected.
+            await _temporary_password_response(request)(scope, receive, send)
+            return
         if (
             current is None
             and path not in SIGNED_OUT_PATHS

@@ -134,8 +134,67 @@ msgstr "Język przeglądarki"
 msgid "The sign-in method was removed from your account."
 msgstr "Metoda logowania została usunięta z Twojego konta."
 
+msgid "Activate account"
+msgstr "Aktywuj konto"
+
+msgid "Deactivate account"
+msgstr "Dezaktywuj konto"
+
+msgid "Make instance administrator"
+msgstr "Nadaj uprawnienia administratora instancji"
+
+msgid "Remove instance administrator"
+msgstr "Odbierz uprawnienia administratora instancji"
+
+#, python-format
+msgid "%(user)s can sign in again."
+msgstr "%(user)s znów może się logować."
+
+#, python-format
+msgid ""
+"%(user)s can no longer sign in, and every session of this account ends "
+"now: password, identity provider and proxy sign-ins alike."
+msgstr ""
+"%(user)s nie może się już logować, a wszystkie sesje tego konta kończą "
+"się teraz: zarówno logowania hasłem, jak i przez dostawcę tożsamości oraz"
+" serwer proxy."
+
+#, python-format
+msgid "%(user)s can manage every account on this instance."
+msgstr "%(user)s może zarządzać wszystkimi kontami w tej instancji."
+
+#, python-format
+msgid "%(user)s can no longer manage accounts on this instance."
+msgstr "%(user)s nie może już zarządzać kontami w tej instancji."
+
+msgid "Done."
+msgstr "Gotowe."
+
+msgid "Nothing to change: the account is already in that state."
+msgstr "Nie ma nic do zmiany: konto jest już w tym stanie."
+
+msgid ""
+"You cannot deactivate your own account or remove your own administrator "
+"role."
+msgstr ""
+"Nie możesz dezaktywować własnego konta ani odebrać sobie uprawnień "
+"administratora."
+
+msgid "This is the last active administrator, so this would leave none."
+msgstr "To ostatni aktywny administrator; po tej zmianie nie zostałby żaden."
+
+msgid ""
+"The identity provider decides this at each sign-in; to change it, change "
+"the group there."
+msgstr ""
+"Decyduje o tym dostawca tożsamości przy każdym logowaniu; aby to zmienić,"
+" zmień tam grupę."
+
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
+
+msgid "An account with this email address already exists."
+msgstr "Konto z tym adresem e-mail już istnieje."
 
 msgid "Use at least 10 characters for the password."
 msgstr "Hasło musi mieć co najmniej 10 znaków."
@@ -163,6 +222,9 @@ msgstr "Token konfiguracji jest nieprawidłowy."
 
 msgid "The new passwords do not match."
 msgstr "Nowe hasła nie są takie same."
+
+msgid "Choose a new password that differs from the current one."
+msgstr "Wybierz nowe hasło, inne niż obecne."
 
 msgid "The current password is not correct."
 msgstr "Obecne hasło jest nieprawidłowe."
@@ -255,6 +317,16 @@ msgstr "Uruchamianie"
 
 msgid "The application is starting. Try again in a moment."
 msgstr "Aplikacja się uruchamia. Spróbuj ponownie za chwilę."
+
+msgid "Change your password first"
+msgstr "Najpierw zmień hasło"
+
+msgid ""
+"Your account has a temporary password. Choose a new password before doing"
+" anything else."
+msgstr ""
+"Twoje konto ma hasło tymczasowe. Zanim zrobisz cokolwiek innego, ustaw "
+"nowe hasło."
 
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
@@ -461,6 +533,9 @@ msgstr "Ustawienia obszaru roboczego"
 msgid "Members"
 msgstr "Członkowie"
 
+msgid "Users"
+msgstr "Użytkownicy"
+
 msgid "Profile"
 msgstr "Profil"
 
@@ -609,6 +684,96 @@ msgstr "Serwer proxy loguje Cię jako %(user)s."
 msgid "Link this proxy sign-in"
 msgstr "Powiąż to logowanie przez proxy"
 
+msgid "Back to users"
+msgstr "Wróć do użytkowników"
+
+msgid "Account created"
+msgstr "Konto utworzone"
+
+#, python-format
+msgid ""
+"The account %(email)s was created. Give this temporary password to "
+"%(name)s; it is shown only now and must be changed at the first sign-in."
+msgstr ""
+"Konto %(email)s zostało utworzone. Przekaż to hasło tymczasowe osobie "
+"%(name)s; jest pokazywane tylko teraz i trzeba je zmienić przy pierwszym "
+"logowaniu."
+
+msgid "Create an account"
+msgstr "Utwórz konto"
+
+msgid ""
+"The account gets a temporary password, shown once after you create it. It"
+" must be changed at the first sign-in. The account starts without a "
+"workspace: invite it to one."
+msgstr ""
+"Konto dostaje hasło tymczasowe, pokazane jeden raz po utworzeniu. Trzeba "
+"je zmienić przy pierwszym logowaniu. Konto nie ma na początku obszaru "
+"roboczego: zaproś je do któregoś."
+
+msgid "Email"
+msgstr "E-mail"
+
+msgid "Create account"
+msgstr "Utwórz konto"
+
+msgid "Account"
+msgstr "Konto"
+
+msgid "Status"
+msgstr "Stan"
+
+msgid "Last sign-in"
+msgstr "Ostatnie logowanie"
+
+msgid "Actions"
+msgstr "Działania"
+
+msgid "Password"
+msgstr "Hasło"
+
+msgid "Identity provider"
+msgstr "Dostawca tożsamości"
+
+msgid "Proxy"
+msgstr "Serwer proxy"
+
+msgid "Active"
+msgstr "Aktywne"
+
+msgid "Deactivated"
+msgstr "Dezaktywowane"
+
+msgid "Administrator"
+msgstr "Administrator"
+
+msgid "Not an administrator"
+msgstr "Nie jest administratorem"
+
+msgid "(from the identity provider)"
+msgstr "(od dostawcy tożsamości)"
+
+msgid "Temporary password"
+msgstr "Hasło tymczasowe"
+
+msgid "Never"
+msgstr "Nigdy"
+
+msgid "Deactivate"
+msgstr "Dezaktywuj"
+
+msgid "Activate"
+msgstr "Aktywuj"
+
+msgid "Remove administrator"
+msgstr "Odbierz uprawnienia administratora"
+
+msgid "Make administrator"
+msgstr "Nadaj uprawnienia administratora"
+
+msgid "You"
+msgstr "Ty"
+
 msgid "Link your account"
 msgstr "Połącz swoje konto"
 
@@ -625,9 +790,6 @@ msgstr ""
 
 msgid "This signs the account out on all other devices."
 msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
-
-msgid "Password"
-msgstr "Hasło"
 
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
@@ -646,14 +808,8 @@ msgstr "Kontynuuj przez %(provider)s"
 msgid "or sign in with your password"
 msgstr "lub zaloguj się hasłem"
 
-msgid "Email"
-msgstr "E-mail"
-
 msgid "No account yet?"
 msgstr "Nie masz jeszcze konta?"
-
-msgid "Create an account"
-msgstr "Utwórz konto"
 
 msgid "Sign-in"
 msgstr "Logowanie"
@@ -675,6 +831,13 @@ msgstr ""
 
 msgid "Change password"
 msgstr "Zmień hasło"
+
+msgid ""
+"You signed in with a temporary password. Choose a new password to "
+"continue; the temporary one is your current password."
+msgstr ""
+"Zalogowano hasłem tymczasowym. Aby kontynuować, ustaw nowe hasło; hasło "
+"tymczasowe jest Twoim obecnym hasłem."
 
 msgid "Current password"
 msgstr "Obecne hasło"
@@ -700,9 +863,6 @@ msgstr "Wyloguj inne urządzenia"
 msgid "Workspace name"
 msgstr "Nazwa obszaru roboczego"
 
-msgid "Create account"
-msgstr "Utwórz konto"
-
 msgid "Already have an account?"
 msgstr "Masz już konto?"
 
@@ -720,9 +880,6 @@ msgstr ""
 
 msgid "Setup token"
 msgstr "Token konfiguracji"
-
-msgid "Administrator"
-msgstr "Administrator"
 
 msgid "Defaults to your display name."
 msgstr "Domyślnie Twoja wyświetlana nazwa."

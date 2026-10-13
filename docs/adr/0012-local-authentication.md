@@ -144,3 +144,14 @@ ADR-0015 adds reverse-proxy header authentication. For local authentication this
 - **Migrations on SQLite** run with foreign-key enforcement off and check `PRAGMA
   foreign_key_check` before committing, so rebuilding a referenced table (batch mode) cannot
   cascade-delete the rows that point at it.
+- **Administrator actions** (activate, deactivate, promote, demote, create an account) go
+  through the same confirmation entry point as profile actions. The change runs in the
+  confirming `BEGIN IMMEDIATE` transaction, which checks again that the actor is an active
+  instance administrator; self-deactivation, self-demotion and removing the last active
+  administrator are refused there, so two administrators acting on each other at once keep
+  one. Deactivation ends every session of the account (all sign-in methods).
+- **Temporary passwords.** An administrator-created account gets a generated password
+  (`secrets.token_urlsafe`, 16 characters, checked against the password policy) shown once in
+  the response and never stored in readable form, logged or audited. `users.must_change_password`
+  (migration 0008) then limits that account's password sessions to the password page and
+  signing out until the password changes; OIDC and proxy sessions are not limited.

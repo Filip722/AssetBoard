@@ -220,6 +220,10 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   everywhere) are confirmed with the password, or without one by a sign-in from the last
   10 minutes (ADR-0012 amendment).
 - Instance admin page: users list, activate/deactivate, promote/demote instance admin, create user with temporary password.
+  Every action is confirmed by the acting administrator (password, or a fresh external
+  sign-in). The temporary password is generated and shown once; the account must change it
+  before anything else and starts without a workspace (it sees the "no workspace" page until
+  it is invited). Account creation is not offered under `OIDC_ONLY`.
 - Audit log page (owner/instance admin): filterable list of `AuditEvent`s; auth and membership events appear.
 - Deactivated users cannot log in and their sessions are revoked.
 

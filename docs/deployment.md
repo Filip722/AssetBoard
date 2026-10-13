@@ -199,6 +199,15 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### F1.5: profile (part 2)
+
+- **Account administration** at "Users" (instance administrators): activate, deactivate,
+  promote and demote accounts, each confirmed with the administrator's password. Deactivating
+  ends every session of that account.
+- **Create accounts with a temporary password** (not under `ASSETBOARD_OIDC_ONLY`). The
+  migration adds `users.must_change_password` (false for existing accounts); such accounts can
+  only change their password after signing in with it. See [docs/accounts.md](accounts.md).
+
 ### F1.5: profile (part 1)
 
 - **Language follows the browser.** The migration makes `users.locale` optional and clears it

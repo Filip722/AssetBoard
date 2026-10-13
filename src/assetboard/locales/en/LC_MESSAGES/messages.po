@@ -119,7 +119,59 @@ msgstr ""
 msgid "The sign-in method was removed from your account."
 msgstr ""
 
+msgid "Activate account"
+msgstr ""
+
+msgid "Deactivate account"
+msgstr ""
+
+msgid "Make instance administrator"
+msgstr ""
+
+msgid "Remove instance administrator"
+msgstr ""
+
+#, python-format
+msgid "%(user)s can sign in again."
+msgstr ""
+
+#, python-format
+msgid ""
+"%(user)s can no longer sign in, and every session of this account ends "
+"now: password, identity provider and proxy sign-ins alike."
+msgstr ""
+
+#, python-format
+msgid "%(user)s can manage every account on this instance."
+msgstr ""
+
+#, python-format
+msgid "%(user)s can no longer manage accounts on this instance."
+msgstr ""
+
+msgid "Done."
+msgstr ""
+
+msgid "Nothing to change: the account is already in that state."
+msgstr ""
+
+msgid ""
+"You cannot deactivate your own account or remove your own administrator "
+"role."
+msgstr ""
+
+msgid "This is the last active administrator, so this would leave none."
+msgstr ""
+
+msgid ""
+"The identity provider decides this at each sign-in; to change it, change "
+"the group there."
+msgstr ""
+
 msgid "Enter a valid email address."
+msgstr ""
+
+msgid "An account with this email address already exists."
 msgstr ""
 
 msgid "Use at least 10 characters for the password."
@@ -147,6 +199,9 @@ msgid "The setup token is not correct."
 msgstr ""
 
 msgid "The new passwords do not match."
+msgstr ""
+
+msgid "Choose a new password that differs from the current one."
 msgstr ""
 
 msgid "The current password is not correct."
@@ -225,6 +280,14 @@ msgid "Starting up"
 msgstr ""
 
 msgid "The application is starting. Try again in a moment."
+msgstr ""
+
+msgid "Change your password first"
+msgstr ""
+
+msgid ""
+"Your account has a temporary password. Choose a new password before doing"
+" anything else."
 msgstr ""
 
 msgid ""
@@ -400,6 +463,9 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
+msgid "Users"
+msgstr ""
+
 msgid "Profile"
 msgstr ""
 
@@ -544,6 +610,90 @@ msgstr ""
 msgid "Link this proxy sign-in"
 msgstr ""
 
+msgid "Back to users"
+msgstr ""
+
+msgid "Account created"
+msgstr ""
+
+#, python-format
+msgid ""
+"The account %(email)s was created. Give this temporary password to "
+"%(name)s; it is shown only now and must be changed at the first sign-in."
+msgstr ""
+
+msgid "Create an account"
+msgstr ""
+
+msgid ""
+"The account gets a temporary password, shown once after you create it. It"
+" must be changed at the first sign-in. The account starts without a "
+"workspace: invite it to one."
+msgstr ""
+
+msgid "Email"
+msgstr ""
+
+msgid "Create account"
+msgstr ""
+
+msgid "Account"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Last sign-in"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Identity provider"
+msgstr ""
+
+msgid "Proxy"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Deactivated"
+msgstr ""
+
+msgid "Administrator"
+msgstr ""
+
+msgid "Not an administrator"
+msgstr ""
+
+msgid "(from the identity provider)"
+msgstr ""
+
+msgid "Temporary password"
+msgstr ""
+
+msgid "Never"
+msgstr ""
+
+msgid "Deactivate"
+msgstr ""
+
+msgid "Activate"
+msgstr ""
+
+msgid "Remove administrator"
+msgstr ""
+
+msgid "Make administrator"
+msgstr ""
+
+msgid "You"
+msgstr ""
+
 msgid "Link your account"
 msgstr ""
 
@@ -557,9 +707,6 @@ msgid ""
 msgstr ""
 
 msgid "This signs the account out on all other devices."
-msgstr ""
-
-msgid "Password"
 msgstr ""
 
 msgid "Link and sign in"
@@ -579,13 +726,7 @@ msgstr ""
 msgid "or sign in with your password"
 msgstr ""
 
-msgid "Email"
-msgstr ""
-
 msgid "No account yet?"
-msgstr ""
-
-msgid "Create an account"
 msgstr ""
 
 msgid "Sign-in"
@@ -605,6 +746,11 @@ msgid "You are signed out here. Signing you out of %(provider)s too…"
 msgstr ""
 
 msgid "Change password"
+msgstr ""
+
+msgid ""
+"You signed in with a temporary password. Choose a new password to "
+"continue; the temporary one is your current password."
 msgstr ""
 
 msgid "Current password"
@@ -631,9 +777,6 @@ msgstr ""
 msgid "Workspace name"
 msgstr ""
 
-msgid "Create account"
-msgstr ""
-
 msgid "Already have an account?"
 msgstr ""
 
@@ -647,9 +790,6 @@ msgid ""
 msgstr ""
 
 msgid "Setup token"
-msgstr ""
-
-msgid "Administrator"
 msgstr ""
 
 msgid "Defaults to your display name."

@@ -1440,3 +1440,16 @@ def test_display_names_refuse_control_and_format_characters(name: str) -> None:
 def test_display_names_are_trimmed_and_inner_whitespace_collapsed() -> None:
     assert normalize_display_name("  Ola   Nowak ") == "Ola Nowak"
     assert normalize_display_name("Żaneta Łęcka") == "Żaneta Łęcka"
+
+
+def test_change_password_refuses_the_current_password_as_the_new_one(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    user = _create_user(db_session, auth_settings, fixed_clock)
+    old_hash = user.password_hash
+    unchanged = change_password(
+        db_session, user, PASSWORD, PASSWORD, settings=auth_settings, clock=fixed_clock
+    )
+    assert unchanged.status == "invalid_new"
+    assert unchanged.error is not None and unchanged.error.code == "password_unchanged"
+    assert user.password_hash == old_hash

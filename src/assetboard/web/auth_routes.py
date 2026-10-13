@@ -92,6 +92,7 @@ ERROR_MESSAGES = {
     "too_long": _("This value is too long."),
     "setup_token": _("The setup token is not correct."),
     "password_mismatch": _("The new passwords do not match."),
+    "password_unchanged": _("Choose a new password that differs from the current one."),
     "current_password_invalid": _("The current password is not correct."),
     "invalid": _("Check the details and try again."),
 }

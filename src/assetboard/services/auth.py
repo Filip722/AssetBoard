@@ -1043,6 +1043,11 @@ def _change_password_flow(
         return PasswordChangeOutcome(status="invalid_current")
 
     try:
+        if new_password == current_password:
+            # Never "changed" to itself; this matters most for a temporary password (F1.5).
+            raise PasswordPolicyError(
+                "password_unchanged", "The new password must differ from the current one"
+            )
         validate_password(new_password, candidate.email, candidate.display_name)
     except PasswordPolicyError as exc:
         run(lambda session: _reset_account(session, candidate.email, clock.now()))
@@ -1060,6 +1065,7 @@ def _change_password_flow(
             # Changed concurrently (another device or the CLI); do not overwrite it.
             return PasswordChangeOutcome(status="invalid_current")
         user.password_hash = new_hash
+        user.must_change_password = False  # a temporary password is replaced (F1.5)
         keep_hash = session_id_hash(current_session_id) if current_session_id else None
         revoked = _delete_sessions_except(session, user.id, keep_hash)
         _audit(
@@ -1882,6 +1888,35 @@ def default_workspace_options(settings: Settings) -> WorkspaceOptions:
     )
 
 
+def create_user_with_temporary_password(
+    session: Session,
+    *,
+    email: str,
+    display_name: str,
+    password: str,
+    password_hash: str,
+    settings: Settings,
+) -> User:
+    """An account an administrator creates (F1.5): no workspace, ``must_change_password`` set.
+
+    The password is hashed by the caller, outside the write transaction; the policy and the
+    display-name rule are checked here like for any other account.
+    """
+    user, _workspace = _create_user_records(
+        session,
+        email=email,
+        display_name=display_name,
+        password=password,
+        workspace_name=None,
+        options=None,
+        settings=settings,
+        is_admin=False,
+        password_hash=password_hash,
+    )
+    user.must_change_password = True
+    return user
+
+
 def create_passwordless_user(
     session: Session,
     *,
@@ -2095,6 +2130,7 @@ class WebSession:
     current_workspace_id: UUID | None = None
     auth_method: str = "password"
     theme: str = "system"
+    must_change_password: bool = False
 
 
 def read_web_session(
@@ -2123,6 +2159,7 @@ def read_web_session(
         current_workspace_id=row.current_workspace_id,
         auth_method=row.auth_method,
         theme=user.theme,
+        must_change_password=user.must_change_password,
     )
 
 

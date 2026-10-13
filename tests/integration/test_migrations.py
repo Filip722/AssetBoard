@@ -382,3 +382,53 @@ def test_0007_round_trip_makes_the_user_locale_nullable_and_keeps_every_row(
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0008_round_trip_adds_must_change_password_and_keeps_every_row(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f15b.db'}"
+    )
+    upgrade_database(settings)
+    command.downgrade(alembic_config(settings), "0007_f15")
+    engine = create_database_engine(settings.database_url or "")
+    user_id = "00000000000000000000000000000001"
+    stamp = "'2026-01-01 00:00:00'"
+
+    def counts() -> tuple[int, int]:
+        with engine.connect() as connection:
+            users = connection.exec_driver_sql("SELECT count(*) FROM users").scalar_one()
+            sessions = connection.exec_driver_sql("SELECT count(*) FROM user_sessions").scalar_one()
+            return users, sessions
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, theme, is_active, "
+                f"is_instance_admin, created_at, updated_at) VALUES (?, 'a@example.com', 'A', "
+                f"'system', 1, 0, {stamp}, {stamp})",
+                (user_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO user_sessions (id_hash, user_id, created_at, last_seen_at, "
+                f"expires_at, auth_method) VALUES (?, ?, {stamp}, {stamp}, "
+                "'2026-02-01 00:00:00', 'password')",
+                ("a" * 64, user_id),
+            )
+        upgrade_database(settings)
+        assert counts() == (1, 1)
+        columns = {c["name"]: c for c in inspect(engine).get_columns("users")}
+        assert columns["must_change_password"]["nullable"] is False
+        with engine.connect() as connection:
+            flag = connection.exec_driver_sql("SELECT must_change_password FROM users")
+            assert flag.scalar_one() == 0  # existing accounts: false
+
+        command.downgrade(alembic_config(settings), "0007_f15")
+        assert counts() == (1, 1)
+        assert "must_change_password" not in {
+            c["name"] for c in inspect(engine).get_columns("users")
+        }
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()

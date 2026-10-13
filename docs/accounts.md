@@ -41,3 +41,30 @@ Linking, removing a sign-in method and signing out other devices ask for confirm
   are for starting the link; finishing the sign-in at the provider may take up to 10 more
   minutes. This is weaker than a password: anyone holding your signed-in browser during those
   minutes could make the change.
+
+## Managing accounts (instance administrators)
+
+"Users" in the account menu lists every account with its sign-in methods (password, identity
+provider, proxy), its status and its last sign-in. Each change has its own confirmation page
+and is confirmed like a profile change: your password, or a sign-in from the last 10 minutes
+if your account has none.
+
+- **Deactivate**: the person can no longer sign in, and every session of the account ends at
+  once (password, identity provider and proxy sessions alike). **Activate** undoes it.
+  Deactivating the only owner of a workspace leaves that workspace without an active owner
+  until the account is activated again.
+- **Make administrator / Remove administrator**: instance administrators manage every account.
+  With `ASSETBOARD_OIDC_ADMIN_GROUP` set, the provider's group decides again at each OIDC
+  sign-in of that person ([docs/auth/oidc.md](auth/oidc.md#administrators-from-a-group)), so a
+  change made here lasts only until then; the Users page says so and marks those accounts
+  "(from the identity provider)". Deactivation does not depend on the group: a deactivated
+  account stays deactivated whatever the provider says.
+- You cannot deactivate yourself or remove your own administrator role, and the last active
+  administrator always stays.
+- **Create an account** (not under `ASSETBOARD_OIDC_ONLY`): enter an email and a display name.
+  A temporary password is generated and shown **once**, on the page that confirms the account;
+  it is not stored in readable form, logged or sent anywhere. Give it to the person. At the
+  first sign-in they can only change it (or sign out) until they choose a new password, which
+  must differ from the temporary one. An unused temporary password stays valid until it is
+  used or the account is deactivated. The new account has no workspace: until a workspace
+  owner invites it, it sees "Your account is not a member of any workspace".

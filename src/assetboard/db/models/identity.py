@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
@@ -44,6 +45,11 @@ class User(IdMixin, TimestampMixin, Base):
     theme: Mapped[str] = mapped_column(String(16), nullable=False, default="system")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Set for an account created by an administrator with a temporary password (F1.5): its
+    # password sessions can only change the password until it does.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
     @validates("email")
