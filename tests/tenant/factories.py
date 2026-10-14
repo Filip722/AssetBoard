@@ -8,16 +8,17 @@ Adding a workspace-owned model without an entry here fails
 
 from __future__ import annotations
 
+import itertools
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
-from assetboard.db.models.ledger import Category
+from assetboard.db.models.ledger import Category, MonthState
 from assetboard.services.invitations import new_token
 
 
@@ -80,10 +81,25 @@ def make_category(session: Session, workspace_id: UUID) -> Category:
     )
 
 
+# (workspace, month) is unique: each row gets its own month.
+_MONTHS = itertools.count()
+
+
+def make_month_state(session: Session, workspace_id: UUID) -> MonthState:
+    index = next(_MONTHS)
+    return MonthState(workspace_id=workspace_id, month=date(2000 + index // 12, 1 + index % 12, 1))
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     Membership: TenantCase(make_membership, update_values={"role": "editor"}),
     AuditEvent: TenantCase(make_audit_event, unsupported=frozenset({"update", "delete"})),
     # Invitations change only through named transitions (revoke, mark_used, ...).
     Invitation: TenantCase(make_invitation, unsupported=frozenset({"update", "delete"})),
     Category: TenantCase(make_category, update_values={"color": "#e11d48"}),
+    # Reopening clears the closed fields; rows are never deleted.
+    MonthState: TenantCase(
+        make_month_state,
+        update_values={"closed_at": datetime(2026, 1, 31, 12, tzinfo=UTC)},
+        unsupported=frozenset({"delete"}),
+    ),
 }

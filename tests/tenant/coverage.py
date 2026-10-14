@@ -33,6 +33,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         for method in ("create", "ordered", "active_by_name_key", "count")
     },
     **{
+        ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"
+        for method in ("for_month", "create")
+    },
+    **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
         for method in (
             "create",
@@ -54,6 +58,7 @@ READER_METHOD_COVERAGE: dict[str, str] = {
 CURRENT_WORKSPACE_METHOD_COVERAGE: dict[str, str] = {
     "get": "test_current_workspace_repository_touches_only_its_workspace",
     "update": "test_current_workspace_repository_touches_only_its_workspace",
+    "lock": "test_current_workspace_repository_touches_only_its_workspace",
 }
 
 # InstanceAuditReader reads only instance-level events (workspace_id IS NULL), never a

@@ -37,6 +37,7 @@ from assetboard.services.auth import (
 )
 from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import HashGate, HashGateBusy
+from assetboard.services.months import MonthClosed
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
 from assetboard.services.proxy_auth import RecentKeys
@@ -49,6 +50,8 @@ from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, 
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
 from assetboard.web.invite_routes import router as invite_router
+from assetboard.web.month_routes import MONTH_CLOSED_MESSAGE, MONTH_CLOSED_TITLE
+from assetboard.web.month_routes import router as month_router
 from assetboard.web.oidc_routes import router as oidc_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
@@ -173,6 +176,7 @@ def create_app(
     app.include_router(audit_router)
     app.include_router(workspace_router)
     app.include_router(category_router)
+    app.include_router(month_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)
     app.include_router(proxy_router)
@@ -221,6 +225,18 @@ def create_app(
             403,
             gettext("Access denied", locale),
             gettext("You do not have permission to view this page.", locale),
+        )
+
+    # Safety net (F2.5): a write refused because its month is closed, when the route did not
+    # handle it itself.
+    @app.exception_handler(MonthClosed)
+    async def handle_month_closed(request: Request, _exc: MonthClosed) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            409,
+            gettext(MONTH_CLOSED_TITLE, locale),
+            gettext(MONTH_CLOSED_MESSAGE, locale),
         )
 
     # A row of another workspace looks exactly like a missing one: same 404, no workspace hint.

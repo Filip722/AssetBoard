@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from uuid import UUID
 
-from sqlalchemy import CheckConstraint, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    Uuid,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
@@ -49,3 +60,24 @@ class Category(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+
+
+class MonthState(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """Per-month state of a workspace (F2.5): whether the month is closed.
+
+    ``month`` is the month's first day (as for budget lines). A row is created the first time a
+    month is closed; reopening clears ``closed_at`` and ``closed_by_user_id`` and keeps the row.
+    A month without a row is open. ``closed_by_user_id`` becomes NULL if the account is deleted,
+    while the month stays closed.
+    """
+
+    __tablename__ = "month_states"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "month", name="uq_month_states_workspace_month"),
+    )
+
+    month: Mapped[date] = mapped_column(Date(), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    closed_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

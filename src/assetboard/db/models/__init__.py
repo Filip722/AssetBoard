@@ -11,7 +11,7 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
-from assetboard.db.models.ledger import Category
+from assetboard.db.models.ledger import Category, MonthState
 
 __all__ = [
     "AuditEvent",
@@ -20,6 +20,7 @@ __all__ = [
     "ExternalIdentity",
     "Invitation",
     "Membership",
+    "MonthState",
     "SetupState",
     "User",
     "UserSession",

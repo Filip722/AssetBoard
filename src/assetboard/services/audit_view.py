@@ -85,6 +85,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "category.restored": ("name",),
     "category.deleted": ("name", "kind"),
     "category.seeded": ("count",),
+    "month.closed": ("month",),
+    "month.reopened": ("month",),
 }
 
 ACTION_LABELS: dict[str, str] = {
@@ -123,6 +125,8 @@ ACTION_LABELS: dict[str, str] = {
     "category.restored": _("Category restored"),
     "category.deleted": _("Category deleted"),
     "category.seeded": _("Suggested categories added"),
+    "month.closed": _("Month closed"),
+    "month.reopened": _("Month reopened"),
 }
 UNKNOWN_ACTION = _("Other event")
 # A failure while linking from the profile is not a refused sign-in.
@@ -155,6 +159,7 @@ KEY_LABELS: dict[str, str] = {
     "affected_transactions": _("Transactions affected"),
     "in_use": _("In use"),
     "count": _("Number"),
+    "month": _("Month"),
 }
 
 # Codes stored as values, with their texts, per kind of key: the same code can mean different
@@ -274,6 +279,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "category.deleted",
             "category.seeded",
         ),
+        "months": ("month.closed", "month.reopened"),
     },
     "instance": {
         "sign_in": ("auth.login_success", "auth.logout", "auth.register"),
@@ -304,6 +310,7 @@ GROUP_LABELS: dict[str, str] = {
     "invitations": _("Invitations"),
     "settings": _("Workspace settings"),
     "categories": _("Categories"),
+    "months": _("Closing months"),
     "sign_in": _("Sign-ins"),
     "failures": _("Failures"),
     "links": _("Linked sign-in methods"),

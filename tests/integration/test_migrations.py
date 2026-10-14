@@ -44,6 +44,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "external_identities",
         "invitations",
         "memberships",
+        "month_states",
         "setup_state",
         "user_sessions",
         "users",
@@ -477,6 +478,56 @@ def test_0009_round_trip_creates_categories_with_a_partial_unique_name_index(
 
         command.downgrade(alembic_config(settings), "0008_f15")
         assert "categories" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0010_round_trip_creates_month_states_unique_per_workspace_month(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f25.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    workspace_id, user_id = "0" * 31 + "1", "0" * 31 + "2"
+    stamp = "'2026-01-01 00:00:00'"
+
+    def insert(connection: Connection, row_id: str, closed_by: str | None = None) -> None:
+        connection.exec_driver_sql(
+            "INSERT INTO month_states (id, workspace_id, month, closed_at, closed_by_user_id, "
+            f"created_at, updated_at) VALUES (?, ?, '2026-10-01', {stamp}, ?, {stamp}, {stamp})",
+            (row_id, workspace_id, closed_by),
+        )
+
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                (workspace_id,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, theme, is_active, is_instance_admin, "
+                "must_change_password, created_at, updated_at) "
+                f"VALUES (?, 'a@example.com', 'A', 'system', 1, 0, 0, {stamp}, {stamp})",
+                (user_id,),
+            )
+            insert(connection, "0" * 31 + "a", closed_by=user_id)
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            insert(connection, "0" * 31 + "b")  # the same (workspace, month) again
+        with engine.begin() as connection:
+            connection.exec_driver_sql("DELETE FROM users WHERE id = ?", (user_id,))
+            closed = connection.exec_driver_sql(
+                "SELECT closed_at, closed_by_user_id FROM month_states"
+            ).one()
+        assert closed[0] is not None and closed[1] is None  # still closed, closer unknown
+
+        command.downgrade(alembic_config(settings), "0009_f21")
+        assert "month_states" not in inspect(engine).get_table_names()
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

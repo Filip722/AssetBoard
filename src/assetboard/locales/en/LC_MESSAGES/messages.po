@@ -220,6 +220,12 @@ msgstr ""
 msgid "Suggested categories added"
 msgstr ""
 
+msgid "Month closed"
+msgstr ""
+
+msgid "Month reopened"
+msgstr ""
+
 msgid "Other event"
 msgstr ""
 
@@ -299,6 +305,9 @@ msgid "In use"
 msgstr ""
 
 msgid "Number"
+msgstr ""
+
+msgid "Month"
 msgstr ""
 
 msgid "owner"
@@ -476,6 +485,9 @@ msgid "Workspace settings"
 msgstr ""
 
 msgid "Categories"
+msgstr ""
+
+msgid "Closing months"
 msgstr ""
 
 msgid "Sign-ins"
@@ -834,6 +846,29 @@ msgid "Viewer"
 msgstr ""
 
 msgid ""
+"This month is closed. Its entries and planned values cannot change until "
+"an owner reopens it."
+msgstr ""
+
+msgid "Enter a month as YYYY-MM, for example 2026-10."
+msgstr ""
+
+msgid "Future months cannot be closed; they stay open for planning."
+msgstr ""
+
+msgid "Month closed."
+msgstr ""
+
+msgid "Month reopened."
+msgstr ""
+
+msgid "This month was already closed."
+msgstr ""
+
+msgid "This month is already open."
+msgstr ""
+
+msgid ""
 "This sign-in expired, or another sign-in was started in a different tab. "
 "Start over."
 msgstr ""
@@ -946,9 +981,6 @@ msgid "Home"
 msgstr ""
 
 msgid "Main navigation"
-msgstr ""
-
-msgid "Month"
 msgstr ""
 
 msgid "Recurring"
@@ -1490,6 +1522,80 @@ msgid ""
 "To make this change, sign out and sign in again (with your identity "
 "provider, or by opening any page through your proxy). You then have 10 "
 "minutes."
+msgstr ""
+
+msgid "Closed"
+msgstr ""
+
+msgid "Months"
+msgstr ""
+
+#, python-format
+msgid "Previous month: %(month)s"
+msgstr ""
+
+msgid "Previous"
+msgstr ""
+
+#, python-format
+msgid "Next month: %(month)s"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
+msgid "Go to month"
+msgstr ""
+
+msgid "YYYY-MM"
+msgstr ""
+
+msgid "Go"
+msgstr ""
+
+msgid "This month is closed. Its entries and planned values are read-only."
+msgstr ""
+
+#, python-format
+msgid "Closed on %(date)s by %(name)s."
+msgstr ""
+
+#, python-format
+msgid "Closed on %(date)s by a former member."
+msgstr ""
+
+#, python-format
+msgid "Reopen %(month)s? Its entries and planned values can be changed again."
+msgstr ""
+
+msgid "Reopen month"
+msgstr ""
+
+msgid "Only an owner can reopen it."
+msgstr ""
+
+#, python-format
+msgid ""
+"Close %(month)s? Its entries and planned values become read-only until an"
+" owner reopens it."
+msgstr ""
+
+msgid "Close month"
+msgstr ""
+
+msgid "Closing protects the month from accidental changes."
+msgstr ""
+
+msgid "Future months stay open for planning."
+msgstr ""
+
+msgid "Nothing in this month yet"
+msgstr ""
+
+msgid "Entries and planned values for this month will appear here."
 msgstr ""
 
 msgid "People in this workspace"

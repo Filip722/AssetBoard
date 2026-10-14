@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input, empty_state with context %}
+{# The month page (F2.5): navigation, picker, closed state, close/reopen. F2.2-F2.4 fill the
+   ``month_body`` block with entries, planned values and the summary. No inline script or style. #}
+{% block title %}{{ month_heading }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 align-middle text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
+{% block content %}
+{% set nav_link = "inline-flex items-center gap-1 rounded-full border border-line bg-white px-3.5 py-2 text-sm font-medium hover:bg-canvas dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800" %}
+{% set nav_off = "inline-flex items-center gap-1 rounded-full border border-line px-3.5 py-2 text-sm font-medium opacity-50 dark:border-slate-800" %}
+<div class="space-y-6" data-month="{{ view.month }}">
+  {% if notice %}
+  <p class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status" data-notice>{{ notice }}</p>
+  {% endif %}
+  {% if error %}
+  <p class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-error>{{ error }}</p>
+  {% endif %}
+
+  <nav class="flex flex-wrap items-center gap-3" aria-label="{{ _('Months') }}" data-month-nav>
+    {% if view.prev %}
+    <a href="{{ scoped_url(request, 'month', month=view.prev|string) }}" rel="prev" class="{{ nav_link }}" data-month-prev aria-label="{{ _('Previous month: %(month)s', month=prev_name) }}"><span aria-hidden="true">‹</span>{{ _("Previous") }}</a>
+    {% else %}
+    <span class="{{ nav_off }}" aria-disabled="true"><span aria-hidden="true">‹</span>{{ _("Previous") }}</span>
+    {% endif %}
+    {% if view.next %}
+    <a href="{{ scoped_url(request, 'month', month=view.next|string) }}" rel="next" class="{{ nav_link }}" data-month-next aria-label="{{ _('Next month: %(month)s', month=next_name) }}">{{ _("Next") }}<span aria-hidden="true">›</span></a>
+    {% else %}
+    <span class="{{ nav_off }}" aria-disabled="true">{{ _("Next") }}<span aria-hidden="true">›</span></span>
+    {% endif %}
+    <a href="{{ scoped_url(request, 'month', month=view.current|string) }}" class="{{ nav_link }}" data-month-today{% if view.is_current %} aria-current="date"{% endif %}>{{ _("Today") }}</a>
+
+    {# Native month picker; desktop Firefox and Safari show a text box, so the server also
+       accepts 10.2026 and 10/2026, and the button submits without JavaScript. #}
+    <form method="get" action="{{ scoped_url(request, 'month_current') }}" class="flex items-center gap-2" data-month-picker>
+      <input type="hidden" name="from" value="{{ view.month }}">
+      <label for="month-picker" class="sr-only">{{ _("Go to month") }}</label>
+      <input id="month-picker" name="month" type="month" value="{{ view.month }}" placeholder="{{ _('YYYY-MM') }}" min="1900-01" max="2199-12"
+             class="rounded-full border border-line bg-white px-3.5 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+      <button type="submit" class="{{ nav_link }}">{{ _("Go") }}</button>
+    </form>
+  </nav>
+
+  {% if view.closed %}
+  <section class="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100" role="status" data-closed-banner>
+    <p class="font-semibold">{{ _("This month is closed. Its entries and planned values are read-only.") }}</p>
+    <p class="mt-1 text-sm">
+      {% if view.closed_by_name %}{{ _("Closed on %(date)s by %(name)s.", date=closed_on, name=view.closed_by_name) }}{% else %}{{ _("Closed on %(date)s by a former member.", date=closed_on) }}{% endif %}
+    </p>
+    {% if view.can_reopen %}
+    <form method="post" action="{{ scoped_url(request, 'month_reopen', month=view.month|string) }}" class="mt-3" data-confirm="{{ _('Reopen %(month)s? Its entries and planned values can be changed again.', month=month_name) }}">
+      {{ csrf_input() }}
+      <button type="submit" data-month-reopen class="rounded-xl border border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900 dark:text-amber-50 dark:hover:bg-amber-800">{{ _("Reopen month") }}</button>
+    </form>
+    {% else %}
+    <p class="mt-1 text-sm">{{ _("Only an owner can reopen it.") }}</p>
+    {% endif %}
+  </section>
+  {% elif view.can_close %}
+  <form method="post" action="{{ scoped_url(request, 'month_close', month=view.month|string) }}" class="flex flex-wrap items-center gap-3" data-confirm="{{ _('Close %(month)s? Its entries and planned values become read-only until an owner reopens it.', month=month_name) }}">
+    {{ csrf_input() }}
+    <button type="submit" data-month-close class="rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">{{ _("Close month") }}</button>
+    <span class="text-xs text-muted dark:text-slate-400">{{ _("Closing protects the month from accidental changes.") }}</span>
+  </form>
+  {% elif view.is_future %}
+  <p class="text-sm text-muted dark:text-slate-400" data-future-note>{{ _("Future months stay open for planning.") }}</p>
+  {% endif %}
+
+  {% block month_body %}
+  {{ empty_state(_("Nothing in this month yet"), _("Entries and planned values for this month will appear here.")) }}
+  {% endblock %}
+</div>
+{% endblock %}

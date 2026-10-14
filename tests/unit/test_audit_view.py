@@ -124,3 +124,19 @@ def test_every_category_action_has_a_label_keys_and_a_group() -> None:
     texts += [*VALUE_TABLES["kind"].values(), *VALUE_TABLES["treatment"].values()]
     for text in texts:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
+
+
+# Month events (F2.5)
+
+MONTH_ACTIONS = {"month.closed", "month.reopened"}
+
+
+def test_every_month_action_has_a_label_keys_and_a_group() -> None:
+    assert {a for a in ACTION_LABELS if a.startswith("month.")} == MONTH_ACTIONS
+    assert set(GROUPS["workspace"]["months"]) == MONTH_ACTIONS
+    keys = {key for action in MONTH_ACTIONS for key in DATA_KEYS[action]}
+    assert keys == {"month"} and keys <= set(KEY_LABELS)
+    texts = [ACTION_LABELS[a] for a in MONTH_ACTIONS] + [KEY_LABELS["month"]]
+    texts.append(GROUP_LABELS["months"])
+    for text in texts:
+        assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"

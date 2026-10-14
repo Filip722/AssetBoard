@@ -80,6 +80,20 @@ F2.1) does this with `editor`; `services/workspaces.py` still uses its own owner
 The workspace row itself is changed only through `CurrentWorkspaceRepository`, which reads and
 updates `ctx.workspace.id` and only the fields in `UPDATABLE_FIELDS`.
 
+### Closed months (F2.5)
+
+A write to a month's data (transactions, planned values) calls
+`services.months.ensure_month_open(session, ctx, month)` (or `ensure_date_open` for a date) in
+its write transaction, right after `require_role_now` and before changing anything; it raises
+`MonthClosed` for a closed month (the app answers 409 if a route does not handle it). Writers are
+serialised on SQLite by `BEGIN IMMEDIATE`. PostgreSQL does not queue writers at `BEGIN`, so the
+guard takes a shared lock on the workspace row (`services.months.lock_month_writes`) and closing
+or reopening takes an exclusive one (`CurrentWorkspaceRepository.lock`). **Lock order:** the
+workspace row first, before any other row, in every transaction that takes it. A write that
+reads stored rows to learn which months it touches (editing a transaction reads its old date;
+bulk changes read the selected rows) calls `lock_month_writes` **before** those reads, then the
+guard for every month; taking the lock again is harmless.
+
 ## How to add a new workspace-owned model
 
 `Invitation` (F1.2) is a worked example: `WorkspaceScopedMixin`, migration `0004_f12`,

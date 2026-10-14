@@ -48,7 +48,7 @@ A self-hosted web app that replaces a personal finance spreadsheet (monthly inco
 ### 3.4 Months
 - A "month" is a calendar month in the workspace timezone. Month pages are created lazily; nothing is "copied" like spreadsheet tabs.
 - Budget (planned) lines are per (month, category). Opening a month with no budget lines offers/does carry-forward from the previous month.
-- A month can be **closed** (read-only for editors) to prevent accidental edits; owners can reopen.
+- A month can be **closed** to prevent accidental edits: its entries and planned values are then read-only for everyone, owners included. Editors and owners can close the current or a past month; only owners can reopen (F2.5).
 
 ### 3.5 Variance convention
 Positive variance is always *favorable*:

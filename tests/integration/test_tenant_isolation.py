@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -41,11 +41,13 @@ from assetboard.db.repositories import (
     InvitationRepository,
     InvitationTokenReader,
     MembershipRepository,
+    MonthStateRepository,
     NotFound,
     ScopedRepository,
     UserMembershipReader,
 )
 from assetboard.db.repositories.base import models_marked_workspace_owned, repositories_for
+from assetboard.domain.months import YearMonth
 from tests.tenant.coverage import (
     BASE_METHOD_COVERAGE,
     CURRENT_WORKSPACE_METHOD_COVERAGE,
@@ -363,6 +365,16 @@ def test_current_workspace_repository_touches_only_its_workspace(
     db_session.expire_all()
     assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
 
+    # lock (F2.5) reads only its own workspace's row, and refuses a workspace that is gone.
+    a_repo.lock(exclusive=False)
+    b_repo.lock(exclusive=True)
+    gone = CurrentWorkspaceRepository(
+        db_session, context_for(uuid4(), FixedClock("2026-01-01T00:00:00+00:00"))
+    )
+    with pytest.raises(NotFound):
+        gone.lock(exclusive=False)
+    assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
+
 
 def test_invitation_transitions_stay_in_their_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
@@ -452,6 +464,24 @@ def test_category_queries_stay_in_their_workspace(
     assert in_b.active_by_name_key(kind="expense", name_key="food") is b_food
     assert in_b.active_by_name_key(kind="income", name_key="salary") is None
     assert (in_a.count(), in_b.count()) == (2, 1)
+
+
+def test_month_state_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = MonthStateRepository(db_session, ctx_a), MonthStateRepository(db_session, ctx_b)
+    october, november = YearMonth(2026, 10), YearMonth(2026, 11)
+
+    a_october = in_a.create(october)
+    assert (a_october.workspace_id, a_october.month) == (ctx_a.workspace.id, date(2026, 10, 1))
+    assert in_a.for_month(october) is a_october
+    assert in_b.for_month(october) is None  # another workspace's month is not seen
+    assert in_a.for_month(november) is None
+    b_october = in_b.create(october)  # the same month in another workspace is no clash
+    assert b_october.workspace_id == ctx_b.workspace.id
+    assert in_b.for_month(october) is b_october
+    assert in_a.for_month(october) is a_october
 
 
 # Method coverage (#11)

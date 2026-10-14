@@ -202,6 +202,12 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: month pages (F2.5)
+
+- **Month pages** at "Month" in the main navigation (`/m`, `/m/YYYY-MM`); see
+  [docs/months.md](months.md). The migration adds the `month_states` table and changes no
+  existing data. No new setting. "Today" follows each workspace's time zone setting.
+
 ### Unreleased: categories (F2.1)
 
 - **Categories page** at "Categories" in the main navigation; see

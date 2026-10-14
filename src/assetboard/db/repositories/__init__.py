@@ -20,6 +20,7 @@ from assetboard.db.repositories.invitation import (
     InvitationTokenReader,
 )
 from assetboard.db.repositories.membership import MembershipRepository, WorkspaceMember
+from assetboard.db.repositories.month_state import MonthStateRepository
 from assetboard.db.repositories.user_memberships import MembershipView, UserMembershipReader
 from assetboard.db.repositories.workspace import UPDATABLE_FIELDS, CurrentWorkspaceRepository
 
@@ -37,6 +38,7 @@ __all__ = [
     "InvitationTokenReader",
     "MembershipRepository",
     "MembershipView",
+    "MonthStateRepository",
     "NotFound",
     "RepositoryError",
     "ScopedRepository",

@@ -12,6 +12,12 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Data model (sketch):** `ImportBatch(id, workspace_id, kind, filename, file_sha256, started_by, started_at, finished_at?, status[dry_run|imported|rolled_back], report JSON)`; `Transaction.import_batch_id`; for dedupe, `Transaction.import_key` (hash of sheet name + row index + normalized values), unique per workspace when not null.
 
+**Open question: closed months (from F2.5).** Months can be closed (read-only for everyone until
+an owner reopens them). Importing into a closed month, and rolling back a batch with rows in
+one, must go through `services.months` (`lock_month_writes`, then `ensure_month_open` per month).
+Whether such rows **refuse the whole import** or are **skipped and reported** in the dry-run is
+undecided: decide in M4's plan.
+
 **Layout of the source workbook (as observed; the importer must be tolerant)**
 - Month sheets are named like `08.26`, `01.2025`, `1.2024` (month `M`/`MM`, then 2- or 4-digit year); many are **hidden** (import hidden sheets too); sheet order is not chronological.
 - Expenses block: columns B–E = day of month, amount, description, category (header row 3, data from row 4). Income block: columns G–J = day, amount, description, category.

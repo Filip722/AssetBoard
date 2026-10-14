@@ -223,6 +223,12 @@ msgstr "Usunięto kategorię"
 msgid "Suggested categories added"
 msgstr "Dodano proponowane kategorie"
 
+msgid "Month closed"
+msgstr "Miesiąc zamknięty"
+
+msgid "Month reopened"
+msgstr "Miesiąc otwarty ponownie"
+
 msgid "Other event"
 msgstr "Inne zdarzenie"
 
@@ -303,6 +309,9 @@ msgstr "W użyciu"
 
 msgid "Number"
 msgstr "Liczba"
+
+msgid "Month"
+msgstr "Miesiąc"
 
 msgid "owner"
 msgstr "właściciel"
@@ -480,6 +489,9 @@ msgstr "Ustawienia obszaru roboczego"
 
 msgid "Categories"
 msgstr "Kategorie"
+
+msgid "Closing months"
+msgstr "Zamykanie miesięcy"
 
 msgid "Sign-ins"
 msgstr "Logowania"
@@ -877,6 +889,31 @@ msgid "Viewer"
 msgstr "Przeglądający"
 
 msgid ""
+"This month is closed. Its entries and planned values cannot change until "
+"an owner reopens it."
+msgstr ""
+"Ten miesiąc jest zamknięty. Jego wpisów i wartości planowanych nie można "
+"zmieniać, dopóki właściciel go ponownie nie otworzy."
+
+msgid "Enter a month as YYYY-MM, for example 2026-10."
+msgstr "Wpisz miesiąc w formacie RRRR-MM, na przykład 2026-10."
+
+msgid "Future months cannot be closed; they stay open for planning."
+msgstr "Przyszłych miesięcy nie można zamykać; pozostają otwarte do planowania."
+
+msgid "Month closed."
+msgstr "Miesiąc zamknięty."
+
+msgid "Month reopened."
+msgstr "Miesiąc otwarty ponownie."
+
+msgid "This month was already closed."
+msgstr "Ten miesiąc był już zamknięty."
+
+msgid "This month is already open."
+msgstr "Ten miesiąc jest już otwarty."
+
+msgid ""
 "This sign-in expired, or another sign-in was started in a different tab. "
 "Start over."
 msgstr ""
@@ -1017,9 +1054,6 @@ msgstr "Strona główna"
 
 msgid "Main navigation"
 msgstr "Menu główne"
-
-msgid "Month"
-msgstr "Miesiąc"
 
 msgid "Recurring"
 msgstr "Cykliczne"
@@ -1595,6 +1629,86 @@ msgstr ""
 "Aby wprowadzić tę zmianę, wyloguj się i zaloguj ponownie (przez dostawcę "
 "tożsamości albo otwierając dowolną stronę przez serwer proxy). Potem masz"
 " na to 10 minut."
+
+msgid "Closed"
+msgstr "Zamknięty"
+
+msgid "Months"
+msgstr "Miesiące"
+
+#, python-format
+msgid "Previous month: %(month)s"
+msgstr "Poprzedni miesiąc: %(month)s"
+
+msgid "Previous"
+msgstr "Poprzedni"
+
+#, python-format
+msgid "Next month: %(month)s"
+msgstr "Następny miesiąc: %(month)s"
+
+msgid "Next"
+msgstr "Następny"
+
+msgid "Today"
+msgstr "Dzisiaj"
+
+msgid "Go to month"
+msgstr "Przejdź do miesiąca"
+
+msgid "YYYY-MM"
+msgstr "RRRR-MM"
+
+msgid "Go"
+msgstr "Przejdź"
+
+msgid "This month is closed. Its entries and planned values are read-only."
+msgstr ""
+"Ten miesiąc jest zamknięty. Jego wpisy i wartości planowane są tylko do "
+"odczytu."
+
+#, python-format
+msgid "Closed on %(date)s by %(name)s."
+msgstr "Zamknięty %(date)s przez: %(name)s."
+
+#, python-format
+msgid "Closed on %(date)s by a former member."
+msgstr "Zamknięty %(date)s przez byłego członka."
+
+#, python-format
+msgid "Reopen %(month)s? Its entries and planned values can be changed again."
+msgstr ""
+"Otworzyć ponownie miesiąc %(month)s? Jego wpisy i wartości planowane "
+"będzie można znowu zmieniać."
+
+msgid "Reopen month"
+msgstr "Otwórz miesiąc ponownie"
+
+msgid "Only an owner can reopen it."
+msgstr "Tylko właściciel może go ponownie otworzyć."
+
+#, python-format
+msgid ""
+"Close %(month)s? Its entries and planned values become read-only until an"
+" owner reopens it."
+msgstr ""
+"Zamknąć miesiąc %(month)s? Jego wpisy i wartości planowane będą tylko do "
+"odczytu, dopóki właściciel go ponownie nie otworzy."
+
+msgid "Close month"
+msgstr "Zamknij miesiąc"
+
+msgid "Closing protects the month from accidental changes."
+msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
+
+msgid "Future months stay open for planning."
+msgstr "Przyszłe miesiące pozostają otwarte do planowania."
+
+msgid "Nothing in this month yet"
+msgstr "W tym miesiącu nic jeszcze nie ma"
+
+msgid "Entries and planned values for this month will appear here."
+msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
