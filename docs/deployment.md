@@ -120,7 +120,7 @@ After the first release has been published and the GHCR package has been made pu
 `ASSETBOARD_IMAGE` to a published version tag and start Compose without building locally:
 
 ```bash
-export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.1.0 # x-release-please-version
+export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.2.0 # x-release-please-version
 docker compose -f compose.example.yaml up -d --no-build
 ```
 
