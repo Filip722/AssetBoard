@@ -118,8 +118,9 @@ Both commands write an audit event with the CLI as the actor.
 
 ## Run a published image
 
-After the first release has been published and the GHCR package has been made public, set
-`ASSETBOARD_IMAGE` to a published version tag and start Compose without building locally:
+Release images are published on GHCR as `ghcr.io/lexanderpl/assetboard` for `linux/amd64` and
+`linux/arm64` (see [Image tags](#image-tags)). Set `ASSETBOARD_IMAGE` to a version tag and start
+Compose without building locally:
 
 ```bash
 export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.2.0 # x-release-please-version

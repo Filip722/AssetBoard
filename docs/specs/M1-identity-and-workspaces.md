@@ -2,7 +2,7 @@
 
 **Goal:** secure multi-user foundation before any financial feature exists, so tenant scoping is never retrofitted.
 
-**Exit criteria:** first-run setup creates an admin + workspace; users can log in locally or via OIDC; roles are enforced; an automated test proves no cross-workspace data access for every workspace-owned model. TOTP MFA is explicitly out of scope for M1 and is moved to the post-1.0 backlog; use OIDC or reverse-proxy auth backed by an IdP that supports MFA until then.
+**Exit criteria:** first-run setup creates an admin + workspace; users can log in locally or via OIDC; roles are enforced; an automated test proves no cross-workspace data access for every workspace-owned model. TOTP MFA is explicitly out of scope for M1 and is moved to the [post-1.0 backlog](backlog-post-1.0.md); use OIDC or reverse-proxy auth backed by an IdP that supports MFA until then.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -95,7 +95,7 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - Changing the base currency is allowed for now; M2 must block or convert once amounts exist.
 - Removing a member does not revoke their sessions: the Context checks membership on every
   request.
-- Backlog: workspace deletion, ownership transfer, leaving a workspace, and F1.6 TOTP second factor; revisit after 1.0; until then use OIDC or proxy auth with an IdP that supports MFA.
+- Backlog: workspace deletion, ownership transfer, leaving a workspace, and F1.6 TOTP second factor; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)); until then use OIDC or proxy auth with an IdP that supports MFA.
 - B2 (invitations), see ADR-0013:
   - Tokens are 256-bit, stored as SHA-256, single use; expiry is 1, 7 (default) or 30 days;
     at most 50 pending invitations per workspace.
