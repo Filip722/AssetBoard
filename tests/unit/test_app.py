@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from alembic import command
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from fastapi import HTTPException
@@ -375,3 +376,47 @@ def test_dummy_hash_is_computed_once_at_startup_before_any_request(
         assert next(iter(cached.values())).startswith("$argon2id$")
         auth.prepare_dummy_hash()  # later callers reuse it
         assert auth._cached_dummy_hashes == cached  # pyright: ignore[reportPrivateUsage]
+
+
+class _Lines(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.lines: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.lines.append(record.getMessage())
+
+
+def _startup_migration_lines(settings: Settings) -> list[str]:
+    logger = logging.getLogger("assetboard")
+    handler = _Lines()
+    logger.addHandler(handler)
+    try:
+        with TestClient(create_app(settings)):
+            pass
+    finally:
+        logger.removeHandler(handler)
+    return [line for line in handler.lines if "database migrations applied" in line]
+
+
+def test_startup_migrations_log_one_line_with_the_revisions(tmp_path: Path) -> None:
+    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    head = ",".join(sorted(ScriptDirectory.from_config(alembic_config(settings)).get_heads()))
+    # A new database.
+    assert _startup_migration_lines(settings) == [
+        f"database migrations applied at startup: empty -> {head}"
+    ]
+    # Already current: nothing to apply, nothing logged.
+    assert _startup_migration_lines(settings) == []
+    # An older database (as 0.1.0 left it).
+    command.downgrade(alembic_config(settings), "0001_f03")
+    assert _startup_migration_lines(settings) == [
+        f"database migrations applied at startup: 0001_f03 -> {head}"
+    ]
+
+
+def test_no_migration_line_when_automatic_migration_is_off(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-secret", auto_migrate=False
+    )
+    assert _startup_migration_lines(settings) == []

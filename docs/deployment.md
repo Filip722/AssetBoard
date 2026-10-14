@@ -88,12 +88,14 @@ proof that the person controls that address, since email addresses are not verif
 ### Database schema state
 
 The schema is checked once at startup. With `ASSETBOARD_AUTO_MIGRATE=true` (the default) an older
-schema is upgraded first. With `ASSETBOARD_AUTO_MIGRATE=false` and an older schema, the process
-still starts but no setup token is created, `/readyz` returns 503 with
-`"database": "schema_outdated"`, and every page shows "The database needs an upgrade" with the
-instruction to run `assetboard migrate` and then restart. If the database was written by a newer
-version of AssetBoard, it is never changed: `/readyz` reports `"schema_newer"` and pages ask you to
-install that version or a later one. `/healthz` stays green in both cases.
+schema is upgraded first, and the log shows one line such as
+`database migrations applied at startup: 0001_f03 -> 0008_f15` (`empty` for a new database). With
+`ASSETBOARD_AUTO_MIGRATE=false` and an older schema, the process still starts but no setup token is
+created, `/readyz` returns 503 with `"database": "schema_outdated"`, and every page shows "The
+database needs an upgrade" with the instruction to run `assetboard migrate` and then restart. If
+the database was written by a newer version of AssetBoard, it is never changed: `/readyz` reports
+`"schema_newer"` and pages ask you to install that version or a later one. `/healthz` stays green
+in both cases.
 
 ## Administrator commands
 
@@ -212,8 +214,9 @@ when you intend to upload the image and its release tags.
   `assetboard.db-wal` and `assetboard.db-shm` beside it (copying the whole data directory is
   simplest).
 - **Migrations run on the first start.** `ASSETBOARD_AUTO_MIGRATE` is `true` by default (and in
-  `compose.example.yaml`). Migrations log nothing; `/readyz` returns
-  `{"status":"ok","database":"ready"}` once they have applied.
+  `compose.example.yaml`). `/readyz` returns `{"status":"ok","database":"ready"}` once they
+  have applied. 0.2.0 logs nothing for them; later versions log one line,
+  `database migrations applied at startup: <from> -> <to>`.
 - **Do not downgrade.** 0.1.0 cannot use the upgraded database. To go back, stop 0.2.0 and
   restore the backup instead.
 - **The first visit redirects to `/setup`.** Use the setup token from the log, or run

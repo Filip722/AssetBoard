@@ -41,28 +41,33 @@ def upgrade_database(settings: Settings) -> None:
 SchemaState = Literal["current", "behind", "ahead"]
 
 
+def current_revisions(settings: Settings) -> tuple[str, ...]:
+    """The database's Alembic revisions, without creating or changing it (empty: none yet)."""
+    database_url = configured_database_url(alembic_config(settings))
+    url = make_url(database_url)
+    if url.get_backend_name() == "sqlite":
+        database = url.database
+        if not database or database == ":memory:":
+            return ()
+        if not database.startswith("file:") and not Path(database).expanduser().is_file():
+            return ()
+    engine = create_engine(url)
+    try:
+        with engine.connect() as connection:
+            return tuple(sorted(MigrationContext.configure(connection).get_current_heads()))
+    finally:
+        engine.dispose()
+
+
 def schema_state(settings: Settings) -> SchemaState:
     """Compare the database with the migrations shipped in this code, without changing it.
 
     ``behind``: a missing or empty database, or older revisions (run ``migrate``).
     ``ahead``: the database has a revision this code does not know (a newer version wrote it).
     """
-    database_url = configured_database_url(alembic_config(settings))
-    url = make_url(database_url)
-    if url.get_backend_name() == "sqlite":
-        database = url.database
-        if not database or database == ":memory:":
-            return "behind"
-        if not database.startswith("file:") and not Path(database).expanduser().is_file():
-            return "behind"
+    current = set(current_revisions(settings))
     script = ScriptDirectory.from_config(alembic_config(settings))
     heads = set(script.get_heads())
-    engine = create_engine(url)
-    try:
-        with engine.connect() as connection:
-            current = set(MigrationContext.configure(connection).get_current_heads())
-    finally:
-        engine.dispose()
     if current == heads:
         return "current"
     known = {revision.revision for revision in script.walk_revisions()}

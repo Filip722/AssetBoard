@@ -18,7 +18,7 @@ from assetboard.branding import APP_NAME, CLI_NAME
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine, database_is_ready
-from assetboard.db.migrate import schema_state, upgrade_database
+from assetboard.db.migrate import current_revisions, schema_state, upgrade_database
 from assetboard.db.repositories import NotFound
 from assetboard.i18n import gettext
 from assetboard.logging import configure_logging
@@ -103,8 +103,15 @@ def create_app(
             # Decided once per process start; a restart picks up an upgraded database.
             state = schema_state(settings)
             if state == "behind" and settings.auto_migrate:
+                before = current_revisions(settings)
                 upgrade_database(settings)
                 state = "current"
+                # One line, so an operator can see that the upgrade happened (and from where).
+                logger.info(
+                    "database migrations applied at startup: %s -> %s",
+                    ",".join(before) or "empty",
+                    ",".join(current_revisions(settings)),
+                )
             app.state.schema_state = state
             if state == "current":
                 with session_factory() as session:
