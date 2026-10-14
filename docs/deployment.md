@@ -120,8 +120,8 @@ After the first release has been published and the GHCR package has been made pu
 `ASSETBOARD_IMAGE` to a published version tag and start Compose without building locally:
 
 ```bash
-ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.1.0 \
-  docker compose -f compose.example.yaml up -d --no-build
+export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.1.0 # x-release-please-version
+docker compose -f compose.example.yaml up -d --no-build
 ```
 
 ## Release automation credentials
@@ -199,12 +199,36 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
-### F1.5: profile (part 3)
+### Upgrading from 0.1.0 to 0.2.0
+
+- **`ASSETBOARD_TRUSTED_PROXIES` empty now trusts no proxy.** 0.1.0 trusted forwarded headers
+  from `127.0.0.1` when the setting was empty. If your reverse proxy runs on the same host and
+  connects over loopback, set `ASSETBOARD_TRUSTED_PROXIES=127.0.0.1`; otherwise set it to the
+  proxy's address or network. Without it, every visitor shares the proxy's address for sign-in
+  throttling.
+- **0.1.0 had no accounts.** 0.2.0 adds sign-in, workspaces, invitations, OIDC and proxy
+  sign-in, account administration and the audit log; the sections below describe each part.
+- **Back up first.** Stop the app and copy `<DATA_DIR>/assetboard.db`, together with any
+  `assetboard.db-wal` and `assetboard.db-shm` beside it (copying the whole data directory is
+  simplest).
+- **Migrations run on the first start.** `ASSETBOARD_AUTO_MIGRATE` is `true` by default (and in
+  `compose.example.yaml`). Migrations log nothing; `/readyz` returns
+  `{"status":"ok","database":"ready"}` once they have applied.
+- **Do not downgrade.** 0.1.0 cannot use the upgraded database. To go back, stop 0.2.0 and
+  restore the backup instead.
+- **The first visit redirects to `/setup`.** Use the setup token from the log, or run
+  `assetboard create-admin`, to create the first administrator.
+- **Start the app with `assetboard serve`** (as the image does). Uvicorn's own access log is off;
+  the app's `request_complete` log line records every request (see the 0.2.0 notes below).
+- **No new setting is required.** Every setting added in 0.2.0 has a default; see
+  [Environment variables](#environment-variables).
+
+### Audit log
 
 - **Audit log pages** at "Audit log: workspace" (workspace owners) and "Audit log: instance"
   (instance administrators); see [docs/accounts.md](accounts.md#audit-log). No migration.
 
-### F1.5: profile (part 2)
+### Account administration and temporary passwords
 
 - **Account administration** at "Users" (instance administrators): activate, deactivate,
   promote and demote accounts, each confirmed with the administrator's password. Deactivating
@@ -213,7 +237,7 @@ when you intend to upload the image and its release tags.
   migration adds `users.must_change_password` (false for existing accounts); such accounts can
   only change their password after signing in with it. See [docs/accounts.md](accounts.md).
 
-### F1.5: profile (part 1)
+### Profile, language and confirming changes
 
 - **Language follows the browser.** The migration makes `users.locale` optional and clears it
   for every existing account, which keeps today's behaviour (the browser's language). Set a
