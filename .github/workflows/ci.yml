@@ -54,8 +54,8 @@ jobs:
       - name: Run project checks
         run: uv run --locked make check
 
-      - name: Run Playwright shell smoke
-        run: ASSETBOARD_RUN_BROWSER_TESTS=1 uv run --locked pytest tests/browser/test_f04_smoke.py
+      - name: Run Playwright browser tests (shell smoke and OIDC sign-in)
+        run: ASSETBOARD_RUN_BROWSER_TESTS=1 uv run --locked pytest tests/browser
 
       - name: Verify generated assets are fresh
         run: |
