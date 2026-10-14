@@ -51,6 +51,11 @@ make check
 `http://127.0.0.1:8000`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and checks, and
 [docs/architecture.md](docs/architecture.md) for the layers and how workspace data is isolated.
 
+## User guides
+
+- [Your account](docs/accounts.md): profile, sign-in methods and the audit log.
+- [Categories](docs/categories.md): expense and income categories, savings and transfers.
+
 ## Roadmap
 
 See the [milestone roadmap](docs/specs/00-overview.md#5-roadmap-and-dependencies) and feature

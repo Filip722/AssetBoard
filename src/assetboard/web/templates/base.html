@@ -29,7 +29,8 @@
         <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
       </a>
       <nav class="mt-7 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:flex-1 lg:flex-col" aria-label="{{ _('Main navigation') }}">
-        <a class="nav-link" href="#month" aria-current="page"><span aria-hidden="true">◷</span>{{ _("Month") }}</a>
+        <a class="nav-link" href="#month"{% if not request.url.path.endswith("/categories") %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>
+        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %}><span aria-hidden="true">▦</span>{{ _("Categories") }}</a>{% endif %}
         <a class="nav-link" href="#recurring"><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>
         <a class="nav-link" href="#net-worth"><span aria-hidden="true">◇</span>{{ _("Net worth") }}</a>
         <a class="nav-link" href="#investments"><span aria-hidden="true">↗</span>{{ _("Investments") }}</a>

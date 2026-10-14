@@ -29,6 +29,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     ("AuditEventRepository", "page"): "test_audit_pages_stay_in_their_scope",
     ("MembershipRepository", "add_member"): "test_membership_queries_stay_in_their_workspace",
     **{
+        ("CategoryRepository", method): "test_category_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "active_by_name_key", "count")
+    },
+    **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
         for method in (
             "create",

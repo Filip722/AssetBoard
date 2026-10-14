@@ -34,6 +34,7 @@ from assetboard.db.repositories import (
     UPDATABLE_FIELDS,
     AuditEventRepository,
     AuditFilter,
+    CategoryRepository,
     CurrentWorkspaceRepository,
     ForeignWorkspace,
     InstanceAuditReader,
@@ -422,6 +423,35 @@ def test_invitation_token_reader_finds_only_the_matching_hash(
     assert found_b is not None and found_b.workspace_id == ctx_b.workspace.id
     assert reader.locate("0" * 64) is None
     assert reader.locate(a_invite.token_hash.upper()) is None
+
+
+def test_category_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = CategoryRepository(db_session, ctx_a), CategoryRepository(db_session, ctx_b)
+
+    def make(repository: CategoryRepository, name: str, kind: str = "expense") -> Any:
+        return repository.create(
+            name=name,
+            name_key=name.casefold(),
+            kind=kind,
+            treatment="regular",
+            color="#16a34a",
+            sort_order=0,
+        )
+
+    a_food, a_salary = make(in_a, "Food"), make(in_a, "Salary", "income")
+    b_food = make(in_b, "Food")  # the same name in another workspace is no clash
+    assert (a_food.workspace_id, b_food.workspace_id) == (ctx_a.workspace.id, ctx_b.workspace.id)
+    assert [c.id for c in in_a.ordered()] == [a_food.id, a_salary.id]
+    assert [c.id for c in in_a.ordered("income")] == [a_salary.id]
+    assert [c.id for c in in_b.ordered()] == [b_food.id]
+    assert in_b.ordered("income") == []
+    assert in_a.active_by_name_key(kind="expense", name_key="food") is a_food
+    assert in_b.active_by_name_key(kind="expense", name_key="food") is b_food
+    assert in_b.active_by_name_key(kind="income", name_key="salary") is None
+    assert (in_a.count(), in_b.count()) == (2, 1)
 
 
 # Method coverage (#11)

@@ -52,6 +52,72 @@ msgstr ""
 msgid "An unexpected error occurred. Please try again."
 msgstr ""
 
+msgid "Food"
+msgstr ""
+
+msgid "Eating out"
+msgstr ""
+
+msgid "Gifts"
+msgstr ""
+
+msgid "Health"
+msgstr ""
+
+msgid "Housing"
+msgstr ""
+
+msgid "Transport"
+msgstr ""
+
+msgid "Cosmetics"
+msgstr ""
+
+msgid "Hobbies"
+msgstr ""
+
+msgid "Utilities"
+msgstr ""
+
+msgid "Travel"
+msgstr ""
+
+msgid "Entertainment"
+msgstr ""
+
+msgid "Education"
+msgstr ""
+
+msgid "Taxes"
+msgstr ""
+
+msgid "Clothes"
+msgstr ""
+
+msgid "Other"
+msgstr ""
+
+msgid "Savings"
+msgstr ""
+
+msgid "Investments"
+msgstr ""
+
+msgid "Salary"
+msgstr ""
+
+msgid "Bonus"
+msgstr ""
+
+msgid "Interest"
+msgstr ""
+
+msgid "Sale of items"
+msgstr ""
+
+msgid "Savings withdrawal"
+msgstr ""
+
 msgid "Enter a valid amount."
 msgstr ""
 
@@ -136,6 +202,24 @@ msgstr ""
 msgid "Invitation used with another email address"
 msgstr ""
 
+msgid "Category added"
+msgstr ""
+
+msgid "Category changed"
+msgstr ""
+
+msgid "Category archived"
+msgstr ""
+
+msgid "Category restored"
+msgstr ""
+
+msgid "Category deleted"
+msgstr ""
+
+msgid "Suggested categories added"
+msgstr ""
+
 msgid "Other event"
 msgstr ""
 
@@ -194,6 +278,27 @@ msgid "Email address fixed"
 msgstr ""
 
 msgid "Valid for days"
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "Kind"
+msgstr ""
+
+msgid "Treatment"
+msgstr ""
+
+msgid "Previous treatment"
+msgstr ""
+
+msgid "Transactions affected"
+msgstr ""
+
+msgid "In use"
+msgstr ""
+
+msgid "Number"
 msgstr ""
 
 msgid "owner"
@@ -337,6 +442,30 @@ msgstr ""
 msgid "language"
 msgstr ""
 
+msgid "kind"
+msgstr ""
+
+msgid "treatment"
+msgstr ""
+
+msgid "colour"
+msgstr ""
+
+msgid "expense"
+msgstr ""
+
+msgid "income"
+msgstr ""
+
+msgid "regular"
+msgstr ""
+
+msgid "savings"
+msgstr ""
+
+msgid "transfer"
+msgstr ""
+
 msgid "Members"
 msgstr ""
 
@@ -344,6 +473,9 @@ msgid "Invitations"
 msgstr ""
 
 msgid "Workspace settings"
+msgstr ""
+
+msgid "Categories"
 msgstr ""
 
 msgid "Sign-ins"
@@ -568,6 +700,66 @@ msgstr ""
 msgid "Other sessions signed out: %(count)d."
 msgstr ""
 
+msgid "Expense"
+msgstr ""
+
+msgid "Income"
+msgstr ""
+
+msgid "Regular"
+msgstr ""
+
+msgid "Transfer"
+msgstr ""
+
+msgid "Enter a name of 1 to 80 characters, without control characters."
+msgstr ""
+
+msgid "Another active category of this kind already has this name."
+msgstr ""
+
+msgid "Choose expense or income."
+msgstr ""
+
+msgid "Choose a treatment."
+msgstr ""
+
+msgid "Choose a colour."
+msgstr ""
+
+msgid "The kind cannot change: this category is in use."
+msgstr ""
+
+msgid "Restore the category before changing it."
+msgstr ""
+
+msgid "The suggested categories can only be added to an empty list."
+msgstr ""
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr ""
+
+msgid "Category added."
+msgstr ""
+
+msgid "Category saved."
+msgstr ""
+
+msgid "Category archived."
+msgstr ""
+
+msgid "Archived because it is in use."
+msgstr ""
+
+msgid "Category restored."
+msgstr ""
+
+msgid "Category deleted."
+msgstr ""
+
+msgid "Suggested categories added."
+msgstr ""
+
 msgid ""
 "The password is not correct, or there were too many attempts. Try again "
 "later."
@@ -747,9 +939,6 @@ msgid ""
 "creating more."
 msgstr ""
 
-msgid "The change could not be made. Reload the page and try again."
-msgstr ""
-
 msgid "Workspace settings saved."
 msgstr ""
 
@@ -766,9 +955,6 @@ msgid "Recurring"
 msgstr ""
 
 msgid "Net worth"
-msgstr ""
-
-msgid "Investments"
 msgstr ""
 
 msgid "Loans"
@@ -832,9 +1018,6 @@ msgid "Overview"
 msgstr ""
 
 msgid "Monthly summary"
-msgstr ""
-
-msgid "Income"
 msgstr ""
 
 msgid "Planned and actual amounts will appear here."
@@ -1185,6 +1368,88 @@ msgid "Time zone"
 msgstr ""
 
 msgid "Create administrator"
+msgstr ""
+
+msgid "No categories yet"
+msgstr ""
+
+msgid ""
+"Start with a suggested set of expense, savings and income categories. You"
+" can rename, reorder or archive them later."
+msgstr ""
+
+msgid "Add suggested categories"
+msgstr ""
+
+msgid "An editor or owner of this workspace can add categories."
+msgstr ""
+
+msgid "Expense categories"
+msgstr ""
+
+msgid "Income categories"
+msgstr ""
+
+msgid "No active categories of this kind."
+msgstr ""
+
+msgid "Add a category"
+msgstr ""
+
+msgid "Colour"
+msgstr ""
+
+msgid "Add"
+msgstr ""
+
+msgid ""
+"Savings: money put aside or invested (expense), or taken out of savings "
+"(income); it is not counted as spending or earnings. Transfer: money "
+"moved between your own accounts; it is left out of the totals."
+msgstr ""
+
+msgid "Archived categories"
+msgstr ""
+
+msgid ""
+"Archived categories keep their history but cannot be chosen for new "
+"entries."
+msgstr ""
+
+msgid "In use: the kind cannot change."
+msgstr ""
+
+#, python-format
+msgid "A treatment change applies to %(num)d transaction."
+msgid_plural "A treatment change applies to %(num)d transactions."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "in use"
+msgstr ""
+
+msgid "Restore"
+msgstr ""
+
+#, python-format
+msgid "Move %(name)s up"
+msgstr ""
+
+#, python-format
+msgid "Move %(name)s down"
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Archive"
+msgstr ""
+
+#, python-format
+msgid "Delete the category %(name)s?"
+msgstr ""
+
+msgid "Delete"
 msgstr ""
 
 msgid "Dismiss"

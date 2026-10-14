@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.clock import Clock
 from assetboard.db.models.identity import UserSession
+from assetboard.db.repositories.membership import MembershipRepository
 from assetboard.db.repositories.user_memberships import UserMembershipReader
 
 if TYPE_CHECKING:
@@ -88,6 +89,21 @@ def require_role(ctx: Context, minimum: Role | str) -> None:
     required = Role(minimum)
     if not has_role(ctx, required):
         raise PermissionDenied(required, ctx.role)
+
+
+def require_role_now(session: Session, ctx: Context, minimum: Role | str) -> None:
+    """Re-read the actor's membership in ``session``; raise unless it is at least ``minimum``.
+
+    A ``Context`` is built at the start of a request and can be stale by the time a write runs
+    (the actor may have been demoted or removed meanwhile). Writes call this inside their
+    ``BEGIN IMMEDIATE`` transaction, after the cheap ``require_role`` check on the Context.
+    A removed member counts as a viewer for the error.
+    """
+    required = Role(minimum)
+    membership = MembershipRepository(session, ctx).for_user(ctx.user.id)
+    actual = Role(membership.role) if membership is not None else Role.VIEWER
+    if membership is None or ROLE_RANK[actual] < ROLE_RANK[required]:
+        raise PermissionDenied(required, actual)
 
 
 def build_context(session: Session, web_session: WebSession, *, clock: Clock) -> Context:

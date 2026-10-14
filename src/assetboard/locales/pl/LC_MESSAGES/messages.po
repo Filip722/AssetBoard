@@ -55,6 +55,72 @@ msgstr "Coś poszło nie tak"
 msgid "An unexpected error occurred. Please try again."
 msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 
+msgid "Food"
+msgstr "Jedzenie"
+
+msgid "Eating out"
+msgstr "Jedzenie na mieście"
+
+msgid "Gifts"
+msgstr "Prezenty"
+
+msgid "Health"
+msgstr "Zdrowie"
+
+msgid "Housing"
+msgstr "Mieszkanie"
+
+msgid "Transport"
+msgstr "Transport"
+
+msgid "Cosmetics"
+msgstr "Kosmetyki"
+
+msgid "Hobbies"
+msgstr "Hobby"
+
+msgid "Utilities"
+msgstr "Media"
+
+msgid "Travel"
+msgstr "Podróże"
+
+msgid "Entertainment"
+msgstr "Rozrywka"
+
+msgid "Education"
+msgstr "Edukacja"
+
+msgid "Taxes"
+msgstr "Podatki"
+
+msgid "Clothes"
+msgstr "Ubrania"
+
+msgid "Other"
+msgstr "Inne"
+
+msgid "Savings"
+msgstr "Oszczędności"
+
+msgid "Investments"
+msgstr "Inwestycje"
+
+msgid "Salary"
+msgstr "Wynagrodzenie"
+
+msgid "Bonus"
+msgstr "Premia"
+
+msgid "Interest"
+msgstr "Odsetki"
+
+msgid "Sale of items"
+msgstr "Sprzedaż rzeczy"
+
+msgid "Savings withdrawal"
+msgstr "Wypłata z oszczędności"
+
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
@@ -139,6 +205,24 @@ msgstr "Przyjęto zaproszenie"
 msgid "Invitation used with another email address"
 msgstr "Zaproszenia użyto z innym adresem e-mail"
 
+msgid "Category added"
+msgstr "Dodano kategorię"
+
+msgid "Category changed"
+msgstr "Zmieniono kategorię"
+
+msgid "Category archived"
+msgstr "Zarchiwizowano kategorię"
+
+msgid "Category restored"
+msgstr "Przywrócono kategorię"
+
+msgid "Category deleted"
+msgstr "Usunięto kategorię"
+
+msgid "Suggested categories added"
+msgstr "Dodano proponowane kategorie"
+
 msgid "Other event"
 msgstr "Inne zdarzenie"
 
@@ -198,6 +282,27 @@ msgstr "Stały adres e-mail"
 
 msgid "Valid for days"
 msgstr "Ważne dni"
+
+msgid "Name"
+msgstr "Nazwa"
+
+msgid "Kind"
+msgstr "Rodzaj"
+
+msgid "Treatment"
+msgstr "Traktowanie"
+
+msgid "Previous treatment"
+msgstr "Poprzednie traktowanie"
+
+msgid "Transactions affected"
+msgstr "Objęte transakcje"
+
+msgid "In use"
+msgstr "W użyciu"
+
+msgid "Number"
+msgstr "Liczba"
 
 msgid "owner"
 msgstr "właściciel"
@@ -340,6 +445,30 @@ msgstr "strefa czasowa"
 msgid "language"
 msgstr "język"
 
+msgid "kind"
+msgstr "rodzaj"
+
+msgid "treatment"
+msgstr "traktowanie"
+
+msgid "colour"
+msgstr "kolor"
+
+msgid "expense"
+msgstr "wydatek"
+
+msgid "income"
+msgstr "przychód"
+
+msgid "regular"
+msgstr "zwykłe"
+
+msgid "savings"
+msgstr "oszczędności"
+
+msgid "transfer"
+msgstr "przelew własny"
+
 msgid "Members"
 msgstr "Członkowie"
 
@@ -348,6 +477,9 @@ msgstr "Zaproszenia"
 
 msgid "Workspace settings"
 msgstr "Ustawienia obszaru roboczego"
+
+msgid "Categories"
+msgstr "Kategorie"
 
 msgid "Sign-ins"
 msgstr "Logowania"
@@ -596,6 +728,66 @@ msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 msgid "Other sessions signed out: %(count)d."
 msgstr "Wylogowane inne sesje: %(count)d."
 
+msgid "Expense"
+msgstr "Wydatek"
+
+msgid "Income"
+msgstr "Przychody"
+
+msgid "Regular"
+msgstr "Zwykłe"
+
+msgid "Transfer"
+msgstr "Przelew własny"
+
+msgid "Enter a name of 1 to 80 characters, without control characters."
+msgstr "Wpisz nazwę o długości od 1 do 80 znaków, bez znaków sterujących."
+
+msgid "Another active category of this kind already has this name."
+msgstr "Inna aktywna kategoria tego rodzaju ma już tę nazwę."
+
+msgid "Choose expense or income."
+msgstr "Wybierz wydatek lub przychód."
+
+msgid "Choose a treatment."
+msgstr "Wybierz sposób traktowania."
+
+msgid "Choose a colour."
+msgstr "Wybierz kolor."
+
+msgid "The kind cannot change: this category is in use."
+msgstr "Nie można zmienić rodzaju: ta kategoria jest w użyciu."
+
+msgid "Restore the category before changing it."
+msgstr "Przywróć kategorię, zanim ją zmienisz."
+
+msgid "The suggested categories can only be added to an empty list."
+msgstr "Proponowane kategorie można dodać tylko do pustej listy."
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr "Nie udało się wprowadzić zmiany. Odśwież stronę i spróbuj ponownie."
+
+msgid "Category added."
+msgstr "Dodano kategorię."
+
+msgid "Category saved."
+msgstr "Zapisano kategorię."
+
+msgid "Category archived."
+msgstr "Zarchiwizowano kategorię."
+
+msgid "Archived because it is in use."
+msgstr "Zarchiwizowano, ponieważ kategoria jest w użyciu."
+
+msgid "Category restored."
+msgstr "Przywrócono kategorię."
+
+msgid "Category deleted."
+msgstr "Usunięto kategorię."
+
+msgid "Suggested categories added."
+msgstr "Dodano proponowane kategorie."
+
 msgid ""
 "The password is not correct, or there were too many attempts. Try again "
 "later."
@@ -817,9 +1009,6 @@ msgstr ""
 "Ten obszar roboczy ma zbyt wiele oczekujących zaproszeń. Odwołaj część z "
 "nich, zanim utworzysz kolejne."
 
-msgid "The change could not be made. Reload the page and try again."
-msgstr "Nie udało się wprowadzić zmiany. Odśwież stronę i spróbuj ponownie."
-
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
 
@@ -837,9 +1026,6 @@ msgstr "Cykliczne"
 
 msgid "Net worth"
 msgstr "Majątek netto"
-
-msgid "Investments"
-msgstr "Inwestycje"
 
 msgid "Loans"
 msgstr "Kredyty"
@@ -903,9 +1089,6 @@ msgstr "Podsumowanie"
 
 msgid "Monthly summary"
 msgstr "Podsumowanie miesiąca"
-
-msgid "Income"
-msgstr "Przychody"
 
 msgid "Planned and actual amounts will appear here."
 msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
@@ -1275,6 +1458,98 @@ msgstr "Strefa czasowa"
 
 msgid "Create administrator"
 msgstr "Utwórz administratora"
+
+msgid "No categories yet"
+msgstr "Nie ma jeszcze kategorii"
+
+msgid ""
+"Start with a suggested set of expense, savings and income categories. You"
+" can rename, reorder or archive them later."
+msgstr ""
+"Zacznij od proponowanego zestawu kategorii wydatków, oszczędności i "
+"przychodów. Później możesz zmieniać ich nazwy, kolejność lub je "
+"archiwizować."
+
+msgid "Add suggested categories"
+msgstr "Dodaj proponowane kategorie"
+
+msgid "An editor or owner of this workspace can add categories."
+msgstr "Kategorie może dodać edytor lub właściciel tego obszaru roboczego."
+
+msgid "Expense categories"
+msgstr "Kategorie wydatków"
+
+msgid "Income categories"
+msgstr "Kategorie przychodów"
+
+msgid "No active categories of this kind."
+msgstr "Brak aktywnych kategorii tego rodzaju."
+
+msgid "Add a category"
+msgstr "Dodaj kategorię"
+
+msgid "Colour"
+msgstr "Kolor"
+
+msgid "Add"
+msgstr "Dodaj"
+
+msgid ""
+"Savings: money put aside or invested (expense), or taken out of savings "
+"(income); it is not counted as spending or earnings. Transfer: money "
+"moved between your own accounts; it is left out of the totals."
+msgstr ""
+"Oszczędności: pieniądze odłożone lub zainwestowane (wydatek) albo "
+"wypłacone z oszczędności (przychód); nie liczą się jako wydatki ani "
+"zarobki. Przelew własny: pieniądze przeniesione między własnymi kontami; "
+"nie są wliczane do sum."
+
+msgid "Archived categories"
+msgstr "Zarchiwizowane kategorie"
+
+msgid ""
+"Archived categories keep their history but cannot be chosen for new "
+"entries."
+msgstr ""
+"Zarchiwizowane kategorie zachowują historię, ale nie można ich wybrać dla"
+" nowych wpisów."
+
+msgid "In use: the kind cannot change."
+msgstr "W użyciu: rodzaju nie można zmienić."
+
+#, python-format
+msgid "A treatment change applies to %(num)d transaction."
+msgid_plural "A treatment change applies to %(num)d transactions."
+msgstr[0] "Zmiana traktowania obejmie %(num)d transakcję."
+msgstr[1] "Zmiana traktowania obejmie %(num)d transakcje."
+msgstr[2] "Zmiana traktowania obejmie %(num)d transakcji."
+
+msgid "in use"
+msgstr "w użyciu"
+
+msgid "Restore"
+msgstr "Przywróć"
+
+#, python-format
+msgid "Move %(name)s up"
+msgstr "Przesuń %(name)s w górę"
+
+#, python-format
+msgid "Move %(name)s down"
+msgstr "Przesuń %(name)s w dół"
+
+msgid "Edit"
+msgstr "Edytuj"
+
+msgid "Archive"
+msgstr "Archiwizuj"
+
+#, python-format
+msgid "Delete the category %(name)s?"
+msgstr "Usunąć kategorię %(name)s?"
+
+msgid "Delete"
+msgstr "Usuń"
 
 msgid "Dismiss"
 msgstr "Zamknij"

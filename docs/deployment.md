@@ -202,6 +202,12 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: categories (F2.1)
+
+- **Categories page** at "Categories" in the main navigation; see
+  [docs/categories.md](categories.md). The migration adds the `categories` table and changes no
+  existing data. No new setting.
+
 ### Minimum password length 8
 
 - **Passwords need at least 8 characters**, down from 10. Existing passwords keep working; the

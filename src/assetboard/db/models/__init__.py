@@ -11,10 +11,12 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
+from assetboard.db.models.ledger import Category
 
 __all__ = [
     "AuditEvent",
     "AuthThrottle",
+    "Category",
     "ExternalIdentity",
     "Invitation",
     "Membership",

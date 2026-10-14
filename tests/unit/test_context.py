@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 from uuid import UUID, uuid4
 
@@ -17,6 +18,7 @@ from assetboard.services.context import (
     WorkspaceNotAvailable,
     build_context,
     require_role,
+    require_role_now,
     select_workspace,
 )
 from tests.tenant.harness import context_for
@@ -203,3 +205,40 @@ def test_fallback_breaks_created_at_ties_by_membership_id(
     memberships = db_session.query(Membership).filter(Membership.user_id == user.id).all()
     lowest = min(memberships, key=lambda membership: membership.id)
     assert build_context(db_session, web, clock=fixed_clock).workspace.id == lowest.workspace_id
+
+
+# require_role_now (F2.1): the role as stored now, not as the Context remembers it
+
+
+@pytest.mark.parametrize(("stored", "required"), sorted(ALLOWED))
+def test_require_role_now_reads_the_stored_role(
+    db_session: Session, fixed_clock: FixedClock, stored: Role, required: Role
+) -> None:
+    workspace = _workspace(db_session, "Home")
+    user = _user(db_session, "member@example.com")
+    _join(db_session, workspace, user, stored.value, fixed_clock, 0)
+    # The Context claims owner; only the stored membership counts.
+    ctx = context_for(workspace.id, fixed_clock, role=Role.OWNER)
+    ctx = replace(ctx, user=replace(ctx.user, id=user.id))
+    if ALLOWED[(stored, required)]:
+        require_role_now(db_session, ctx, required)
+        require_role_now(db_session, ctx, required.value)
+    else:
+        with pytest.raises(PermissionDenied) as denied:
+            require_role_now(db_session, ctx, required)
+        assert (denied.value.required, denied.value.actual) == (required, stored)
+
+
+def test_require_role_now_refuses_a_removed_member(
+    db_session: Session, fixed_clock: FixedClock
+) -> None:
+    workspace = _workspace(db_session, "Home")
+    other = _workspace(db_session, "Other")
+    user = _user(db_session, "gone@example.com")
+    _join(db_session, other, user, "owner", fixed_clock, 0)  # an owner elsewhere only
+    ctx = context_for(workspace.id, fixed_clock, role=Role.OWNER)
+    ctx = replace(ctx, user=replace(ctx.user, id=user.id))
+    for required in Role:
+        with pytest.raises(PermissionDenied) as denied:
+            require_role_now(db_session, ctx, required)
+        assert denied.value.actual is Role.VIEWER

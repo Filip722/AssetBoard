@@ -1162,6 +1162,10 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
     assert "Password" not in every_value
 
 
+# Workspace-owned tables with a non-null workspace_id (F1.2, F2.1).
+WORKSPACE_TABLES = {"memberships", "invitations", "categories"}
+
+
 def test_workspace_table_scope_allowlist_for_f12() -> None:
     expected_global = {
         "auth_throttles": "global authentication controls keyed by account/IP",
@@ -1175,12 +1179,12 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
     for table, model_table in mapped.items():
         if table == "audit_events":
             assert model_table.c.workspace_id.nullable
-        elif table in {"memberships", "invitations"}:
+        elif table in WORKSPACE_TABLES:
             assert model_table.c.workspace_id.nullable is False
         else:
             assert "workspace_id" not in model_table.c
             assert table in expected_global
-    assert set(mapped) == set(expected_global) | {"audit_events", "memberships", "invitations"}
+    assert set(mapped) == set(expected_global) | {"audit_events"} | WORKSPACE_TABLES
 
 
 def test_change_password_wrong_attempts_use_the_account_throttle(

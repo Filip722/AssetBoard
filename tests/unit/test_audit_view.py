@@ -10,8 +10,16 @@ import pytest
 from sqlalchemy import update
 
 from assetboard.db.models.identity import AuditEvent, SetupState, User
+from assetboard.domain.categories import Kind, Treatment
+from assetboard.i18n import gettext
 from assetboard.services.admin_users import NotInstanceAdmin
 from assetboard.services.audit_view import (
+    ACTION_LABELS,
+    DATA_KEYS,
+    GROUP_LABELS,
+    GROUPS,
+    KEY_LABELS,
+    VALUE_TABLES,
     AuditQuery,
     BadAuditRequest,
     decode_cursor,
@@ -89,3 +97,30 @@ def test_the_services_check_the_scope_themselves(db: WorkspaceDb) -> None:
 def test_malformed_cursors_are_refused(value: str) -> None:
     with pytest.raises(BadAuditRequest):
         decode_cursor(value)
+
+
+# Category events (F2.1): an action without labels would read "Other event"
+
+CATEGORY_ACTIONS = {
+    "category.created",
+    "category.updated",
+    "category.archived",
+    "category.restored",
+    "category.deleted",
+    "category.seeded",
+}
+
+
+def test_every_category_action_has_a_label_keys_and_a_group() -> None:
+    assert {a for a in ACTION_LABELS if a.startswith("category.")} == CATEGORY_ACTIONS
+    assert set(GROUPS["workspace"]["categories"]) == CATEGORY_ACTIONS
+    assert "categories" in GROUP_LABELS
+    keys = {key for action in CATEGORY_ACTIONS for key in DATA_KEYS[action]}
+    assert keys <= set(KEY_LABELS)
+    assert set(VALUE_TABLES["kind"]) == {k.value for k in Kind}
+    for table in ("treatment", "previous_treatment"):
+        assert set(VALUE_TABLES[table]) == {t.value for t in Treatment}
+    texts = [ACTION_LABELS[a] for a in CATEGORY_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts += [*VALUE_TABLES["kind"].values(), *VALUE_TABLES["treatment"].values()]
+    for text in texts:
+        assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"

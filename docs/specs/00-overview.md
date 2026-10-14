@@ -43,7 +43,7 @@ A self-hosted web app that replaces a personal finance spreadsheet (monthly inco
 - `kind=expense, treatment=regular`: spending. `treatment=savings`: money moved to savings/investments (counted as "saved", not "spent"). `treatment=transfer`: between own accounts (excluded from both).
 - `kind=income, treatment=regular`: earnings. `treatment=savings`: withdrawal from savings (excluded from "earned").
 - Derived KPIs: `earned`, `spent`, `saved`, `savings_rate = (earned - spent) / earned` (guard divide-by-zero).
-- Categories are flat in v1 (`parent_id` column reserved, unused). Archiving hides a category from entry but keeps history.
+- Categories are flat in v1; a `parent_id` column will be added when a category hierarchy is implemented (not in F2.1). Archiving hides a category from entry but keeps history.
 
 ### 3.4 Months
 - A "month" is a calendar month in the workspace timezone. Month pages are created lazily; nothing is "copied" like spreadsheet tabs.

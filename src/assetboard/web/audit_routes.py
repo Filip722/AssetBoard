@@ -32,6 +32,7 @@ from assetboard.services.audit_view import (
     KEY_LABELS,
     MAX_PAGE_SIZE,
     PAGE_SIZE,
+    VALUE_TABLES,
     AuditPage,
     AuditQuery,
     AuditRow,
@@ -71,7 +72,8 @@ def _value(request: Request, key: str, value: str | int | bool) -> str:
         return _t(request, _("yes") if value else _("no"))
     if isinstance(value, int):
         return str(value)
-    if "," in value:  # a list of codes, such as changed workspace fields
+    # A list of codes, such as changed fields; free text (a category name) is never split.
+    if "," in value and key in VALUE_TABLES:
         return ", ".join(_value(request, key, part) for part in value.split(",") if part)
     label = value_label(key, value)
     return _t(request, label) if label else value

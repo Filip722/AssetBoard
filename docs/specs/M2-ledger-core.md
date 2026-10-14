@@ -7,7 +7,7 @@
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
 **Data model (sketch)**
-- `Category(id, workspace_id, name, kind[expense|income], treatment[regular|savings|transfer], color, sort_order, archived_at)`; unique `(workspace_id, kind, lower(name))` among non-archived.
+- `Category(id, workspace_id, name, name_key, kind[expense|income], treatment[regular|savings|transfer], color, sort_order, archived_at)`; unique `(workspace_id, kind, name_key)` among non-archived (partial unique index `WHERE archived_at IS NULL`, on SQLite and PostgreSQL). `name_key` is computed in Python (`domain.categories.name_key`: NFKC, Unicode casefold, whitespace collapsed) because SQLite's `lower()` folds ASCII only. `UNIQUE(workspace_id, id)` is the target of composite foreign keys from Transaction and BudgetLine. (Changed in F2.1; was `lower(name)`.)
 - `Transaction(id, workspace_id, direction[expense|income], date, amount_minor, currency, category_id, description, source, scheduled_occurrence_id?, import_batch_id?, account_id?, created_by, created_at, updated_at, deleted_at)`; index `(workspace_id, date)`, `(workspace_id, category_id, date)`.
 - `BudgetLine(id, workspace_id, month, category_id, planned_minor, currency)`; unique `(workspace_id, month, category_id)`.
 - `MonthState(workspace_id, month, closed_at?, closed_by?)`.
@@ -27,6 +27,14 @@ exist, M2 must either block the change or convert stored amounts; decide in F2.2
 - First run offers a seed set (en + pl names): expenses — Food, Eating out, Gifts, Health, Housing, Transport, Cosmetics, Hobbies, Utilities, Travel, Entertainment, Education, Taxes, Clothes, Other; savings (expense, treatment `savings`) — Savings, Investments; income — Salary, Bonus, Interest, Sale of items, Other; savings withdrawal (income, treatment `savings`).
 - Changing `kind` of a category that has transactions is blocked; changing `treatment` is allowed and shows how many past transactions are affected.
 - Editors/owners only; viewers read-only.
+
+**As built (F2.1)**
+- "In use" comes from `services.categories.USAGE_SOURCES` (empty in F2.1). **F2.2 must register** a source for transactions: `references` counts every transaction row of the category, soft-deleted ones included; `active_transactions` counts non-deleted ones (any date; shown as "affected" on a treatment change). **F2.3** (budget lines) and **M3** (scheduled items) register `references` only.
+- Deleting a category in use archives it ("Archived because it is in use"); the Delete button is shown only for unused categories, Archive/Restore always. Restoring fails while an active category of the same kind has the name; a restored category goes to the end of its list.
+- "First run" means the workspace has no categories at all (archived included); nothing is seeded automatically. Seed names are stored in the language of the user who clicks, and are ordinary names afterwards.
+- Reordering (up/down buttons, active categories only) is not audited; create/update/archive/restore/delete/seed are (`category.*` actions, "Categories" group in the workspace audit log).
+- Colour: free choice (`<input type="color">`), stored `#rrggbb` lowercase; rendered as SVG `fill` (CSP `style-src 'self'` forbids inline styles).
+- Polish names are real translations in the catalog (not fuzzy placeholders: the catalog test rejects fuzzy entries).
 
 **Agent prompt**
 ```

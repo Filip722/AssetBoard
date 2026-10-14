@@ -40,6 +40,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "audit_events",
         "auth_throttles",
+        "categories",
         "external_identities",
         "invitations",
         "memberships",
@@ -427,6 +428,55 @@ def test_0008_round_trip_adds_must_change_password_and_keeps_every_row(tmp_path:
         assert "must_change_password" not in {
             c["name"] for c in inspect(engine).get_columns("users")
         }
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0009_round_trip_creates_categories_with_a_partial_unique_name_index(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f21.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    workspace_id = "00000000000000000000000000000001"
+    stamp = "'2026-01-01 00:00:00'"
+
+    def insert(connection: Connection, row_id: str, name: str, archived: bool = False) -> None:
+        connection.exec_driver_sql(
+            "INSERT INTO categories (id, workspace_id, name, name_key, kind, treatment, color, "
+            f"sort_order, archived_at, created_at, updated_at) VALUES (?, ?, ?, ?, 'expense', "
+            f"'regular', '#16a34a', 0, ?, {stamp}, {stamp})",
+            (row_id, workspace_id, name, name.casefold(), stamp.strip("'") if archived else None),
+        )
+
+    try:
+        with engine.connect() as connection:
+            indexes = dict(
+                connection.exec_driver_sql(
+                    "SELECT name, sql FROM sqlite_master WHERE type = 'index' "
+                    "AND tbl_name = 'categories'"
+                ).all()
+            )
+        assert "WHERE archived_at IS NULL" in indexes["uq_categories_active_name"]
+        assert "UNIQUE" in indexes["uq_categories_active_name"]
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                (workspace_id,),
+            )
+            insert(connection, "0" * 31 + "a", "Żywność")
+            insert(connection, "0" * 31 + "b", "ŻYWNOŚĆ", archived=True)  # archived: no clash
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            insert(connection, "0" * 31 + "c", "żywność")
+
+        command.downgrade(alembic_config(settings), "0008_f15")
+        assert "categories" not in inspect(engine).get_table_names()
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

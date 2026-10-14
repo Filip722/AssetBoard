@@ -73,6 +73,18 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "invitation.revoked": ("reason",),
     "invitation.accepted": ("role",),
     "invitation.email_mismatch": (),
+    "category.created": ("name", "kind", "treatment"),
+    "category.updated": (
+        "name",
+        "fields",
+        "previous_treatment",
+        "treatment",
+        "affected_transactions",
+    ),
+    "category.archived": ("name", "in_use"),
+    "category.restored": ("name",),
+    "category.deleted": ("name", "kind"),
+    "category.seeded": ("count",),
 }
 
 ACTION_LABELS: dict[str, str] = {
@@ -105,6 +117,12 @@ ACTION_LABELS: dict[str, str] = {
     "invitation.revoked": _("Invitation revoked"),
     "invitation.accepted": _("Invitation accepted"),
     "invitation.email_mismatch": _("Invitation used with another email address"),
+    "category.created": _("Category added"),
+    "category.updated": _("Category changed"),
+    "category.archived": _("Category archived"),
+    "category.restored": _("Category restored"),
+    "category.deleted": _("Category deleted"),
+    "category.seeded": _("Suggested categories added"),
 }
 UNKNOWN_ACTION = _("Other event")
 # A failure while linking from the profile is not a refused sign-in.
@@ -130,6 +148,13 @@ KEY_LABELS: dict[str, str] = {
     "role": _("Role"),
     "email_locked": _("Email address fixed"),
     "expires_in_days": _("Valid for days"),
+    "name": _("Name"),
+    "kind": _("Kind"),
+    "treatment": _("Treatment"),
+    "previous_treatment": _("Previous treatment"),
+    "affected_transactions": _("Transactions affected"),
+    "in_use": _("In use"),
+    "count": _("Number"),
 }
 
 # Codes stored as values, with their texts, per kind of key: the same code can mean different
@@ -193,6 +218,18 @@ FIELD_LABELS: dict[str, str] = {
     "country_code": _("country"),
     "timezone": _("time zone"),
     "locale": _("language"),
+    "kind": _("kind"),
+    "treatment": _("treatment"),
+    "color": _("colour"),
+}
+KIND_LABELS: dict[str, str] = {
+    "expense": _("expense"),
+    "income": _("income"),
+}
+TREATMENT_LABELS: dict[str, str] = {
+    "regular": _("regular"),
+    "savings": _("savings"),
+    "transfer": _("transfer"),
 }
 VALUE_TABLES: dict[str, dict[str, str]] = {
     "role": ROLE_LABELS,
@@ -206,6 +243,9 @@ VALUE_TABLES: dict[str, dict[str, str]] = {
     "scope": METHOD_LABELS,
     "purpose": PURPOSE_LABELS,
     "fields": FIELD_LABELS,
+    "kind": KIND_LABELS,
+    "treatment": TREATMENT_LABELS,
+    "previous_treatment": TREATMENT_LABELS,
 }
 
 
@@ -226,6 +266,14 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "invitation.email_mismatch",
         ),
         "settings": ("workspace.settings_updated",),
+        "categories": (
+            "category.created",
+            "category.updated",
+            "category.archived",
+            "category.restored",
+            "category.deleted",
+            "category.seeded",
+        ),
     },
     "instance": {
         "sign_in": ("auth.login_success", "auth.logout", "auth.register"),
@@ -255,6 +303,7 @@ GROUP_LABELS: dict[str, str] = {
     "members": _("Members"),
     "invitations": _("Invitations"),
     "settings": _("Workspace settings"),
+    "categories": _("Categories"),
     "sign_in": _("Sign-ins"),
     "failures": _("Failures"),
     "links": _("Linked sign-in methods"),

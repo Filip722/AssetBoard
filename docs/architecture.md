@@ -70,6 +70,13 @@ one `BEGIN IMMEDIATE` transaction that:
 3. makes the change and appends the audit event.
 
 Concurrent owner actions queue at `BEGIN` and each sees the previous one's committed result.
+
+`require_role_now(session, ctx, minimum)` in `services/context.py` is the shared form of step 1
+for any role: it re-reads the actor's membership in the open transaction and raises
+`PermissionDenied` unless the stored role is at least `minimum` (a removed member counts as a
+viewer). Services check `require_role(ctx, ...)` on the Context first, as a cheap early refusal,
+and then `require_role_now` inside the write. Every category write (`services/categories.py`,
+F2.1) does this with `editor`; `services/workspaces.py` still uses its own owner-only helper.
 The workspace row itself is changed only through `CurrentWorkspaceRepository`, which reads and
 updates `ctx.workspace.id` and only the fields in `UPDATABLE_FIELDS`.
 
