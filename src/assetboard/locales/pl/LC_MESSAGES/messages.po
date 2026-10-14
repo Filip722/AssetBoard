@@ -522,8 +522,8 @@ msgid ""
 "first page."
 msgstr "Filtry lub pozycja strony są nieprawidłowe. Zacznij od pierwszej strony."
 
-msgid "Use at least 10 characters for the password."
-msgstr "Hasło musi mieć co najmniej 10 znaków."
+msgid "Use at least 8 characters for the password."
+msgstr "Hasło musi mieć co najmniej 8 znaków."
 
 msgid "Use at most 1,024 characters for the password."
 msgstr "Hasło może mieć najwyżej 1024 znaki."
@@ -1222,8 +1222,8 @@ msgstr "Obecne hasło"
 msgid "New password"
 msgstr "Nowe hasło"
 
-msgid "At least 10 characters. Common passwords are not accepted."
-msgstr "Co najmniej 10 znaków. Popularne hasła nie są akceptowane."
+msgid "At least 8 characters. Common passwords are not accepted."
+msgstr "Co najmniej 8 znaków. Popularne hasła nie są akceptowane."
 
 msgid "Repeat the new password"
 msgstr "Powtórz nowe hasło"

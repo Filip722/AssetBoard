@@ -76,7 +76,7 @@ def _(message: str) -> str:
 
 ERROR_MESSAGES = {
     "invalid_email": _("Enter a valid email address."),
-    "password_too_short": _("Use at least 10 characters for the password."),
+    "password_too_short": _("Use at least 8 characters for the password."),
     "password_too_long": _("Use at most 1,024 characters for the password."),
     "password_too_common": _("This password is too common. Choose another one."),
     "password_matches_identity": _(

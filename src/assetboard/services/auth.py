@@ -63,7 +63,7 @@ ActorType = Literal["user", "cli", "system"]
 ThrottleScope = Literal["account", "ip", "setup", "register"]
 AuthMethod = Literal["password", "oidc", "proxy"]
 
-MIN_PASSWORD_LENGTH = 10
+MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 1024
 MAX_NAME_LENGTH = 120
 SESSION_TOUCH_INTERVAL = timedelta(minutes=5)

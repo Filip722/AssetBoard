@@ -31,7 +31,7 @@
   {{ csrf_input() }}
   {{ field("email", _("Email"), type="email", value=values.email, error=errors.get("email"), required=true, autocomplete="email", maxlength=320) }}
   {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
-  {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 10 characters. Common passwords are not accepted.")) }}
+  {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 8 characters. Common passwords are not accepted.")) }}
   {{ primary_button(_("Create account and join")) }}
 </form>
 {% endif %}

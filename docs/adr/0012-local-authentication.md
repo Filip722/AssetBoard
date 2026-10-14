@@ -14,7 +14,7 @@ on infrastructure a homelab may not have.
 ## Decision
 
 - **Local accounts with Argon2id.** Passwords are hashed with argon2-cffi's default parameters
-  (minimum length 10, a bundled common-password list, no composition rules). Hashing runs in a
+  (minimum length 8, a bundled common-password list, no composition rules; see the amendment below). Hashing runs in a
   dedicated thread pool behind a concurrency limit (`ASSETBOARD_AUTH_MAX_CONCURRENT_HASHES`, at most
   16 waiting); a saturated limit answers 503 with `Retry-After` instead of queueing without bound.
   A dummy hash computed at startup is verified for unknown users so they cost the same as known
@@ -72,8 +72,8 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
   - **The generated setup token is in the logs**; anyone who can read them can complete setup
     until it is done. Set `ASSETBOARD_SETUP_TOKEN` to avoid this.
   - **Single worker only**, as above.
-  - **The common-password list covers few long passwords**: only 51 of its 10,000 entries have 10
-    or more characters, so it mainly blocks very common passphrases.
+  - **The common-password list does most of the work at the minimum length**: 2,087 of its 10,000
+    entries have 8 or more characters (51 had 10 or more under the original minimum).
   - **Shared address bucket**: without a correct `ASSETBOARD_TRUSTED_PROXIES`, clients behind a
     proxy or Docker port publishing share one per-address budget.
   - **Throttled responses are fast**, which reveals that throttling applies (not whether the
@@ -155,3 +155,11 @@ ADR-0015 adds reverse-proxy header authentication. For local authentication this
   the response and never stored in readable form, logged or audited. `users.must_change_password`
   (migration 0008) then limits that account's password sessions to the password page and
   signing out until the password changes; OIDC and proxy sessions are not limited.
+
+## Amendment (2026-10-14): minimum password length 8
+
+The minimum length drops from 10 to 8 characters, the floor NIST SP 800-63B sets for
+user-chosen passwords that are checked against a list of commonly used ones. The bundled
+common-password list, the identity check (not the email name or display name) and the
+throttles are unchanged. Existing passwords are unaffected; the rule applies when a password is
+set or changed. Temporary passwords are still 16 characters.

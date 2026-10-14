@@ -184,7 +184,9 @@ def test_user_model_normalizes_email_on_assignment() -> None:
     ("password", "email", "display_name", "code"),
     [
         ("short", "alice@example.com", "Alice", "password_too_short"),
-        ("123456789", "alice@example.com", "Alice", "password_too_short"),
+        ("Zx9!q7p", "alice@example.com", "Alice", "password_too_short"),  # 7: one below the minimum
+        ("123456789", "alice@example.com", "Alice", "password_too_common"),
+        ("password", "alice@example.com", "Alice", "password_too_common"),  # 8, but common
         ("x" * 1025, "alice@example.com", "Alice", "password_too_long"),
         ("QWERTYUIOP", "alice@example.com", "Alice", "password_too_common"),
         ("BasketBall", "alice@example.com", "Alice", "password_too_common"),
@@ -1453,3 +1455,8 @@ def test_change_password_refuses_the_current_password_as_the_new_one(
     assert unchanged.status == "invalid_new"
     assert unchanged.error is not None and unchanged.error.code == "password_unchanged"
     assert user.password_hash == old_hash
+
+
+def test_eight_characters_are_enough() -> None:
+    # The minimum is 8 (it was 10 until 0.2.0); an uncommon 8-character password passes.
+    validate_password("Zx9!q7pK", "alice@example.com", "Alice")

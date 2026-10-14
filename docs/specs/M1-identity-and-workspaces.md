@@ -23,7 +23,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Acceptance**
 - With zero users, every route redirects to `/setup` (create admin: email, display name, password; workspace: name, base currency, country, timezone, locale). `/setup` returns 404 once a user exists.
-- Passwords: argon2id; minimum length 10, no composition rules; check against a small bundled common-password list.
+- Passwords: argon2id; minimum length 8 (10 until 0.2.0), no composition rules; check against a small bundled common-password list.
 - Sessions are **server-side** (`UserSession`), cookie holds an opaque random id (stored hashed), `HttpOnly`, `SameSite=Lax`, `Secure` when `BASE_URL` is https; idle timeout 14 days, absolute 60 days (configurable); "log out other devices".
 - Login/logout, change password (invalidates other sessions), CSRF on all forms.
 - Login throttling per IP and per account (e.g., 5 failures → exponential backoff), generic error messages (no user enumeration), constant-time-ish comparison path for unknown users. Decided in PR A: per-account 5 free failures, reset on success; per-IP (IPv4 address / IPv6 /64, hashed) 20 free failures in a time window that decays only with time; backoff doubles from 60 s, capped at 15 min. Registration has its own per-IP limit (5 attempts per hour, success or not) and never resets a login counter. Wrong current passwords on change-password count against the same per-account bucket. IPv4-mapped IPv6 client addresses are treated as IPv4. Stored IP prefixes on sessions and audit events are IPv4 /24 and IPv6 /48.

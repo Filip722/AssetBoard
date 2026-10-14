@@ -12,7 +12,7 @@
     <legend class="text-sm font-semibold">{{ _("Administrator") }}</legend>
     {{ field("email", _("Email"), type="email", value=values.email, error=errors.get("email"), required=true, autocomplete="email", maxlength=320) }}
     {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
-    {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 10 characters. Common passwords are not accepted.")) }}
+    {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 8 characters. Common passwords are not accepted.")) }}
   </fieldset>
   <fieldset class="grid gap-4 sm:grid-cols-2">
     <legend class="mb-2 text-sm font-semibold sm:col-span-2">{{ _("Workspace") }}</legend>

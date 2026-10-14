@@ -500,7 +500,7 @@ msgid ""
 "first page."
 msgstr ""
 
-msgid "Use at least 10 characters for the password."
+msgid "Use at least 8 characters for the password."
 msgstr ""
 
 msgid "Use at most 1,024 characters for the password."
@@ -1136,7 +1136,7 @@ msgstr ""
 msgid "New password"
 msgstr ""
 
-msgid "At least 10 characters. Common passwords are not accepted."
+msgid "At least 8 characters. Common passwords are not accepted."
 msgstr ""
 
 msgid "Repeat the new password"
@@ -1348,5 +1348,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Affected account (email)"
+#~ msgstr ""
+
+#~ msgid "Use at least 10 characters for the password."
+#~ msgstr ""
+
+#~ msgid "At least 10 characters. Common passwords are not accepted."
 #~ msgstr ""
 

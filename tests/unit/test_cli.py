@@ -192,7 +192,7 @@ def test_create_admin_works_with_existing_users_and_can_skip_workspace(tmp_path:
             "Strong New Password\n",
             "No user",
         ),
-        (["reset-password", "cli@example.com", "--password-stdin"], "short\n", "at least 10"),
+        (["reset-password", "cli@example.com", "--password-stdin"], "short\n", "at least 8"),
         (["reset-password", "cli@example.com", "--password-stdin"], "\n", "must not be empty"),
     ],
 )
