@@ -7,6 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from assetboard.db.models.identity import User, Workspace
+from assetboard.db.models.ledger import Category
+from assetboard.domain.categories import SEED
+from assetboard.i18n import gettext
 from assetboard.services.auth import SetupAlreadyCompleted
 
 if TYPE_CHECKING:
@@ -139,3 +142,25 @@ def test_oversized_setup_fields_are_refused_before_hashing(
         assert "This value is too long." in response.text
         assert (argon2_calls.hashes, argon2_calls.verifies) == before
         assert client.get("/setup").status_code == 200  # setup stays open
+
+
+@pytest.mark.parametrize(("page_language", "workspace_locale"), [("pl", "en"), ("en", "pl")])
+def test_setup_seeds_the_categories_in_the_page_language(
+    web: WebHarness, page_language: str, workspace_locale: str
+) -> None:
+    app = web.app()
+    with TestClient(app) as client:
+        client.headers["accept-language"] = page_language
+        response = client.post(
+            "/setup",
+            data=_form(client, web, app.state.setup_token, workspace_locale=workspace_locale),
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        page = client.get("/categories").text
+    food = gettext("Food", page_language)
+    assert f"data-category-name>{food}<" in page
+    assert gettext("Add suggested categories", page_language) not in page
+    with app.state.session_factory() as session:
+        names = session.scalars(select(Category.name)).all()
+    assert len(names) == len(SEED) and food in names

@@ -267,6 +267,7 @@ async def oidc_callback(request: Request) -> Response:
                 host=client_host(request),
                 user_agent=_user_agent(request),
                 existing_session_id=existing,
+                locale=request.state.locale,
             )
         )
     except OperationalError as exc:

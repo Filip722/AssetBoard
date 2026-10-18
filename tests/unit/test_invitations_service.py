@@ -232,10 +232,7 @@ def test_accept_builds_its_scope_from_the_invitation_row_only() -> None:
     parameters = set(inspect.signature(accept_invitation).parameters)
     assert parameters == {"factory", "token", "user_id", "user_email", "clock"}
     # And the membership is written through repositories, with no new allowlist entry.
-    assert set(BOOTSTRAP_ALLOWLIST) == {
-        ("assetboard.services.auth", "_create_user_records"),
-        ("assetboard.services.auth", "_audit"),
-    }
+    assert set(BOOTSTRAP_ALLOWLIST) == {("assetboard.services.auth", "_audit")}
 
 
 def test_accept_joins_the_invitations_workspace_not_the_users_current_one(

@@ -2072,3 +2072,6 @@ msgstr ""
 #~ " in this currency."
 #~ msgstr ""
 
+#~ msgid "Added with the new workspace"
+#~ msgstr ""
+

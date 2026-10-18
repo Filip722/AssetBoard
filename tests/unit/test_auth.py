@@ -939,7 +939,8 @@ def test_registration_creates_owner_workspace_and_one_workspace_audit_event(
     assert not outcome.user.is_instance_admin
     membership = db_session.scalar(select(Membership).where(Membership.user_id == outcome.user.id))
     assert membership is not None and membership.role == "owner"
-    events = db_session.scalars(select(AuditEvent)).all()
+    events = db_session.scalars(select(AuditEvent).where(AuditEvent.action != "category.seeded"))
+    events = events.all()
     assert [(e.action, e.workspace_id) for e in events] == [("auth.register", outcome.workspace.id)]
     assert events[0].data == {}
 
@@ -1233,6 +1234,7 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
     actions = set(db_session.scalars(select(AuditEvent.action)).all())
     assert actions == {
         "setup.create_admin",
+        "category.seeded",  # setup and create-admin seed their new workspaces
         "auth.login_failure",
         "auth.login_success",
         "auth.password_change",

@@ -1,12 +1,18 @@
-"""The current workspace's own row.
+"""The current workspace's own row, and creating a workspace with its first owner.
 
 ``Workspace`` is the tenant itself and has no ``workspace_id``, so it is not a
 ``ScopedRepository``. This repository can only ever read or change ``ctx.workspace.id``, and
 only the fields in ``UPDATABLE_FIELDS``.
+
+``create_owned_workspace`` is the one place that creates a workspace (first-run setup,
+registration, ``create-admin``, OIDC and proxy auto-create). It runs before any Context exists
+and returns a ``NewWorkspaceScope`` for writing into the new workspace through the scoped
+repositories (its owner membership, the seeded categories, audit events).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from sqlalchemy import select
@@ -14,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
 from assetboard.db.repositories.base import NotFound, WorkspaceScope
+from assetboard.db.repositories.membership import MembershipRepository
 
 UPDATABLE_FIELDS = frozenset(
     {"name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan"}
@@ -56,3 +63,44 @@ class CurrentWorkspaceRepository:
             setattr(workspace, name, value)
         self._session.flush()
         return workspace
+
+
+@dataclass(frozen=True, slots=True)
+class _WorkspaceId:
+    id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class NewWorkspaceScope:
+    """A ``WorkspaceScope`` for a workspace created in the current transaction."""
+
+    workspace: _WorkspaceId
+
+
+def create_owned_workspace(
+    session: Session,
+    *,
+    name: str,
+    base_currency: str,
+    country_code: str | None,
+    timezone: str,
+    locale: str,
+    owner_user_id: UUID,
+) -> tuple[Workspace, NewWorkspaceScope]:
+    """Create a workspace and make ``owner_user_id`` its owner, in the caller's transaction.
+
+    The values are validated by the caller (``services.workspace_options``).
+    """
+    workspace = Workspace(
+        name=name,
+        base_currency=base_currency,
+        country_code=country_code,
+        timezone=timezone,
+        locale=locale,
+    )
+    session.add(workspace)
+    session.flush()
+    scope = NewWorkspaceScope(_WorkspaceId(workspace.id))
+    MembershipRepository(session, scope).add_member(user_id=owner_user_id, role="owner")
+    session.flush()
+    return workspace, scope

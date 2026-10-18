@@ -115,8 +115,8 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             page.get_by_label("Workspace name").fill("Browser Home")
             page.get_by_role("button", name="Create administrator").click()
             page.wait_for_url(f"{base}/")
+            # Setup gave the workspace the suggested categories (pre-release A).
             page.goto(f"{base}/categories")
-            page.locator("[data-seed]").click()
             expect(page.locator("li[data-category]").first).to_be_visible()
 
             page.goto(f"{base}/m/{MONTH}")

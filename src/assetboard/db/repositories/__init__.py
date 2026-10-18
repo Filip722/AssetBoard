@@ -28,7 +28,12 @@ from assetboard.db.repositories.transaction import (
     TransactionRepository,
 )
 from assetboard.db.repositories.user_memberships import MembershipView, UserMembershipReader
-from assetboard.db.repositories.workspace import UPDATABLE_FIELDS, CurrentWorkspaceRepository
+from assetboard.db.repositories.workspace import (
+    UPDATABLE_FIELDS,
+    CurrentWorkspaceRepository,
+    NewWorkspaceScope,
+    create_owned_workspace,
+)
 
 __all__ = [
     "UPDATABLE_FIELDS",
@@ -49,6 +54,7 @@ __all__ = [
     "MembershipRepository",
     "MembershipView",
     "MonthStateRepository",
+    "NewWorkspaceScope",
     "NotFound",
     "RepositoryError",
     "ScopedRepository",
@@ -56,4 +62,5 @@ __all__ = [
     "UnsupportedOperation",
     "UserMembershipReader",
     "WorkspaceMember",
+    "create_owned_workspace",
 ]

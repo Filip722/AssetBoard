@@ -41,6 +41,13 @@ def _names(html: str, kind: str) -> list[str]:
     return re.findall(r"data-category-name>([^<]+)<", match.group(0))
 
 
+@pytest.fixture(autouse=True)
+def _empty_home(owner: OwnerApp) -> None:
+    """These tests start from a workspace without categories: setup now seeds "Home", so its
+    categories are removed (as for a workspace created before every new one was seeded)."""
+    owner.clear_categories()
+
+
 @pytest.fixture
 def in_use(monkeypatch: pytest.MonkeyPatch) -> set[UUID]:
     """Category ids reported as referenced (stands in for F2.2's transactions)."""
@@ -280,6 +287,17 @@ def test_category_events_appear_in_the_audit_log_translated(owner: OwnerApp) -> 
     owner.client.headers["Accept-Language"] = "pl"
     page = owner.client.get("/audit?scope=workspace&group=categories").text
     assert "Dodano kategorię" in page and "Poprzednie traktowanie: zwykłe" in page
+
+
+def test_the_automatic_seed_appears_in_the_audit_log_translated(owner: OwnerApp) -> None:
+    # Setup seeded "Home" (the autouse fixture removed the categories, not the event).
+    page = owner.client.get("/audit?scope=workspace&group=categories").text
+    assert "Suggested categories added" in page
+    assert "Automatic: yes" in page
+    owner.client.headers["Accept-Language"] = "pl"
+    page = owner.client.get("/audit?scope=workspace&group=categories").text
+    assert "Dodano proponowane kategorie" in page
+    assert "Automatycznie: tak" in page
 
 
 def test_the_page_never_opens_an_edit_form_for_an_archived_category(owner: OwnerApp) -> None:

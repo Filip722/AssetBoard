@@ -26,8 +26,10 @@ them can be refused. Each category also has a colour.
 
 ## Suggested categories
 
-While a workspace has no categories at all (archived ones count), the page offers **Add
-suggested categories**. It adds these, named in the language you use the app in:
+Every new workspace starts with these categories, named in the language you use the app in
+when you create it (at first-run setup, registration, or your first sign-in through an
+identity provider or a proxy). `assetboard create-admin` names them in its `--locale`, or in
+the instance's default language:
 
 - Expenses: Food, Eating out, Gifts, Health, Housing, Transport, Cosmetics, Hobbies, Utilities,
   Travel, Entertainment, Education, Taxes, Clothes, Other.
@@ -35,7 +37,14 @@ suggested categories**. It adds these, named in the language you use the app in:
 - Income: Salary, Bonus, Interest, Sale of items, Other.
 - Savings withdrawal (income, treatment savings).
 
+The names follow the language the creating page was shown in, which may differ from the
+workspace's formatting default chosen in the same form.
+
 After that they are ordinary categories: rename, reorder, archive or delete them as you like.
+
+A workspace created before this, or one whose categories were all deleted, has none: while a
+workspace has no categories at all (archived ones count), the page offers **Add suggested
+categories**, which adds the same set.
 
 ## Changing categories
 

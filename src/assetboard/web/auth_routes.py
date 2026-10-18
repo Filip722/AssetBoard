@@ -290,6 +290,8 @@ async def setup_submit(
             country_code=country_code or None,
             timezone=timezone or None,
             workspace_locale=workspace_locale or None,
+            # The suggested categories are named in the language the page is shown in.
+            seed_locale=request.state.locale,
             host=host,
             user_agent=_user_agent(request),
         )
@@ -584,6 +586,7 @@ async def register_submit(
             host=host,
             user_agent=_user_agent(request),
             workspace_locale=request.state.locale,
+            seed_locale=request.state.locale,
         )
     except RegistrationDisabled as exc:
         raise HTTPException(status_code=404) from exc

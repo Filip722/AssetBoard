@@ -11,9 +11,11 @@ from pathlib import Path
 import pytest
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import delete
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.ledger import Category
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("ASSETBOARD_RUN_BROWSER_TESTS") != "1",
@@ -76,10 +78,10 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
 
             page.locator("[data-categories-link]").click()
             page.wait_for_url(f"{base}/categories")
-            page.get_by_role("button", name="Add suggested categories").click()
+            # Setup gave the new workspace the suggested categories; nothing to click.
             expense = page.locator('[data-section="expense"] [data-category-name]')
             expect(expense.first).to_have_text("Food")
-            assert page.url == f"{base}/categories"  # an HTMX swap, not a navigation
+            expect(page.get_by_role("button", name="Add suggested categories")).to_have_count(0)
 
             # Inline edit: the row turns into a form, saving swaps the list back in place.
             food = page.locator("li[data-category]", has_text="Food").first
@@ -102,6 +104,17 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             page.get_by_role("button", name="Continue").click()
             expect(page.locator("[data-notice]")).to_have_text("Category deleted.")
             expect(page.locator("li[data-category]", has_text="Gifts")).to_have_count(0)
+
+            # A workspace without any category (one created before the automatic seed) is
+            # offered the suggested set; adding it swaps the list in place.
+            with app.state.session_factory.begin() as session:
+                session.execute(delete(Category))
+            page.reload(wait_until="networkidle")
+            expect(page.locator("li[data-category]")).to_have_count(0)
+            page.get_by_role("button", name="Add suggested categories").click()
+            expect(expense.first).to_have_text("Food")
+            assert page.url == f"{base}/categories"  # an HTMX swap, not a navigation
+            expect(page.get_by_role("button", name="Add suggested categories")).to_have_count(0)
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [e for e in console_errors if "Content Security Policy" in e]

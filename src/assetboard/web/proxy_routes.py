@@ -193,6 +193,7 @@ async def proxy_sign_in(request: Request, next: str = "") -> Response:  # noqa: 
                 # replaced: a new session id every time.
                 existing_session_id=request.cookies.get(session_cookie_name(settings)),
                 audit_filter=audit_filter,
+                locale=request.state.locale,
             )
         )
     except OperationalError as exc:

@@ -65,7 +65,7 @@ class AuditEventRepository(ScopedRepository[AuditEvent]):
         entity_id: str | None,
         ts: datetime,
         data: Mapping[str, str | int | bool] | None = None,
-        actor_type: Literal["user", "system"] = "user",
+        actor_type: Literal["user", "cli", "system"] = "user",
     ) -> AuditEvent:
         """Append an action to this workspace's audit log."""
         return self.add(

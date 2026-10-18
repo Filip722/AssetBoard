@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -44,6 +45,7 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     MonthStateRepository,
 )
+from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.categories import (
     SEED,
     Direction,
@@ -500,37 +502,69 @@ def delete_category(
     return run_immediate(factory, write)
 
 
+def seed_into(
+    session: Session,
+    scope: WorkspaceScope,
+    *,
+    locale: str,
+    actor_user_id: UUID | None,
+    actor_type: Literal["user", "cli", "system"],
+    now: datetime,
+    automatic: bool,
+) -> int:
+    """Create the suggested categories in ``scope``'s workspace, named in ``locale``.
+
+    The caller's transaction must have checked that the workspace has no category. Every new
+    workspace gets the set automatically (``automatic=True``, pre-release A); the "Add
+    suggested categories" button calls it for an older workspace without any category.
+    Recorded as ``category.seeded`` in that workspace.
+    """
+    repository = CategoryRepository(session, scope)
+    positions: dict[Kind, int] = {}
+    for seed in SEED:
+        name = clean_name(gettext(seed.name, locale))
+        position = positions.get(seed.kind, 0)
+        positions[seed.kind] = position + 1
+        repository.create(
+            name=name,
+            name_key=name_key(name),
+            kind=seed.kind.value,
+            treatment=seed.treatment.value,
+            color=seed.color,
+            sort_order=position,
+        )
+    data: dict[str, str | int | bool] = {"count": len(SEED)}
+    if automatic:
+        data["automatic"] = True
+    AuditEventRepository(session, scope).record(
+        actor_user_id=actor_user_id,
+        actor_type=actor_type,
+        action="category.seeded",
+        entity_type="workspace",
+        entity_id=str(scope.workspace.id),
+        ts=now,
+        data=data,
+    )
+    return len(SEED)
+
+
 def seed_categories(factory: sessionmaker[Session], ctx: Context, *, locale: str) -> int:
-    """Create the suggested categories, named in ``locale``; only for a workspace without any."""
+    """The suggested categories, named in ``locale``; only for a workspace without any."""
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> int:
         require_role_now(session, ctx, Role.EDITOR)
-        repository = CategoryRepository(session, ctx)
-        if repository.count() > 0:
+        if CategoryRepository(session, ctx).count() > 0:
             raise AlreadySeeded
-        positions: dict[Kind, int] = {}
-        for seed in SEED:
-            name = clean_name(gettext(seed.name, locale))
-            position = positions.get(seed.kind, 0)
-            positions[seed.kind] = position + 1
-            repository.create(
-                name=name,
-                name_key=name_key(name),
-                kind=seed.kind.value,
-                treatment=seed.treatment.value,
-                color=seed.color,
-                sort_order=position,
-            )
-        AuditEventRepository(session, ctx).record(
+        return seed_into(
+            session,
+            ctx,
+            locale=locale,
             actor_user_id=ctx.user.id,
-            action="category.seeded",
-            entity_type="workspace",
-            entity_id=str(ctx.workspace.id),
-            ts=ctx.clock.now(),
-            data={"count": len(SEED)},
+            actor_type="user",
+            now=ctx.clock.now(),
+            automatic=False,
         )
-        return len(SEED)
 
     try:
         return run_immediate(factory, write)

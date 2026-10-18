@@ -29,6 +29,8 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
+from assetboard.domain.categories import SEED
+from assetboard.i18n import gettext
 from assetboard.services import auth as auth_service
 from assetboard.services import csrf
 from assetboard.services.auth import argon2_hash, session_id_hash
@@ -39,6 +41,7 @@ from assetboard.services.oidc_flow import FlowState, PendingLink
 from assetboard.services.workspaces import create_invitation
 from assetboard.web import oidc_routes
 from assetboard.web.oidc_routes import FAILURES
+from tests.conftest import owned_workspace_category_names
 from tests.oidc.fake_idp import BASE_URL, CLIENT_ID, CLIENT_SECRET, ISSUER, FakeIdp, StepClock
 
 if TYPE_CHECKING:
@@ -839,3 +842,10 @@ def test_account_page_says_an_oidc_only_account_has_no_password(oidc: Oidc) -> N
     assert response.status_code == 400
     assert "This account has no password" in response.text
     assert "The current password is not correct" not in response.text
+
+
+def test_auto_create_seeds_the_new_workspace_in_the_request_language(oidc: Oidc) -> None:
+    oidc.client.headers["accept-language"] = "pl"
+    assert oidc.sign_in().status_code == 303
+    names = owned_workspace_category_names(oidc.app.state.session_factory, "ola@example.com")
+    assert len(names) == len(SEED) and gettext("Food", "pl") in names

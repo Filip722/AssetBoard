@@ -42,6 +42,8 @@ PART_A_CODES = {
 def ledger(owner: OwnerApp) -> OwnerApp:
     # Today: October 2026. Only past instants: the access gate checks sessions with this clock.
     owner.app.state.clock = FixedClock(NOW)
+    # These tests name their own categories; setup's suggested set would clash with them.
+    owner.clear_categories()
     return owner
 
 

@@ -38,10 +38,6 @@ ALLOWED_PACKAGES = (
 
 # Bootstrap code that runs before any Context exists: (module, function) -> reason.
 BOOTSTRAP_ALLOWLIST: dict[tuple[str, str], str] = {
-    ("assetboard.services.auth", "_create_user_records"): (
-        "first-run setup, registration and create-admin create a workspace and its owner "
-        "membership before a Context can exist"
-    ),
     ("assetboard.services.auth", "_audit"): (
         "auth and admin audit events are written outside any workspace Context, usually with "
         "workspace_id NULL (instance-level); workspace events use AuditEventRepository"

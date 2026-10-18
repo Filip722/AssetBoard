@@ -18,7 +18,7 @@ from argon2 import profiles
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,7 @@ from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import upgrade_database
 from assetboard.db.models.identity import Membership, User, Workspace
+from assetboard.db.models.ledger import Category
 from assetboard.services import auth as auth_service
 from assetboard.services.auth import argon2_hash, run_initial_setup
 
@@ -235,6 +236,19 @@ def argon2_calls(monkeypatch: pytest.MonkeyPatch) -> CountingHasher:
     return counter
 
 
+def owned_workspace_category_names(factory: Any, email: str) -> list[str]:
+    """Category names of the one workspace ``email`` owns (every new workspace is seeded)."""
+    with factory() as session:
+        workspace_id = session.scalars(
+            select(Membership.workspace_id)
+            .join(User, User.id == Membership.user_id)
+            .where(User.email == email, Membership.role == "owner")
+        ).one()
+        return list(
+            session.scalars(select(Category.name).where(Category.workspace_id == workspace_id))
+        )
+
+
 @dataclass
 class OwnerApp:
     """An app after first-run setup, with the administrator (owner of "Home") signed in."""
@@ -304,6 +318,14 @@ class OwnerApp:
                 .where(Membership.workspace_id == (workspace_id or self.home_id))
             )
             return {email.split("@")[0]: role for email, role in rows}
+
+    def clear_categories(self, workspace_id: UUID | None = None) -> None:
+        """Delete a workspace's categories (every new workspace starts with the suggested
+        set), for tests that need a workspace without any, like one created before seeding."""
+        with self.db() as session, session.begin():
+            session.execute(
+                delete(Category).where(Category.workspace_id == (workspace_id or self.home_id))
+            )
 
     def token(self, path: str = "/") -> str:
         return self.web.csrf(self.client.get(path).text)

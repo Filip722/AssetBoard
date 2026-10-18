@@ -42,12 +42,12 @@ from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
-    Membership,
     SetupState,
     User,
     UserSession,
     Workspace,
 )
+from assetboard.db.repositories import create_owned_workspace
 from assetboard.domain.identity import (
     MAX_EMAIL_LENGTH,
     InvalidDisplayName,
@@ -55,7 +55,7 @@ from assetboard.domain.identity import (
     normalize_display_name,
     normalize_email,
 )
-from assetboard.services import invitations
+from assetboard.services import categories, invitations
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
@@ -1325,6 +1325,23 @@ def _workspace_options(
         raise InvalidAccountDetails("invalid_workspace_settings", str(exc)) from exc
 
 
+class WorkspaceCreationFailed(RuntimeError):
+    """Creating a new account's workspace or its categories failed on a constraint.
+
+    Not an ``IntegrityError``, so it is never mistaken for a duplicate email or identity.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceSeed:
+    """Every new workspace gets the suggested categories (pre-release A): their language and
+    the actor recorded on ``category.seeded`` (``user`` is the new account itself)."""
+
+    locale: str
+    actor_type: ActorType
+    now: datetime
+
+
 def _create_user_records(
     session: Session,
     *,
@@ -1336,12 +1353,16 @@ def _create_user_records(
     settings: Settings,
     is_admin: bool,
     password_hash: str | None = None,
+    seed: WorkspaceSeed | None = None,
 ) -> tuple[User, Workspace | None]:
-    """Create a user and, when ``options`` is given, a workspace they own.
+    """Create a user and, when ``options`` is given, a workspace they own, with its categories.
 
     ``password_hash`` lets the caller hash outside the transaction; the policy is checked here
-    either way. ``password=None`` creates a user without a password (OIDC, F1.3).
+    either way. ``password=None`` creates a user without a password (OIDC, F1.3). A workspace
+    needs ``seed``: it is created with the suggested categories in ``seed.locale``.
     """
+    if options is not None and seed is None:
+        raise RuntimeError("A new workspace needs its category seed")
     clean_display_name = _clean_display_name(display_name)
     normalized_email = normalize_email(email)
     if password is not None:
@@ -1359,24 +1380,42 @@ def _create_user_records(
         is_instance_admin=is_admin,
     )
     session.add(user)
-    workspace = None
-    if options is not None:
-        workspace = Workspace(
-            name=_clean_name(
-                workspace_name or clean_display_name,
-                "invalid_workspace_name",
-                "Workspace name must contain 1 to 120 characters",
-            ),
+    workspace_name_clean = (
+        _clean_name(
+            workspace_name or clean_display_name,
+            "invalid_workspace_name",
+            "Workspace name must contain 1 to 120 characters",
+        )
+        if options is not None
+        else None
+    )
+    session.flush()
+    if options is None or seed is None or workspace_name_clean is None:
+        return user, None
+    try:
+        workspace, scope = create_owned_workspace(
+            session,
+            name=workspace_name_clean,
             base_currency=options.base_currency,
             country_code=options.country_code,
             timezone=options.timezone,
             locale=options.locale,
+            owner_user_id=user.id,
         )
-        session.add(workspace)
-    session.flush()
-    if workspace is not None:
-        session.add(Membership(workspace_id=workspace.id, user_id=user.id, role="owner"))
+        categories.seed_into(
+            session,
+            scope,
+            locale=seed.locale,
+            actor_user_id=user.id if seed.actor_type == "user" else None,
+            actor_type=seed.actor_type,
+            now=seed.now,
+            automatic=True,
+        )
         session.flush()
+    except IntegrityError as exc:
+        # Callers read an IntegrityError around this call as "the email (or identity) is
+        # taken"; only the user insert above can mean that. Anything else is a bug.
+        raise WorkspaceCreationFailed from exc
     return user, workspace
 
 
@@ -1393,6 +1432,7 @@ def create_initial_admin(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
     host: str | None = None,
     user_agent: str | None = None,
     password_hash: str | None = None,
@@ -1417,6 +1457,7 @@ def create_initial_admin(
         settings=settings,
         is_admin=True,
         password_hash=password_hash,
+        seed=WorkspaceSeed(seed_locale or options.locale, "system", clock.now()),
     )
     if workspace is None:
         raise RuntimeError("Initial setup must create a workspace")
@@ -1448,6 +1489,7 @@ def run_initial_setup(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
     host: str | None = None,
     user_agent: str | None = None,
     hasher: Hasher | None = None,
@@ -1486,6 +1528,7 @@ def run_initial_setup(
                 country_code=country_code,
                 timezone=timezone,
                 workspace_locale=workspace_locale,
+                seed_locale=seed_locale,
                 host=host,
                 user_agent=user_agent,
                 password_hash=password_hash,
@@ -1511,6 +1554,7 @@ async def run_initial_setup_async(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
     host: str | None = None,
     user_agent: str | None = None,
 ) -> tuple[User, Workspace]:
@@ -1528,6 +1572,7 @@ async def run_initial_setup_async(
             country_code=country_code,
             timezone=timezone,
             workspace_locale=workspace_locale,
+            seed_locale=seed_locale,
             host=host,
             user_agent=user_agent,
             hasher=hasher,
@@ -1549,6 +1594,7 @@ def create_admin_cli(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
 ) -> tuple[User, Workspace | None]:
     """Break-glass admin creation; works with or without existing users, never modifies one."""
     normalized_email = normalize_email(email)
@@ -1576,6 +1622,9 @@ def create_admin_cli(
         options=options,
         settings=settings,
         is_admin=True,
+        seed=WorkspaceSeed(seed_locale or options.locale, "cli", clock.now())
+        if options is not None
+        else None,
     )
     _audit(
         session,
@@ -1665,6 +1714,7 @@ def _register_flow(
     country_code: str | None,
     timezone: str | None,
     workspace_locale: str | None,
+    seed_locale: str | None,
     hasher: Hasher | None,
     invitation: InvitationSignUp | None = None,
 ) -> RegistrationOutcome:
@@ -1742,6 +1792,9 @@ def _register_flow(
                     settings=settings,
                     is_admin=False,
                     password_hash=password_hash,
+                    seed=WorkspaceSeed(seed_locale or details.options.locale, "user", clock.now())
+                    if details.options is not None
+                    else None,
                 )
         except IntegrityError:
             # Defence in depth: a concurrent registration of the same email won the insert.
@@ -1791,6 +1844,7 @@ def register_user(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
 ) -> RegistrationOutcome:
     """Open registration; every attempt counts against its own per-IP window.
 
@@ -1812,6 +1866,7 @@ def register_user(
         country_code=country_code,
         timezone=timezone,
         workspace_locale=workspace_locale,
+        seed_locale=seed_locale,
         hasher=None,
     )
 
@@ -1831,6 +1886,7 @@ def register_with_factory(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
     hasher: Hasher | None = None,
 ) -> RegistrationOutcome:
     return _register_flow(
@@ -1847,6 +1903,7 @@ def register_with_factory(
         country_code=country_code,
         timezone=timezone,
         workspace_locale=workspace_locale,
+        seed_locale=seed_locale,
         hasher=hasher,
     )
 
@@ -1867,6 +1924,7 @@ async def register_user_async(
     country_code: str | None = None,
     timezone: str | None = None,
     workspace_locale: str | None = None,
+    seed_locale: str | None = None,
 ) -> RegistrationOutcome:
     """Web entry point; raises ``HashGateBusy`` after releasing the counted attempt."""
     hasher = _gate_hasher(gate)
@@ -1885,6 +1943,7 @@ async def register_user_async(
             country_code=country_code,
             timezone=timezone,
             workspace_locale=workspace_locale,
+            seed_locale=seed_locale,
             hasher=hasher,
         )
     )
@@ -1918,6 +1977,7 @@ def register_with_invitation(
         country_code=None,
         timezone=None,
         workspace_locale=None,
+        seed_locale=None,  # an invitation sign-up never creates a workspace
         hasher=hasher,
         invitation=InvitationSignUp(factory, token, clock),
     )
@@ -2027,17 +2087,27 @@ def create_passwordless_user(
     own_workspace: bool,
     settings: Settings,
     is_admin: bool,
+    clock: Clock,
+    seed_locale: str | None = None,
 ) -> tuple[User, Workspace | None]:
-    """A user who signs in elsewhere (OIDC): no password, optionally an own workspace."""
+    """A user who signs in elsewhere (OIDC, proxy): no password, optionally an own workspace.
+
+    The own workspace gets the suggested categories named in ``seed_locale`` (the language of
+    the sign-in request), else in the workspace's default locale.
+    """
+    options = default_workspace_options(settings) if own_workspace else None
     return _create_user_records(
         session,
         email=email,
         display_name=display_name,
         password=None,
         workspace_name=None,
-        options=default_workspace_options(settings) if own_workspace else None,
+        options=options,
         settings=settings,
         is_admin=is_admin,
+        seed=WorkspaceSeed(seed_locale or options.locale, "user", clock.now())
+        if options is not None
+        else None,
     )
 
 

@@ -150,7 +150,11 @@ def create_admin_command(
     base_currency: str | None = typer.Option(None, "--currency", help="ISO currency code."),
     country: str | None = typer.Option(None, "--country", help="ISO country code."),
     timezone: str | None = typer.Option(None, "--timezone", help="IANA time zone."),
-    locale: str | None = typer.Option(None, "--locale", help="Workspace locale."),
+    locale: str | None = typer.Option(
+        None,
+        "--locale",
+        help="Workspace locale; the suggested categories are named in it.",
+    ),
     no_workspace: bool = typer.Option(False, "--no-workspace", help="Create only the user."),
     password_stdin: bool = typer.Option(False, "--password-stdin"),
 ) -> None:

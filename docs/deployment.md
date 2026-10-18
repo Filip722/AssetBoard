@@ -203,6 +203,14 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: new workspaces start with the suggested categories (pre-release A)
+
+- Every workspace created from now on (first-run setup, registration, `assetboard create-admin`,
+  OIDC or proxy auto-create) starts with the suggested categories, named in the language of the
+  person creating it (`create-admin`: its `--locale`, else `ASSETBOARD_DEFAULT_LOCALE`). Existing
+  workspaces are unchanged; one without any category still offers **Add suggested categories**.
+  No setting or migration.
+
 ### Unreleased: every invitation needs an email address (pre-release A)
 
 - Owners must now enter the invitee's email address for every invitation, not only for owner

@@ -85,7 +85,7 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "category.archived": ("name", "in_use"),
     "category.restored": ("name",),
     "category.deleted": ("name", "kind"),
-    "category.seeded": ("count",),
+    "category.seeded": ("count", "automatic"),
     "month.closed": ("month",),
     "month.reopened": ("month",),
     # Never the description: audit rows are append-only, free text there could not be erased.

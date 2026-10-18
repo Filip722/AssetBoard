@@ -346,11 +346,13 @@ def sign_in_external(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
     audit_filter: Callable[[str], bool] | None = None,
+    locale: str | None = None,
 ) -> SignInOutcome:
     """Sign in with an OIDC or proxy identity, under that provider's ``MappingPolicy``.
 
     ``audit_filter(reason)`` decides whether a refusal is audited (the proxy limits repeats,
-    ADR-0015); without it every refusal is.
+    ADR-0015); without it every refusal is. ``locale`` (the request's language) names the
+    suggested categories of an auto-created account's own workspace.
     """
     policy = _sign_in_policy(identity, settings)
     request = _Request(settings, policy, clock, host, user_agent, existing_session_id)
@@ -461,6 +463,8 @@ def sign_in_external(
                     own_workspace=token is None,
                     settings=settings,
                     is_admin=False,
+                    clock=clock,
+                    seed_locale=locale,
                 )
                 session.add(
                     ExternalIdentity(

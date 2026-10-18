@@ -2174,3 +2174,6 @@ msgstr "Zapisz ustawienia"
 #~ msgid "Entries and planned values for this month will appear here."
 #~ msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 
+#~ msgid "Added with the new workspace"
+#~ msgstr "Dodane z nowym obszarem roboczym"
+
