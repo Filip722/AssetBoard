@@ -9,7 +9,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categorie
 {%- endmacro %}
 
 {% macro small_button(label, attrs="") -%}
-<button type="submit" {{ attrs }} class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-canvas hover:text-ink dark:text-slate-300 dark:hover:bg-slate-800">{{ label }}</button>
+<button type="submit" {{ attrs }} class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ label }}</button>
 {%- endmacro %}
 
 {% macro options(labels, selected) -%}
@@ -26,38 +26,38 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categorie
       <label for="name-{{ row_id }}" class="sr-only">{{ _("Name") }}</label>
       <input id="name-{{ row_id }}" name="name" type="text" value="{{ edit_values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off"
              {% if edit_errors.get("name") %}aria-invalid="true" aria-describedby="name-{{ row_id }}-error"{% endif %}
-             class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-      {% if edit_errors.get("name") %}<p id="name-{{ row_id }}-error" class="text-sm text-rose-700 dark:text-rose-300">{{ edit_errors.get("name") }}</p>{% endif %}
+             class="form-control px-3 w-full py-2">
+      {% if edit_errors.get("name") %}<p id="name-{{ row_id }}-error" class="text-sm text-danger">{{ edit_errors.get("name") }}</p>{% endif %}
     </div>
     <div class="space-y-1">
       <label for="kind-{{ row_id }}" class="sr-only">{{ _("Kind") }}</label>
       {% if c.in_use %}
       <input type="hidden" name="kind" value="{{ c.kind }}">
-      <select id="kind-{{ row_id }}" disabled aria-describedby="kind-{{ row_id }}-help" class="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">{{ options(kind_labels, c.kind) }}</select>
-      <p id="kind-{{ row_id }}-help" class="text-xs text-muted dark:text-slate-400" data-kind-locked>{{ _("In use: the kind cannot change.") }}</p>
+      <select id="kind-{{ row_id }}" disabled aria-describedby="kind-{{ row_id }}-help" class="form-select pl-3 w-full py-2">{{ options(kind_labels, c.kind) }}</select>
+      <p id="kind-{{ row_id }}-help" class="text-xs text-muted" data-kind-locked>{{ _("In use: the kind cannot change.") }}</p>
       {% else %}
-      <select id="kind-{{ row_id }}" name="kind" {% if edit_errors.get("kind") %}aria-invalid="true" aria-describedby="kind-{{ row_id }}-error"{% endif %} class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">{{ options(kind_labels, edit_values.kind) }}</select>
+      <select id="kind-{{ row_id }}" name="kind" {% if edit_errors.get("kind") %}aria-invalid="true" aria-describedby="kind-{{ row_id }}-error"{% endif %} class="form-select pl-3 w-full py-2">{{ options(kind_labels, edit_values.kind) }}</select>
       {% endif %}
-      {% if edit_errors.get("kind") %}<p id="kind-{{ row_id }}-error" class="text-sm text-rose-700 dark:text-rose-300">{{ edit_errors.get("kind") }}</p>{% endif %}
+      {% if edit_errors.get("kind") %}<p id="kind-{{ row_id }}-error" class="text-sm text-danger">{{ edit_errors.get("kind") }}</p>{% endif %}
     </div>
     <div class="space-y-1">
       <label for="treatment-{{ row_id }}" class="sr-only">{{ _("Treatment") }}</label>
       {% set closed = c.closed_months_affected %}
       {% set described = (["treatment-" ~ row_id ~ "-help"] if c.active_transactions else []) + (["treatment-" ~ row_id ~ "-closed"] if closed else []) %}
-      <select id="treatment-{{ row_id }}" name="treatment" {% if described %}aria-describedby="{{ described|join(' ') }}"{% endif %} class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">{{ options(treatment_labels, edit_values.treatment) }}</select>
-      {% if c.active_transactions %}<p id="treatment-{{ row_id }}-help" class="text-xs text-muted dark:text-slate-400" data-affected>{{ ngettext("A treatment change applies to %(num)d transaction.", "A treatment change applies to %(num)d transactions.", c.active_transactions) }}</p>{% endif %}
+      <select id="treatment-{{ row_id }}" name="treatment" {% if described %}aria-describedby="{{ described|join(' ') }}"{% endif %} class="form-select pl-3 w-full py-2">{{ options(treatment_labels, edit_values.treatment) }}</select>
+      {% if c.active_transactions %}<p id="treatment-{{ row_id }}-help" class="text-xs text-muted" data-affected>{{ ngettext("A treatment change applies to %(num)d transaction.", "A treatment change applies to %(num)d transactions.", c.active_transactions) }}</p>{% endif %}
       {% if closed %}
       {% set shown = closed[:12]|map("string")|join(", ") ~ (", …" if closed|length > 12 else "") %}
-      <p id="treatment-{{ row_id }}-closed" class="text-xs text-amber-800 dark:text-amber-200" data-closed-months>{{ ngettext("This changes the totals of %(num)d closed month: %(months)s.", "This changes the totals of %(num)d closed months: %(months)s.", closed|length, months=shown) }}</p>
+      <p id="treatment-{{ row_id }}-closed" class="text-xs text-warning-strong" data-closed-months>{{ ngettext("This changes the totals of %(num)d closed month: %(months)s.", "This changes the totals of %(num)d closed months: %(months)s.", closed|length, months=shown) }}</p>
       {% endif %}
-      {% if edit_errors.get("treatment") %}<p class="text-sm text-rose-700 dark:text-rose-300">{{ edit_errors.get("treatment") }}</p>{% endif %}
+      {% if edit_errors.get("treatment") %}<p class="text-sm text-danger">{{ edit_errors.get("treatment") }}</p>{% endif %}
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <label for="color-{{ row_id }}" class="sr-only">{{ _("Colour") }}</label>
-      <input id="color-{{ row_id }}" name="color" type="color" value="{{ edit_values.color }}" class="h-9 w-10 rounded-lg border border-line bg-white p-1 dark:border-slate-700 dark:bg-slate-950">
-      <button type="submit" class="rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{{ _("Save") }}</button>
-      <a href="{{ scoped_url(request, 'categories') }}" hx-get="{{ scoped_url(request, 'category_row', category_id=row_id) }}" hx-target="#category-{{ row_id }}" hx-swap="outerHTML" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-canvas dark:text-slate-300 dark:hover:bg-slate-800">{{ _("Cancel") }}</a>
-      {% if edit_errors.get("color") %}<p class="w-full text-sm text-rose-700 dark:text-rose-300">{{ edit_errors.get("color") }}</p>{% endif %}
+      <input id="color-{{ row_id }}" name="color" type="color" value="{{ edit_values.color }}" class="h-9 w-10 rounded-lg border border-line-strong bg-field p-1">
+      <button type="submit" class="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
+      <a href="{{ scoped_url(request, 'categories') }}" hx-get="{{ scoped_url(request, 'category_row', category_id=row_id) }}" hx-target="#category-{{ row_id }}" hx-swap="outerHTML" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>
+      {% if edit_errors.get("color") %}<p class="w-full text-sm text-danger">{{ edit_errors.get("color") }}</p>{% endif %}
     </div>
   </form>
 </li>
@@ -72,9 +72,9 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categorie
   <div class="flex min-w-0 items-center gap-3">
     {{ swatch(c.color) }}
     <span class="truncate text-sm font-medium" data-category-name>{{ c.name }}</span>
-    {% if c.treatment != "regular" %}<span class="rounded-full bg-canvas px-2 py-0.5 text-xs text-muted dark:bg-slate-800 dark:text-slate-300" data-treatment="{{ c.treatment }}">{{ treatment_labels[c.treatment] }}</span>{% endif %}
-    {% if c.archived %}<span class="text-xs text-muted dark:text-slate-400" data-kind="{{ c.kind }}">{{ kind_labels[c.kind] }}</span>{% endif %}
-    {% if c.in_use %}<span class="text-xs text-muted dark:text-slate-400" data-in-use>{{ _("in use") }}</span>{% endif %}
+    {% if c.treatment != "regular" %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-treatment="{{ c.treatment }}">{{ treatment_labels[c.treatment] }}</span>{% endif %}
+    {% if c.archived %}<span class="text-xs text-muted" data-kind="{{ c.kind }}">{{ kind_labels[c.kind] }}</span>{% endif %}
+    {% if c.in_use %}<span class="text-xs text-muted" data-in-use>{{ _("in use") }}</span>{% endif %}
   </div>
   {% if can_edit %}
   <div class="flex flex-wrap items-center gap-1">
@@ -82,15 +82,15 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categorie
     <form {{ htmx_form(scoped_url(request, 'category_restore', category_id=row_id)) }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore") }}</form>
     {% else %}
     <form {{ htmx_form(scoped_url(request, 'category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="direction" value="up">
-      <button type="submit" data-move-up {% if first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-canvas disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-800"><span aria-hidden="true">↑</span></button></form>
+      <button type="submit" data-move-up {% if first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
     <form {{ htmx_form(scoped_url(request, 'category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="direction" value="down">
-      <button type="submit" data-move-down {% if last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-canvas disabled:opacity-30 dark:text-slate-300 dark:hover:bg-slate-800"><span aria-hidden="true">↓</span></button></form>
-    <a href="{{ scoped_url(request, 'categories') }}?edit={{ row_id }}" hx-get="{{ scoped_url(request, 'category_edit', category_id=row_id) }}" hx-target="#category-{{ row_id }}" hx-swap="outerHTML" data-edit class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-canvas hover:text-ink dark:text-slate-300 dark:hover:bg-slate-800">{{ _("Edit") }}</a>
+      <button type="submit" data-move-down {% if last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
+    <a href="{{ scoped_url(request, 'categories') }}?edit={{ row_id }}" hx-get="{{ scoped_url(request, 'category_edit', category_id=row_id) }}" hx-target="#category-{{ row_id }}" hx-swap="outerHTML" data-edit class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
     <form {{ htmx_form(scoped_url(request, 'category_archive', category_id=row_id)) }}>{{ csrf_input() }}{{ small_button(_("Archive"), "data-archive") }}</form>
     {% endif %}
     {% if not c.in_use %}
     <form {{ htmx_form(scoped_url(request, 'category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=c.name) }}">{{ csrf_input() }}
-      <button type="submit" data-delete class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950">{{ _("Delete") }}</button></form>
+      <button type="submit" data-delete class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft">{{ _("Delete") }}</button></form>
     {% endif %}
   </div>
   {% endif %}

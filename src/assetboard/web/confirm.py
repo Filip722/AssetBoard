@@ -20,6 +20,7 @@ from starlette.requests import Request
 
 from assetboard.db.engine import is_database_locked
 from assetboard.db.models.identity import User
+from assetboard.i18n import gettext
 from assetboard.services.auth import WebSession, gate_verifier
 from assetboard.services.profile import (
     ConfirmMethod,
@@ -28,7 +29,9 @@ from assetboard.services.profile import (
     confirmation_method,
     fresh_until,
 )
+from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.security import client_host
+from assetboard.web.throttle import retry_after, throttled_message
 
 
 def _(message: str) -> str:
@@ -36,12 +39,38 @@ def _(message: str) -> str:
     return message
 
 
-CONFIRM_FAILED = _("The password is not correct, or there were too many attempts. Try again later.")
+CONFIRM_FAILED = _("The password is not correct.")
 BUSY = _("The server is busy. Try again in a moment.")
 CONFIRM_STALE = _(
     "Sign in again to confirm this change: without a password, it needs a sign-in from the "
     "last 10 minutes."
 )
+
+
+@dataclass(frozen=True, slots=True)
+class Refusal:
+    """A confirmation that did not go through: translated message, status, Retry-After."""
+
+    message: str
+    status_code: int
+    retry_after: str | None = None
+
+
+def refusal(request: Request, outcome: ConfirmOutcome[Any]) -> Refusal:
+    """One mapping for every page that confirms a sensitive action.
+
+    A throttled confirmation keeps the 401 of a wrong password and adds the wait.
+    """
+    locale = request.state.locale
+    if outcome.status == "busy":
+        return Refusal(gettext(BUSY, locale), 503, BUSY_RETRY_AFTER)
+    if outcome.status == "stale":
+        return Refusal(gettext(CONFIRM_STALE, locale), 403)
+    if outcome.status == "throttled":
+        now = request.app.state.clock.now()
+        until = outcome.throttled_until
+        return Refusal(throttled_message(until, now, locale), 401, retry_after(until, now))
+    return Refusal(gettext(CONFIRM_FAILED, locale), 401)
 
 
 @dataclass(frozen=True, slots=True)

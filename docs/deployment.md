@@ -24,9 +24,9 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_ALLOW_REGISTRATION` | `false` | App | Allow open self-registration; each registrant gets a new empty workspace they own. |
 | `ASSETBOARD_SESSION_IDLE_TIMEOUT_DAYS` | `14` | App | Sessions expire after this many days without activity. Must not exceed the absolute timeout. |
 | `ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS` | `60` | App | Sessions expire this many days after login regardless of activity. |
-| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Failed logins (and wrong current passwords when changing a password) per account before exponential backoff starts. A successful login resets this counter; it also counts as zero after 24 hours without failures. |
+| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Sign-in attempts per email (successful ones included) within the window of `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` before exponential backoff starts; nothing resets the count. The same number of wrong current passwords (password change, confirming a change) is allowed per user, in a separate count that a correct password resets. |
 | `ASSETBOARD_AUTH_IP_FREE_FAILURES` | `20` | App | Failed logins per client address (IPv4 address or IPv6 /64) within the IP window before backoff starts. |
-| `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` | `60` | App | Window after which per-address login and setup-token failure counters decay. Successful logins do not reset them. |
+| `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` | `60` | App | Window after which the per-address login and setup-token failure counters and the per-email sign-in counter decay. Successful logins do not reset them. |
 | `ASSETBOARD_AUTH_THROTTLE_BASE_SECONDS` | `60` | App | First backoff delay; it doubles with each further failure. |
 | `ASSETBOARD_AUTH_THROTTLE_MAX_SECONDS` | `900` | App | Maximum backoff delay (bounds how long an attacker can lock an account). |
 | `ASSETBOARD_SETUP_THROTTLE_FREE_FAILURES` | `5` | App | Wrong setup-token attempts per client address before backoff starts. |
@@ -201,6 +201,26 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### Unreleased: new look and sign-in messages (0.2 polish)
+
+- **New colours.** The interface uses neutral greys with a blue primary colour, in both the
+  light and the dark theme; the green brand colour is gone. An orange accent colour is defined
+  but reserved for future highlights. Dropdowns have more room around their arrow. Theme
+  choices (saved and per device) are kept. No setting or migration.
+- **Separate sign-in messages.** A wrong email or password now says "The email or password is
+  not correct."; only a throttled attempt says "Too many attempts. Try again in N minutes." The
+  response is still `401`, now with a `Retry-After` header when throttled, so fail2ban or proxy
+  rules that count 401s on `POST /login` keep working. Rules that match the old page text ("or
+  there were too many attempts") need updating.
+- **Sign-in counting changed.** The per-email sign-in count now covers every attempt,
+  successful ones included, within a window equal to `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` (60
+  by default), and is never cleared, so it reveals nothing about which accounts exist. Someone
+  who signs in more than `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` (5) times within the window
+  gets a short pause; raise the setting if your users sign in often. Wrong passwords on
+  password change and confirmation pages have their own per-user count and no longer block
+  sign-in. Existing counters carry over; no migration
+  ([ADR-0012](adr/0012-local-authentication.md), amendment of 2026-10-17).
 
 ### Unreleased: transactions, data layer (F2.2 part A)
 

@@ -2,23 +2,23 @@
 {% from "macros/components.html" import csrf_input with context %}
 <div id="categories-body" class="space-y-6">
   {% if notice %}
-  <p class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status" data-notice>{{ notice }}</p>
+  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}
   {% if error %}
-  <p class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-error>{{ error }}</p>
+  <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}
 
   {% if categories.can_seed %}
   <section class="panel p-6 sm:p-7" aria-labelledby="seed-heading" data-seed-offer>
     <h2 id="seed-heading" class="text-base font-semibold">{{ _("No categories yet") }}</h2>
     {% if can_edit %}
-    <p class="mt-2 text-sm text-muted dark:text-slate-400">{{ _("Start with a suggested set of expense, savings and income categories. You can rename, reorder or archive them later.") }}</p>
+    <p class="mt-2 text-sm text-muted">{{ _("Start with a suggested set of expense, savings and income categories. You can rename, reorder or archive them later.") }}</p>
     <form {{ htmx_form(scoped_url(request, 'categories_seed')) }} class="mt-4">
       {{ csrf_input() }}
-      <button type="submit" data-seed class="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark">{{ _("Add suggested categories") }}</button>
+      <button type="submit" data-seed class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add suggested categories") }}</button>
     </form>
     {% else %}
-    <p class="mt-2 text-sm text-muted dark:text-slate-400">{{ _("An editor or owner of this workspace can add categories.") }}</p>
+    <p class="mt-2 text-sm text-muted">{{ _("An editor or owner of this workspace can add categories.") }}</p>
     {% endif %}
   </section>
   {% endif %}
@@ -28,11 +28,11 @@
   <section class="panel p-6 sm:p-7" aria-labelledby="{{ kind }}-heading" data-section="{{ kind }}">
     <h2 id="{{ kind }}-heading" class="text-base font-semibold">{{ heading }}</h2>
     {% if rows %}
-    <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
+    <ul class="mt-3 divide-y divide-line">
       {% for c in rows %}{{ category_row(c, loop.first, loop.last) }}{% endfor %}
     </ul>
     {% else %}
-    <p class="mt-3 text-sm text-muted dark:text-slate-400">{{ _("No active categories of this kind.") }}</p>
+    <p class="mt-3 text-sm text-muted">{{ _("No active categories of this kind.") }}</p>
     {% endif %}
   </section>
   {% endfor %}
@@ -46,28 +46,28 @@
         <label for="new-name" class="block text-sm font-medium">{{ _("Name") }}</label>
         <input id="new-name" name="name" type="text" value="{{ create_values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off"
                {% if create_errors.get("name") %}aria-invalid="true" aria-describedby="new-name-error"{% endif %}
-               class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-        {% if create_errors.get("name") %}<p id="new-name-error" class="text-sm text-rose-700 dark:text-rose-300">{{ create_errors.get("name") }}</p>{% endif %}
+               class="form-control px-3 w-full py-2">
+        {% if create_errors.get("name") %}<p id="new-name-error" class="text-sm text-danger">{{ create_errors.get("name") }}</p>{% endif %}
       </div>
       <div class="space-y-1.5">
         <label for="new-kind" class="block text-sm font-medium">{{ _("Kind") }}</label>
-        <select id="new-kind" name="kind" class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">{{ options(kind_labels, create_values.kind) }}</select>
-        {% if create_errors.get("kind") %}<p class="text-sm text-rose-700 dark:text-rose-300">{{ create_errors.get("kind") }}</p>{% endif %}
+        <select id="new-kind" name="kind" class="form-select pl-3 w-full py-2">{{ options(kind_labels, create_values.kind) }}</select>
+        {% if create_errors.get("kind") %}<p class="text-sm text-danger">{{ create_errors.get("kind") }}</p>{% endif %}
       </div>
       <div class="space-y-1.5">
         <label for="new-treatment" class="block text-sm font-medium">{{ _("Treatment") }}</label>
-        <select id="new-treatment" name="treatment" aria-describedby="treatment-help" class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">{{ options(treatment_labels, create_values.treatment) }}</select>
-        {% if create_errors.get("treatment") %}<p class="text-sm text-rose-700 dark:text-rose-300">{{ create_errors.get("treatment") }}</p>{% endif %}
+        <select id="new-treatment" name="treatment" aria-describedby="treatment-help" class="form-select pl-3 w-full py-2">{{ options(treatment_labels, create_values.treatment) }}</select>
+        {% if create_errors.get("treatment") %}<p class="text-sm text-danger">{{ create_errors.get("treatment") }}</p>{% endif %}
       </div>
       <div class="space-y-1.5">
         <label for="new-color" class="block text-sm font-medium">{{ _("Colour") }}</label>
         <div class="flex items-center gap-2">
-          <input id="new-color" name="color" type="color" value="{{ create_values.color }}" class="h-9 w-10 rounded-lg border border-line bg-white p-1 dark:border-slate-700 dark:bg-slate-950">
-          <button type="submit" class="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{{ _("Add") }}</button>
+          <input id="new-color" name="color" type="color" value="{{ create_values.color }}" class="h-9 w-10 rounded-lg border border-line-strong bg-field p-1">
+          <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add") }}</button>
         </div>
-        {% if create_errors.get("color") %}<p class="text-sm text-rose-700 dark:text-rose-300">{{ create_errors.get("color") }}</p>{% endif %}
+        {% if create_errors.get("color") %}<p class="text-sm text-danger">{{ create_errors.get("color") }}</p>{% endif %}
       </div>
-      <p id="treatment-help" class="text-xs text-muted dark:text-slate-400 sm:col-span-4">{{ _("Savings: money put aside or invested (expense), or taken out of savings (income); it is not counted as spending or earnings. Transfer: money moved between your own accounts; it is left out of the totals.") }}</p>
+      <p id="treatment-help" class="text-xs text-muted sm:col-span-4">{{ _("Savings: money put aside or invested (expense), or taken out of savings (income); it is not counted as spending or earnings. Transfer: money moved between your own accounts; it is left out of the totals.") }}</p>
     </form>
   </section>
   {% endif %}
@@ -75,8 +75,8 @@
   {% if categories.archived %}
   <details class="panel p-6 sm:p-7" data-archived>
     <summary class="cursor-pointer text-base font-semibold">{{ _("Archived categories") }} <span class="text-sm font-normal text-muted">({{ categories.archived|length }})</span></summary>
-    <p class="mt-2 text-sm text-muted dark:text-slate-400">{{ _("Archived categories keep their history but cannot be chosen for new entries.") }}</p>
-    <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
+    <p class="mt-2 text-sm text-muted">{{ _("Archived categories keep their history but cannot be chosen for new entries.") }}</p>
+    <ul class="mt-3 divide-y divide-line">
       {% for c in categories.archived %}{{ category_row(c) }}{% endfor %}
     </ul>
   </details>

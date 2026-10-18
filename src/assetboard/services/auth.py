@@ -30,7 +30,7 @@ from uuid import UUID, uuid4
 
 import anyio.from_thread
 import anyio.to_thread
-from argon2 import Parameters, PasswordHasher
+from argon2 import Parameters, PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -60,7 +60,9 @@ from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
 ActorType = Literal["user", "cli", "system"]
-ThrottleScope = Literal["account", "ip", "setup", "register"]
+# ``account``: sign-in attempts per normalized email (whether or not an account has it).
+# ``confirm``: password re-checks of a known user (change, confirm, link), per user id.
+ThrottleScope = Literal["account", "confirm", "ip", "setup", "register"]
 AuthMethod = Literal["password", "oidc", "proxy"]
 
 MIN_PASSWORD_LENGTH = 8
@@ -70,6 +72,20 @@ SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 THROTTLE_IDLE_RESET = timedelta(hours=24)
 
 # Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
+# The production Argon2id parameters, pinned (argon2-cffi's RFC 9106 low-memory profile as of
+# 25.1): a library upgrade must not change them silently, because hashes made with other
+# parameters would then verify in a different time than the dummy hash. Changing them is a
+# deliberate migration (ADR-0012): stored hashes are rehashed at their next sign-in.
+PRODUCTION_ARGON2_PARAMETERS = Parameters(
+    type=Type.ID,
+    version=19,
+    salt_len=16,
+    hash_len=32,
+    time_cost=3,
+    memory_cost=65536,
+    parallelism=4,
+)
+# Test-only override; production leaves it ``None``.
 ARGON2_PARAMETERS: Parameters | None = None
 _cached_dummy_hashes: dict[str, str] = {}
 _dummy_hash_lock = threading.Lock()
@@ -165,11 +181,26 @@ class RegistrationDisabled(AuthError):
 
 
 @dataclass(frozen=True, slots=True)
+class Throttled:
+    """An attempt refused, unverified, because a throttle bucket blocks until ``until``."""
+
+    until: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class LoginOutcome:
-    """A failed login never says why: unknown email, wrong password and throttling look alike."""
+    """A failed login never says whether the account exists.
+
+    Unknown email and wrong password look alike. ``throttled_until`` is set only when the
+    attempt was refused by a blocked bucket. The sign-in (``account``) bucket is keyed by the
+    normalized email, counted the same way whether or not an account has it, decays with time
+    only and is never reset by the owner's activity, so it looks the same for every email
+    (ADR-0012, amendment of 2026-10-17).
+    """
 
     user: User | None = None
     session_id: str | None = None
+    throttled_until: datetime | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -186,6 +217,7 @@ class PasswordChangeOutcome:
     status: PasswordChangeStatus
     revoked_sessions: int = 0
     error: AuthError | None = None
+    throttled_until: datetime | None = None
 
 
 RegistrationStatus = Literal[
@@ -241,11 +273,14 @@ def validate_password(password: str, email: str, display_name: str) -> None:
         )
 
 
+def argon2_parameters() -> Parameters:
+    """The parameters in effect: the pinned production ones unless a test overrides them."""
+    return ARGON2_PARAMETERS or PRODUCTION_ARGON2_PARAMETERS
+
+
 def password_hasher() -> PasswordHasher:
-    """Production uses argon2-cffi defaults; tests patch ``ARGON2_PARAMETERS`` only."""
-    if ARGON2_PARAMETERS is None:
-        return PasswordHasher()
-    return PasswordHasher.from_parameters(ARGON2_PARAMETERS)
+    """The one hasher for passwords and the dummy hash, with the pinned parameters."""
+    return PasswordHasher.from_parameters(argon2_parameters())
 
 
 def argon2_hash(password: str) -> str:
@@ -267,7 +302,7 @@ def _dummy_hash() -> str:
     ``prepare_dummy_hash`` runs at startup, so requests normally only read the cache. The lock
     makes concurrent cold callers (CLI, tests) compute it exactly once.
     """
-    key = repr(ARGON2_PARAMETERS)
+    key = repr(argon2_parameters())
     cached = _cached_dummy_hashes.get(key)
     if cached is not None:
         return cached
@@ -395,6 +430,21 @@ def _is_blocked(row: AuthThrottle | None, now: datetime) -> bool:
     return row is not None and row.blocked_until is not None and row.blocked_until > now
 
 
+def _blocked_until(
+    session: Session, keys: Sequence[tuple[ThrottleScope, str]], now: datetime
+) -> datetime | None:
+    """The latest time any of these buckets blocks until, or ``None`` if none is blocked.
+
+    Read-only, like ``_find_throttle``. The longest wait is the one that matters.
+    """
+    until: datetime | None = None
+    for scope, key in keys:
+        row = _find_throttle(session, scope, key)
+        if row is not None and row.blocked_until is not None and row.blocked_until > now:
+            until = row.blocked_until if until is None else max(until, row.blocked_until)
+    return until
+
+
 def _get_or_create_throttle(
     session: Session, scope: ThrottleScope, key: str, now: datetime
 ) -> AuthThrottle:
@@ -450,18 +500,46 @@ def _count_attempt(
     return row
 
 
-def _reset_account(session: Session, account_key: str, now: datetime) -> None:
-    """Successful authentication: clear the account counter and start a new window.
+def _reset_confirm(session: Session, user_id: UUID, now: datetime) -> None:
+    """A correct password re-check: clear the user's ``confirm`` counter, start a new window.
+
+    Only the ``confirm`` bucket is ever reset. It is reachable only by a signed-in user or an
+    email the identity provider proved, so its state discloses nothing. The sign-in
+    (``account``) bucket is never reset by anything an account's owner does: it decays with
+    time only, so it cannot tell an attacker whether an account exists (ADR-0012).
 
     The new ``window_started_at`` makes any reservation still in flight from before the reset
     a no-op when it is released.
     """
-    row = _find_throttle(session, "account", account_key)
+    row = _find_throttle(session, "confirm", _confirm_key(user_id))
     if row is not None:
         row.failure_count = 0
         row.blocked_until = None
         row.window_started_at = now
         row.updated_at = now
+
+
+def _confirm_key(user_id: UUID) -> str:
+    return str(user_id)
+
+
+def _confirm_slot(user_id: UUID, settings: Settings) -> ThrottleSlot:
+    return ThrottleSlot("confirm", _confirm_key(user_id), None, settings.auth_account_free_failures)
+
+
+def _account_slot(account_key: str, settings: Settings) -> ThrottleSlot:
+    """Sign-in attempts for one normalized email: a fixed window, like the address bucket.
+
+    The window is the address bucket's (``auth_ip_window_minutes``, 60 minutes by default):
+    after it the count starts again, and nothing else resets it. Every attempt counts,
+    successful ones included, so its state never depends on whether a password was right.
+    """
+    return ThrottleSlot(
+        "account",
+        account_key,
+        timedelta(minutes=settings.auth_ip_window_minutes),
+        settings.auth_account_free_failures,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -599,11 +677,20 @@ def verify_setup_token(
 
 
 def _login_keys(email: str) -> tuple[str, str]:
-    lookup = email.strip().lower()[:MAX_EMAIL_LENGTH]
+    """The user lookup value and the throttle key, normalized once.
+
+    A valid address is normalized and used for both. Anything else cannot match an account
+    (stored emails are normalized and valid); it is truncated and keyed as ``invalid:``.
+    """
     try:
-        return lookup, normalize_email(lookup)
+        normalized = normalize_email(email)
     except InvalidEmail:
+        lookup = email.strip().lower()[:MAX_EMAIL_LENGTH]
         return lookup, f"invalid:{lookup}"
+    return normalized, normalized
+
+
+_NO_USER = UUID(int=0)  # matches no account
 
 
 @dataclass(frozen=True, slots=True)
@@ -635,7 +722,7 @@ def _login_flow(
         return LoginOutcome()
     lookup, account_key = _login_keys(email)
     slots = (
-        ThrottleSlot("account", account_key, None, settings.auth_account_free_failures),
+        _account_slot(account_key, settings),
         ThrottleSlot(
             "ip",
             _ip_key(host),
@@ -644,11 +731,14 @@ def _login_flow(
         ),
     )
 
-    def reserve(session: Session) -> _LoginCandidate | None:
+    keys: list[tuple[ThrottleScope, str]] = [(slot.scope, slot.key) for slot in slots]
+
+    def reserve(session: Session) -> _LoginCandidate | Throttled:
         # Blocked attempts are answered from read-only lookups and write nothing.
-        reserved = reserve_attempts(session, slots, clock.now(), settings)
+        now = clock.now()
+        reserved = reserve_attempts(session, slots, now, settings)
         if reserved is None:
-            return None
+            return Throttled(_blocked_until(session, keys, now) or now)
         user = session.scalar(select(User).where(User.email == lookup))
         return _LoginCandidate(
             reserved,
@@ -657,18 +747,20 @@ def _login_flow(
             bool(user and user.is_instance_admin),
         )
 
-    def blocked(session: Session) -> bool:
-        now = clock.now()
-        return any(_is_blocked(_find_throttle(session, s.scope, s.key), now) for s in slots)
+    def blocked(session: Session) -> datetime | None:
+        return _blocked_until(session, keys, clock.now())
 
     # A deferred read first, so a flood of blocked requests never takes the write lock;
-    # ``reserve`` checks again under the lock.
-    if run.read(blocked):
-        return LoginOutcome()
+    # ``reserve`` checks again under the lock. Neither looks at the user: a blocked attempt
+    # is answered the same way whether or not the account exists.
+    until = run.read(blocked)
+    if until is not None:
+        return LoginOutcome(throttled_until=until)
     candidate = run(reserve)
-    if candidate is None:
-        return LoginOutcome()
+    if isinstance(candidate, Throttled):
+        return LoginOutcome(throttled_until=candidate.until)
     rehashed: str | None = None
+    verified: bool | None = None
     try:
         check = verify or verify_password
         verified = check(candidate.password_hash or _dummy_hash(), password)
@@ -686,12 +778,18 @@ def _login_flow(
                 # Best effort: the login still succeeds; the next login retries the rehash.
                 rehashed = None
     except BaseException:
-        run(lambda session: release_attempts(session, candidate.reserved))
+        # Before a verify outcome exists (``HashGateBusy`` from a saturated gate, any error),
+        # nothing account-specific has happened: take the whole attempt back. After it (an
+        # error while rehashing, which only a correct password reaches), the account attempt
+        # stays counted, as it would on success.
+        taken_back = [item for item in candidate.reserved if verified is None or item.scope == "ip"]
+        run(lambda session: release_attempts(session, taken_back))
         raise
 
     def finish(session: Session) -> LoginOutcome:
         now = clock.now()
-        user = session.get(User, candidate.user_id) if candidate.user_id else None
+        # The same query whether or not the account exists (never the identity map).
+        user = session.scalar(select(User).where(User.id == (candidate.user_id or _NO_USER)))
         not_admin = require_instance_admin and not (user is not None and user.is_instance_admin)
         succeeded = (
             verified
@@ -718,9 +816,10 @@ def _login_flow(
                 data={"reason": "not_instance_admin"} if verified and not_admin else None,
             )
             return LoginOutcome()
-        # The account counter resets; the IP counter only takes back this request's attempt
-        # and otherwise decays with its time window.
-        _reset_account(session, account_key, now)
+        # Every attempt counts in the account bucket, this successful one too: taking it back
+        # (or resetting the bucket) would make the outcome of a verify visible to others
+        # probing the same email, and only a known email can succeed. The address bucket,
+        # keyed by the requester, takes back this request's attempt as before.
         release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
         if rehashed is not None:
             # Safe: ``succeeded`` above means the stored hash is still the verified one.
@@ -996,23 +1095,26 @@ def _change_password_flow(
         email: str
         display_name: str
 
-    def reserve(session: Session) -> Candidate | None:
+    def reserve(session: Session) -> Candidate | Throttled:
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
-        slot = ThrottleSlot("account", user.email, None, settings.auth_account_free_failures)
-        reserved = reserve_attempts(session, (slot,), clock.now(), settings)
+        slot = _confirm_slot(user_id, settings)
+        now = clock.now()
+        reserved = reserve_attempts(session, (slot,), now, settings)
         if reserved is None:
-            return None
+            return Throttled(_blocked_until(session, [(slot.scope, slot.key)], now) or now)
         return Candidate(reserved, user.password_hash, user.email, user.display_name)
 
-    def blocked(session: Session) -> bool | None:
+    def blocked(session: Session) -> Throttled | bool | None:
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
         if user.password_hash is None:
             return None
-        return _is_blocked(_find_throttle(session, "account", user.email), clock.now())
+        slot = _confirm_slot(user_id, settings)
+        until = _blocked_until(session, [(slot.scope, slot.key)], clock.now())
+        return Throttled(until) if until is not None else False
 
     # Deferred read first; ``reserve`` checks again under the write lock.
     is_blocked = run.read(blocked)
@@ -1020,11 +1122,11 @@ def _change_password_flow(
         # A user without a password (OIDC, F1.3) has nothing to change: no attempt is counted.
         # Setting a first password is the CLI's ``reset-password`` (F1.5 adds a page).
         return PasswordChangeOutcome(status="no_password")
-    if is_blocked:
-        return PasswordChangeOutcome(status="throttled")
+    if isinstance(is_blocked, Throttled):
+        return PasswordChangeOutcome(status="throttled", throttled_until=is_blocked.until)
     candidate = run(reserve)
-    if candidate is None:
-        return PasswordChangeOutcome(status="throttled")
+    if isinstance(candidate, Throttled):
+        return PasswordChangeOutcome(status="throttled", throttled_until=candidate.until)
 
     def release(session: Session) -> None:
         release_attempts(session, candidate.reserved)
@@ -1050,7 +1152,7 @@ def _change_password_flow(
             )
         validate_password(new_password, candidate.email, candidate.display_name)
     except PasswordPolicyError as exc:
-        run(lambda session: _reset_account(session, candidate.email, clock.now()))
+        run(lambda session: _reset_confirm(session, user_id, clock.now()))
         return PasswordChangeOutcome(status="invalid_new", error=exc)
     try:
         new_hash = (hasher or argon2_hash)(new_password)
@@ -1059,7 +1161,7 @@ def _change_password_flow(
         raise
 
     def apply(session: Session) -> PasswordChangeOutcome:
-        _reset_account(session, candidate.email, clock.now())
+        _reset_confirm(session, user_id, clock.now())
         user = session.get(User, user_id)
         if user is None or user.password_hash != candidate.password_hash:
             # Changed concurrently (another device or the CLI); do not overwrite it.
@@ -1099,7 +1201,7 @@ def change_password(
 ) -> PasswordChangeOutcome:
     """Change the password and revoke every other session; the caller commits any outcome.
 
-    Wrong current passwords count against the same per-account throttle as login.
+    Wrong current passwords count against the user's ``confirm`` throttle (not sign-in's).
     """
     return _change_password_flow(
         SameSession(session),
@@ -1969,46 +2071,51 @@ def _confirm_password_flow[T](
     user_agent: str | None,
     verify: Verifier | None,
     on_success: Callable[[Session, User], T],
-) -> T | None:
+) -> T | Throttled | None:
     if len(password) > MAX_PASSWORD_LENGTH:
         return None
 
-    def slots(email: str) -> tuple[ThrottleSlot, ...]:
-        return (
-            ThrottleSlot("account", email, None, settings.auth_account_free_failures),
-            ThrottleSlot(
-                "ip",
-                _ip_key(host),
-                timedelta(minutes=settings.auth_ip_window_minutes),
-                settings.auth_ip_free_failures,
-            ),
-        )
+    # The user's own ``confirm`` bucket (never the sign-in bucket of their email) and the
+    # client address.
+    slots = (
+        _confirm_slot(user_id, settings),
+        ThrottleSlot(
+            "ip",
+            _ip_key(host),
+            timedelta(minutes=settings.auth_ip_window_minutes),
+            settings.auth_ip_free_failures,
+        ),
+    )
+    keys: list[tuple[ThrottleScope, str]] = [(slot.scope, slot.key) for slot in slots]
 
-    def blocked(session: Session) -> bool:
+    def blocked(session: Session) -> Throttled | bool:
         user = session.get(User, user_id)
         if user is None:
             return True
-        now = clock.now()
-        return any(
-            _is_blocked(_find_throttle(session, slot.scope, slot.key), now)
-            for slot in slots(user.email)
-        )
+        until = _blocked_until(session, keys, clock.now())
+        return Throttled(until) if until is not None else False
 
-    def reserve(session: Session) -> _ConfirmCandidate | None:
+    def reserve(session: Session) -> _ConfirmCandidate | Throttled | None:
         user = session.get(User, user_id)
         if user is None:
             return None
-        reserved = reserve_attempts(session, slots(user.email), clock.now(), settings)
+        now = clock.now()
+        reserved = reserve_attempts(session, slots, now, settings)
         if reserved is None:
-            return None
+            return Throttled(_blocked_until(session, keys, now) or now)
         return _ConfirmCandidate(reserved, user.email, user.password_hash)
 
-    # As for login: a deferred read first, then the reservation under the write lock.
-    if run.read(blocked):
+    # As for login: a deferred read first, then the reservation under the write lock. The
+    # account is already known here (a signed-in user, or one the identity provider named),
+    # so saying that it is throttled discloses nothing.
+    is_blocked = run.read(blocked)
+    if isinstance(is_blocked, Throttled):
+        return is_blocked
+    if is_blocked:
         return None
     candidate = run(reserve)
-    if candidate is None:
-        return None
+    if candidate is None or isinstance(candidate, Throttled):
+        return candidate
     try:
         # A user without a password costs the same dummy verify and fails like a wrong one.
         verified = (verify or verify_password)(candidate.password_hash or _dummy_hash(), password)
@@ -2040,7 +2147,7 @@ def _confirm_password_flow[T](
                 data={"purpose": purpose},
             )
             return None
-        _reset_account(session, candidate.email, clock.now())
+        _reset_confirm(session, user_id, clock.now())
         release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
         return on_success(session, user)
 
@@ -2059,13 +2166,14 @@ def confirm_password_with_factory[T](
     host: str | None = None,
     user_agent: str | None = None,
     verify: Verifier | None = None,
-) -> T | None:
+) -> T | Throttled | None:
     """Re-check a known user's password, then run ``on_success`` in the same transaction.
 
-    Used to link an OIDC identity to an account that has a password (F1.3) and meant for F1.5's
-    sensitive profile actions. It shares login's throttle (the user's account bucket and the
-    client address) and its dummy verify. Every failure is the same ``None``: wrong password,
-    no password, inactive user, throttled, or a password changed meanwhile.
+    Used to link an OIDC identity to an account that has a password (F1.3) and for F1.5's
+    sensitive profile actions. It uses the user's own ``confirm`` bucket (shared with password
+    change, never the sign-in bucket of the email) and login's address bucket and dummy
+    verify. A refused attempt returns ``Throttled``; every other failure is the same ``None``:
+    wrong password, no password, inactive user, or a password changed meanwhile.
     """
     return _confirm_password_flow(
         ImmediateTransactions(factory),
@@ -2093,7 +2201,7 @@ async def confirm_password_async[T](
     on_success: Callable[[Session, User], T],
     host: str | None = None,
     user_agent: str | None = None,
-) -> T | None:
+) -> T | Throttled | None:
     """Web entry point: verifies through the hashing limit (``HashGateBusy`` when saturated)."""
     verify = gate_verifier(gate)
     return await anyio.to_thread.run_sync(

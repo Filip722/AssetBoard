@@ -261,11 +261,17 @@ def test_parallel_login_burst_verifies_at_most_free_plus_one_per_account(
     _run_threads(20, attempt)
     # Reservations are serialised, so exactly free + 1 requests get to verify a password.
     assert overlap.verifications == settings.auth_account_free_failures + 1
-    assert outcomes == [LoginOutcome()] * 20
     account = _throttle(factory, "account", "admin@example.com")
     assert account is not None
     assert account.failure_count == overlap.verifications
     assert account.blocked_until is not None
+    # Verified attempts fail plainly; only the attempts the block refused say so.
+    verified = [o for o in outcomes if o.throttled_until is None]
+    assert verified == [LoginOutcome()] * overlap.verifications
+    throttled = [o for o in outcomes if o.throttled_until is not None]
+    assert throttled == [LoginOutcome(throttled_until=account.blocked_until)] * (
+        20 - overlap.verifications
+    )
 
 
 def test_parallel_login_burst_verifies_at_most_free_plus_one_per_ip(
@@ -292,9 +298,16 @@ def test_parallel_login_burst_verifies_at_most_free_plus_one_per_ip(
 
     _run_threads(30, attempt)
     assert overlap.verifications == settings.auth_ip_free_failures + 1
-    assert outcomes == [LoginOutcome()] * 30
     ip_row = _throttle(factory, "ip", "198.51.100.7/32")
     assert ip_row is not None and ip_row.failure_count == overlap.verifications
+    assert [o for o in outcomes if o.throttled_until is None] == [
+        LoginOutcome()
+    ] * overlap.verifications
+    assert all(
+        o == LoginOutcome(throttled_until=ip_row.blocked_until)
+        for o in outcomes
+        if o.throttled_until is not None
+    )
 
 
 def test_parallel_wrong_current_passwords_verify_at_most_free_plus_one(
@@ -342,6 +355,16 @@ def test_blocked_requests_never_take_the_write_lock(database: Connect, settings:
             clock=CLOCK,
             host="192.0.2.1",
         )
+    # Password change has its own bucket (per user id), blocked by its own failures.
+    for _ in range(settings.auth_account_free_failures + 1):
+        change_password_with_factory(
+            factory,
+            user_id=user.id,
+            current_password="wrong",
+            new_password="Another Strong Password",
+            settings=settings,
+            clock=CLOCK,
+        )
     statements = _record_statements(engine)
 
     login = authenticate_with_factory(
@@ -361,7 +384,12 @@ def test_blocked_requests_never_take_the_write_lock(database: Connect, settings:
         clock=CLOCK,
     )
 
-    assert login == LoginOutcome() and change.status == "throttled"
+    account = _throttle(factory, "account", "admin@example.com")
+    confirm = _throttle(factory, "confirm", str(user.id))
+    assert account is not None and account.blocked_until is not None
+    assert confirm is not None and confirm.blocked_until is not None
+    assert login == LoginOutcome(throttled_until=account.blocked_until)
+    assert change.status == "throttled" and change.throttled_until == confirm.blocked_until
     assert "BEGIN" in statements
     assert "BEGIN IMMEDIATE" not in statements
     assert not any(
@@ -427,8 +455,8 @@ def test_change_password_releases_its_reservation_when_hashing_fails(
             clock=CLOCK,
             hasher=broken_hasher,
         )
-    account = _throttle(factory, "account", "admin@example.com")
-    assert account is not None and account.failure_count == 0
+    confirm = _throttle(factory, "confirm", str(user.id))
+    assert confirm is not None and confirm.failure_count == 0
     with factory() as session:
         stored = session.get(User, user.id)
         assert stored is not None and auth.verify_password(stored.password_hash or "", PASSWORD)
@@ -560,8 +588,12 @@ def test_busy_gate_skips_the_rehash_and_the_login_still_succeeds(
     )
     assert outcome.succeeded
     assert _stored_hash(factory, user.id) == before  # unchanged; the next login retries
+    # The successful attempt stays counted (every sign-in attempt does); the address takes
+    # its attempt back.
     account = _throttle(factory, "account", "admin@example.com")
-    assert account is not None and account.failure_count == 0
+    assert account is not None and account.failure_count == 1
+    ip_row = _throttle(factory, "ip", "192.0.2.5/32")
+    assert ip_row is not None and ip_row.failure_count == 0
 
 
 def test_login_is_refused_and_the_newer_hash_kept_when_the_password_changes_mid_login(
@@ -799,3 +831,95 @@ def test_busy_gate_releases_the_registration_attempt(database: Connect) -> None:
         )
     row = _throttle(factory, "register", "192.0.2.90/32")
     assert row is not None and row.failure_count == 0
+
+
+# An attempt in flight is invisible as an outcome (ADR-0012)
+
+
+@pytest.mark.parametrize("in_flight_ends", ["verified", "gate_busy"])
+def test_a_sign_in_in_flight_looks_the_same_for_known_and_unknown_emails(
+    database: Connect, settings: Settings, in_flight_ends: str
+) -> None:
+    """The review's race: while someone's sign-in is being verified, an attacker probes the
+    same email, and probes again after it finished. The owner's correct password (known email)
+    and the same request for an email without an account must look the same to the attacker,
+    mid-flight and after, whether the verify completes or the hashing gate turns it away."""
+    factory = database().factory
+    _setup_admin(factory, settings, email="victim@example.com")
+
+    def login(email: str, password: str, host: str, verify: auth.Verifier | None = None):
+        return authenticate_with_factory(
+            factory,
+            email=email,
+            password=password,
+            settings=settings,
+            clock=CLOCK,
+            host=host,
+            verify=verify,
+        )
+
+    def scenario(email: str, net: str) -> tuple[object, ...]:
+        # Distinct addresses: only the email's bucket is involved.
+        for index in range(settings.auth_account_free_failures):
+            assert login(email, "guess", f"{net}.{index + 1}").throttled_until is None
+        inside, go = threading.Event(), threading.Event()
+
+        def held_verify(encoded: str, password: str) -> bool:
+            inside.set()
+            assert go.wait(5)
+            if in_flight_ends == "gate_busy":
+                raise HashGateBusy
+            return auth.verify_password(encoded, password)
+
+        results: list[object] = []
+
+        def in_flight() -> None:
+            try:
+                results.append(login(email, PASSWORD, f"{net}.100", held_verify).succeeded)
+            except HashGateBusy:
+                results.append("busy")
+
+        thread = threading.Thread(target=in_flight)
+        thread.start()
+        assert inside.wait(5)
+        during = login(email, "guess", f"{net}.200")
+        go.set()
+        thread.join(5)
+        after = login(email, "guess", f"{net}.201")
+        row = _throttle(factory, "account", email)
+        assert row is not None
+        return during, after, row.failure_count, row.blocked_until
+
+    known = scenario("victim@example.com", "192.0.2")
+    unknown = scenario("nobody@example.com", "198.51.100")
+    assert known == unknown
+    during, after, _count, _blocked = known
+    if in_flight_ends == "verified":
+        # The in-flight attempt is the sixth: it set the block when it was reserved, and it
+        # stays counted whatever its verify says.
+        assert isinstance(during, LoginOutcome) and during.throttled_until is not None
+        assert after == during
+    else:
+        # Turned away before any verify outcome: the whole attempt is taken back, alike.
+        assert isinstance(after, LoginOutcome) and after.throttled_until is None
+
+
+def test_failed_sign_ins_run_the_same_queries_for_known_and_unknown_emails(
+    database: Connect, settings: Settings
+) -> None:
+    engine, factory = database()
+    _setup_admin(factory, settings, email="victim@example.com")
+    recorded = _record_statements(engine)
+
+    def statements_for(email: str, host: str) -> list[str]:
+        start = len(recorded)
+        outcome = authenticate_with_factory(
+            factory, email=email, password="guess", settings=settings, clock=CLOCK, host=host
+        )
+        assert outcome == LoginOutcome()
+        return recorded[start:]
+
+    known = statements_for("victim@example.com", "192.0.2.1")
+    unknown = statements_for("nobody@example.com", "192.0.2.2")
+    assert known == unknown
+    assert any("FROM users" in statement for statement in known)

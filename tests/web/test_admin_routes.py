@@ -145,6 +145,23 @@ def test_unknown_actions_and_users_are_404(h: Harness, path: str) -> None:
 # Every admin mutation goes through the one confirmation path
 
 
+def test_a_throttled_admin_confirmation_says_how_long_to_wait(h: Harness) -> None:
+    add_user(h, OLA)
+    target = user_id(h, OLA)
+    client = admin(h)
+    free = h.app.state.settings.auth_account_free_failures
+    wrong = [act(h, client, target, "deactivate", "wrong password") for _ in range(free + 1)]
+    right = act(h, client, target, "deactivate")
+    assert all(r.status_code == 401 for r in [*wrong, right])
+    assert "The password is not correct." in wrong[-1].text
+    assert "Too many attempts" not in wrong[-1].text
+    assert "Too many attempts. Try again in 1 minute." in right.text
+    assert right.headers["retry-after"] == "60"
+    with h.app.state.session_factory() as session:
+        user = session.get(User, target)
+        assert user is not None and user.is_active
+
+
 @pytest.mark.parametrize("action", ["create", "activate", "deactivate", "promote", "demote"])
 @pytest.mark.parametrize("password", ["", "wrong password"])
 def test_every_admin_mutation_needs_confirmation(h: Harness, action: str, password: str) -> None:

@@ -1,29 +1,29 @@
 {% macro field(name, label, type="text", value="", error=None, required=false, autocomplete=None, maxlength=None, help=None) -%}
 <div class="space-y-1.5">
-  <label for="{{ name }}" class="block text-sm font-medium text-ink dark:text-slate-200">{{ label }}</label>
+  <label for="{{ name }}" class="block text-sm font-medium text-ink">{{ label }}</label>
   <input id="{{ name }}" name="{{ name }}" type="{{ type }}" value="{{ value }}"
          {% if required %}required{% endif %}
          {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
          {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
          {% if error %}aria-invalid="true" aria-describedby="{{ name }}-error"{% elif help %}aria-describedby="{{ name }}-help"{% endif %}
-         class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
-  {% if help and not error %}<p id="{{ name }}-help" class="text-xs text-muted dark:text-slate-400">{{ help }}</p>{% endif %}
-  {% if error %}<p id="{{ name }}-error" class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>{% endif %}
+         class="form-control w-full">
+  {% if help and not error %}<p id="{{ name }}-help" class="text-xs text-muted">{{ help }}</p>{% endif %}
+  {% if error %}<p id="{{ name }}-error" class="text-sm text-danger">{{ error }}</p>{% endif %}
 </div>
 {%- endmacro %}
 
 {% macro select(name, label, options, selected="", error=None, blank=None) -%}
 <div class="space-y-1.5">
-  <label for="{{ name }}" class="block text-sm font-medium text-ink dark:text-slate-200">{{ label }}</label>
+  <label for="{{ name }}" class="block text-sm font-medium text-ink">{{ label }}</label>
   <select id="{{ name }}" name="{{ name }}"
           {% if error %}aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}
-          class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+          class="form-select w-full">
     {% if blank is not none %}<option value="">{{ blank }}</option>{% endif %}
     {% for value, text in options %}
     <option value="{{ value }}" {% if value == selected %}selected{% endif %}>{{ text }}</option>
     {% endfor %}
   </select>
-  {% if error %}<p id="{{ name }}-error" class="text-sm text-rose-700 dark:text-rose-300">{{ error }}</p>{% endif %}
+  {% if error %}<p id="{{ name }}-error" class="text-sm text-danger">{{ error }}</p>{% endif %}
 </div>
 {%- endmacro %}
 
@@ -32,33 +32,33 @@
 {%- endmacro %}
 
 {% macro primary_button(label) -%}
-<button type="submit" class="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark focus:outline-none focus:ring-2 focus:ring-accent/40">{{ label }}</button>
+<button type="submit" class="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/40">{{ label }}</button>
 {%- endmacro %}
 
 {% macro link_button(label, href) -%}
-<a href="{{ href }}" rel="noreferrer" class="flex w-full justify-center rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40 dark:border-slate-700 dark:bg-slate-950 dark:text-white">{{ label }}</a>
+<a href="{{ href }}" rel="noreferrer" class="flex w-full justify-center rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40">{{ label }}</a>
 {%- endmacro %}
 
 {% macro flashes(messages=[]) -%}
 {% if messages %}
 <div class="space-y-2" role="status" aria-live="polite">
   {% for message in messages %}
-  <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">{{ message }}</div>
+  <div class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong">{{ message }}</div>
   {% endfor %}
 </div>
 {% endif %}
 {%- endmacro %}
 
 {% macro confirm_dialog(id, title, message, confirm_label, cancel_label) -%}
-<dialog id="{{ id }}" class="w-[min(92vw,28rem)] rounded-2xl border border-line bg-white p-0 text-ink shadow-2xl backdrop:bg-slate-950/50 dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+<dialog id="{{ id }}" class="w-[min(92vw,28rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50">
   <div class="space-y-5 p-6">
     <div>
       <h2 class="text-lg font-semibold">{{ title }}</h2>
-      <p data-confirm-message class="mt-2 text-sm text-muted dark:text-slate-400">{{ message }}</p>
+      <p data-confirm-message class="mt-2 text-sm text-muted">{{ message }}</p>
     </div>
     <div class="flex justify-end gap-3">
       <button type="button" data-confirm-cancel class="rounded-xl border border-line px-4 py-2 text-sm font-medium">{{ cancel_label }}</button>
-      <button type="button" data-confirm-accept class="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white">{{ confirm_label }}</button>
+      <button type="button" data-confirm-accept class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary">{{ confirm_label }}</button>
     </div>
   </div>
 </dialog>
@@ -67,11 +67,11 @@
 {% macro toast(message, undo_url, undo_label) -%}
 <div hx-swap-oob="beforeend:#toast-container">
   <div id="toast-{{ uuid4().hex }}" data-toast role="status" aria-live="polite"
-       class="flex items-center justify-between gap-4 rounded-xl bg-ink px-4 py-3 text-sm text-white shadow-lg">
+       class="flex items-center justify-between gap-4 rounded-xl bg-inverse px-4 py-3 text-sm text-on-inverse shadow-lg">
     <span>{{ message }}</span>
     <div class="flex items-center gap-3">
-      {% if undo_url %}<button type="button" data-toast-undo class="font-semibold text-emerald-300" hx-post="{{ undo_url }}">{{ undo_label }}</button>{% endif %}
-      <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-slate-300">×</button>
+      {% if undo_url %}<button type="button" data-toast-undo class="font-semibold text-inverse-link" hx-post="{{ undo_url }}">{{ undo_label }}</button>{% endif %}
+      <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-on-inverse">×</button>
     </div>
   </div>
 </div>
@@ -79,11 +79,11 @@
 
 {% macro empty_state(title, message, action_label=None, action_url=None) -%}
 <div class="panel flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center">
-  <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-accent dark:bg-emerald-950 dark:text-emerald-300" aria-hidden="true">+</div>
+  <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary-ink" aria-hidden="true">+</div>
   <h2 class="text-base font-semibold">{{ title }}</h2>
-  <p class="mt-2 max-w-sm text-sm leading-6 text-muted dark:text-slate-400">{{ message }}</p>
+  <p class="mt-2 max-w-sm text-sm leading-6 text-muted">{{ message }}</p>
   {% if action_label and action_url %}
-  <a href="{{ action_url }}" class="mt-5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark">{{ action_label }}</a>
+  <a href="{{ action_url }}" class="mt-5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ action_label }}</a>
   {% endif %}
 </div>
 {%- endmacro %}
@@ -97,15 +97,15 @@
 {% macro confirm_block(confirm, suffix, label) -%}
 {% if confirm.method == "password" %}
 <div class="space-y-1.5">
-  <label for="confirm-password-{{ suffix }}" class="block text-sm font-medium text-ink dark:text-slate-200">{{ _("Your password") }}</label>
+  <label for="confirm-password-{{ suffix }}" class="block text-sm font-medium text-ink">{{ _("Your password") }}</label>
   <input id="confirm-password-{{ suffix }}" name="confirm_password" type="password" required autocomplete="current-password" maxlength="1024"
-         class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+         class="form-control w-full">
 </div>
-<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ label }}</button>
+<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-subtle">{{ label }}</button>
 {% elif confirm.method == "fresh_session" %}
-<p class="text-xs text-muted dark:text-slate-400" data-confirm-fresh>{{ _("Confirmed by your recent sign-in for %(minutes)d more minutes.", minutes=confirm.minutes_left) }}</p>
-<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ label }}</button>
+<p class="text-xs text-muted" data-confirm-fresh>{{ _("Confirmed by your recent sign-in for %(minutes)d more minutes.", minutes=confirm.minutes_left) }}</p>
+<button type="submit" class="rounded-xl border border-line px-4 py-2.5 text-sm font-semibold hover:bg-subtle">{{ label }}</button>
 {% else %}
-<p class="text-xs text-muted dark:text-slate-400" data-confirm-stale>{{ _("To make this change, sign out and sign in again (with your identity provider, or by opening any page through your proxy). You then have 10 minutes.") }}</p>
+<p class="text-xs text-muted" data-confirm-stale>{{ _("To make this change, sign out and sign in again (with your identity provider, or by opening any page through your proxy). You then have 10 minutes.") }}</p>
 {% endif %}
 {%- endmacro %}

@@ -219,7 +219,7 @@ def test_password_hash_is_argon2id_and_common_list_is_bounded(
     monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
     production = hash_password(PASSWORD, "alice@example.com", "Alice")
     assert production.startswith("$argon2id$")
-    assert extract_parameters(production) == profiles.get_default_parameters()
+    assert extract_parameters(production) == auth.PRODUCTION_ARGON2_PARAMETERS
     assert len(common_passwords()) == 10000
     assert "password" in common_passwords()
 
@@ -234,11 +234,30 @@ def test_production_hasher_uses_library_defaults_and_rehashes_cheap_hashes(
     assert not auth.verify_password("not-a-hash", PASSWORD)
     assert not auth.password_hasher().check_needs_rehash(encoded)
     monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
-    assert profiles.get_default_parameters() == profiles.RFC_9106_LOW_MEMORY
     assert extract_parameters(auth.password_hasher().hash(PASSWORD)) == (
-        profiles.get_default_parameters()
+        auth.PRODUCTION_ARGON2_PARAMETERS
     )
     assert auth.password_hasher().check_needs_rehash(encoded)
+
+
+def test_production_argon2_parameters_are_pinned_and_shared_by_the_dummy_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The values in force when they were pinned (argon2-cffi 25.1's RFC 9106 low-memory
+    # profile). Changing them is a deliberate migration (ADR-0012), never a library upgrade.
+    assert auth.PRODUCTION_ARGON2_PARAMETERS == profiles.RFC_9106_LOW_MEMORY
+    assert (
+        auth.PRODUCTION_ARGON2_PARAMETERS.time_cost,
+        auth.PRODUCTION_ARGON2_PARAMETERS.memory_cost,
+        auth.PRODUCTION_ARGON2_PARAMETERS.parallelism,
+        auth.PRODUCTION_ARGON2_PARAMETERS.hash_len,
+        auth.PRODUCTION_ARGON2_PARAMETERS.salt_len,
+    ) == (3, 65536, 4, 32, 16)
+    monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
+    # A library whose defaults moved on does not change what is used.
+    monkeypatch.setattr(profiles, "get_default_parameters", lambda: profiles.CHEAPEST)
+    assert extract_parameters(auth._dummy_hash()) == auth.PRODUCTION_ARGON2_PARAMETERS  # pyright: ignore[reportPrivateUsage]
+    assert extract_parameters(auth.argon2_hash(PASSWORD)) == auth.PRODUCTION_ARGON2_PARAMETERS
 
 
 # Sessions
@@ -392,11 +411,20 @@ def test_unknown_email_and_wrong_password_are_indistinguishable(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
-    outcomes: list[LoginOutcome] = []
+    free = auth_settings.auth_account_free_failures
+    outcomes: dict[str, list[LoginOutcome]] = {}
     for email in ("test@example.com", "unknown@example.com"):
-        for _ in range(auth_settings.auth_account_free_failures + 2):
-            outcomes.append(_login(db_session, auth_settings, fixed_clock, email=email))
-    assert outcomes == [LoginOutcome()] * len(outcomes)
+        outcomes[email] = [
+            _login(db_session, auth_settings, fixed_clock, email=email) for _ in range(free + 3)
+        ]
+    # The same sequence for both: free + 1 plain failures (the last one sets the block), then
+    # throttled attempts with the same wait. Throttling is reported, the account never is.
+    assert outcomes["test@example.com"] == outcomes["unknown@example.com"]
+    blocked_until = fixed_clock.now() + timedelta(seconds=auth_settings.auth_throttle_base_seconds)
+    assert (
+        outcomes["unknown@example.com"]
+        == [LoginOutcome()] * (free + 1) + [LoginOutcome(throttled_until=blocked_until)] * 2
+    )
     known = _throttle(db_session, "account", "test@example.com")
     unknown = _throttle(db_session, "account", "unknown@example.com")
     assert known is not None and unknown is not None
@@ -433,6 +461,58 @@ def test_unknown_user_and_user_without_password_go_through_dummy_verify(
     assert len(calls) == 3
     assert all(encoded.startswith("$argon2id$") for encoded in calls)
     assert calls[0] == calls[2] != calls[1]
+
+
+def test_throttled_attempts_are_never_verified_for_known_or_unknown_emails(
+    db_session: Session,
+    auth_settings: Settings,
+    fixed_clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _create_user(db_session, auth_settings, fixed_clock)
+    calls: dict[str, int] = {}
+    real_verify = auth.verify_password
+    current = {"email": ""}
+
+    def counting_verify(encoded: str, password: str) -> bool:
+        calls[current["email"]] = calls.get(current["email"], 0) + 1
+        return real_verify(encoded, password)
+
+    monkeypatch.setattr(auth, "verify_password", counting_verify)
+    free = auth_settings.auth_account_free_failures
+    for email in (user.email, "unknown@example.com"):
+        current["email"] = email
+        for index in range(free + 4):
+            # Distinct addresses: only the account bucket is involved.
+            _login(db_session, auth_settings, fixed_clock, email=email, host=f"192.0.2.{index}")
+    # The same timing path for both: free + 1 verifications (dummy for the unknown email),
+    # then fast refusals that verify nothing.
+    assert calls == {user.email: free + 1, "unknown@example.com": free + 1}
+
+
+def test_throttled_until_is_the_longest_wait_of_the_blocked_buckets(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    # The address bucket: the 21st failure (at 20 s) blocks it until 80 s.
+    for index in range(auth_settings.auth_ip_free_failures + 1):
+        _login(db_session, auth_settings, at(seconds=index), email=f"spray-{index}@example.com")
+    ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
+    assert ip_row is not None and ip_row.blocked_until == at(seconds=80).now()
+    # An account bucket, from elsewhere: blocked at 30 s until 90 s.
+    for _ in range(auth_settings.auth_account_free_failures + 1):
+        _login(db_session, auth_settings, at(seconds=30), email="x@example.com", host="192.0.2.99")
+    both = _login(db_session, auth_settings, at(seconds=40), email="x@example.com")
+    assert both == LoginOutcome(throttled_until=at(seconds=90).now())
+    address_only = _login(db_session, auth_settings, at(seconds=40), email="y@example.com")
+    assert address_only == LoginOutcome(throttled_until=at(seconds=80).now())
+
+
+def test_oversized_credentials_are_a_plain_failure_without_throttle_details(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    outcome = _login(db_session, auth_settings, fixed_clock, password="x" * 5000)
+    assert outcome == LoginOutcome()
+    assert db_session.scalars(select(AuthThrottle)).all() == []
 
 
 def test_account_backoff_is_exponential_capped_and_configurable(
@@ -499,7 +579,7 @@ def test_ip_threshold_allows_twenty_distinct_accounts_before_backoff(
     assert other is not None and other.failure_count == 1
 
 
-def test_login_success_resets_only_the_account_counter(
+def test_a_successful_sign_in_counts_in_the_account_bucket_and_resets_nothing(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
@@ -508,8 +588,23 @@ def test_login_success_resets_only_the_account_counter(
     assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
     account = _throttle(db_session, "account", "test@example.com")
     ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
-    assert account is not None and account.failure_count == 0 and account.blocked_until is None
+    # The account bucket counts every attempt (decaying with time only); the address bucket,
+    # keyed by the requester, takes back the successful one.
+    assert account is not None and account.failure_count == 4 and account.blocked_until is None
     assert ip_row is not None and ip_row.failure_count == 3
+
+
+def test_the_owners_own_sign_ins_use_the_free_attempts(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    _create_user(db_session, auth_settings, fixed_clock)
+    free = auth_settings.auth_account_free_failures
+    outcomes = [
+        _login(db_session, auth_settings, fixed_clock, password=PASSWORD) for _ in range(free + 2)
+    ]
+    # free + 1 sign-ins succeed (the last of them starts the backoff), then the wait applies.
+    assert [o.succeeded for o in outcomes] == [True] * (free + 1) + [False]
+    assert outcomes[-1].throttled_until == at(seconds=60).now()
 
 
 def test_ip_counter_decays_only_with_its_time_window(
@@ -1187,7 +1282,7 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
     assert set(mapped) == set(expected_global) | {"audit_events"} | WORKSPACE_TABLES
 
 
-def test_change_password_wrong_attempts_use_the_account_throttle(
+def test_change_password_wrong_attempts_use_the_users_own_confirm_throttle(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     user = _create_user(db_session, auth_settings, fixed_clock)
@@ -1206,9 +1301,14 @@ def test_change_password_wrong_attempts_use_the_account_throttle(
     assert statuses == ["invalid_current"] * 6
     assert attempt(PASSWORD, fixed_clock).status == "throttled"
     assert auth.verify_password(user.password_hash or "", PASSWORD)
-    # The same bucket blocks login, and the block ends with the backoff.
-    assert not _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    # The bucket is the user's own (by id): sign-in for the email is untouched by it.
+    confirm = _throttle(db_session, "confirm", str(user.id))
+    assert confirm is not None and confirm.failure_count == 6 and confirm.blocked_until
+    assert _throttle(db_session, "account", user.email) is None
+    assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    # The block ends with the backoff; a change resets the user's own bucket.
     assert attempt(PASSWORD, at(seconds=60)).status == "changed"
+    assert (confirm.failure_count, confirm.blocked_until) == (0, None)
 
 
 @pytest.mark.parametrize(
@@ -1252,7 +1352,7 @@ def test_blocked_login_attempts_with_distinct_emails_add_no_rows(
         outcome = _login(
             db_session, auth_settings, fixed_clock, email=f"blocked-{index}@example.com"
         )
-        assert outcome == LoginOutcome()
+        assert outcome == LoginOutcome(throttled_until=ip_row.blocked_until)
     db_session.flush()
     rows_after = db_session.scalars(select(AuthThrottle)).all()
     assert [(r.key_type, r.key_hash, r.failure_count, r.updated_at) for r in rows_after] == snapshot
@@ -1260,7 +1360,7 @@ def test_blocked_login_attempts_with_distinct_emails_add_no_rows(
 
 
 @pytest.mark.parametrize("pruning", [True, False])
-def test_account_counter_idle_for_24_hours_counts_as_zero(
+def test_account_counter_after_its_window_or_idle_for_24_hours_counts_as_zero(
     db_session: Session,
     auth_settings: Settings,
     fixed_clock: FixedClock,
@@ -1271,10 +1371,17 @@ def test_account_counter_idle_for_24_hours_counts_as_zero(
         monkeypatch.setattr(auth, "prune_auth_throttles", lambda _session, _clock: 0)
     for _ in range(auth_settings.auth_account_free_failures):
         _login(db_session, auth_settings, fixed_clock, email="idle@example.com")
-    almost = at(hours=24, seconds=-1)
+    window = timedelta(minutes=auth_settings.auth_ip_window_minutes)
+    almost = at(seconds=window.total_seconds() - 1)
     _login(db_session, auth_settings, almost, email="idle@example.com")
     row = _throttle(db_session, "account", "idle@example.com")
     assert row is not None and row.failure_count == 6 and row.blocked_until is not None
+    # The window (the address bucket's) ends: the count starts again, the block stays.
+    after_window = at(seconds=window.total_seconds())
+    _login(db_session, auth_settings, after_window, email="idle@example.com")
+    assert row.failure_count == 6  # blocked: not counted
+    _login(db_session, auth_settings, at(hours=2), email="idle@example.com")
+    assert (row.failure_count, row.blocked_until) == (1, None)
 
     later = at(hours=48)
     if pruning:
@@ -1338,15 +1445,18 @@ def test_release_takes_back_only_this_requests_attempt(
 def test_release_is_a_no_op_after_a_reset_or_a_new_window(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
-    slot = _account_slot(auth_settings)
+    user_id = uuid4()
+    slot = auth.ThrottleSlot(
+        "confirm", str(user_id), None, auth_settings.auth_account_free_failures
+    )
     reserved = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
     assert reserved
-    # A successful login elsewhere resets the counter and starts a new window ...
-    auth._reset_account(db_session, "test@example.com", at(seconds=1).now())  # pyright: ignore[reportPrivateUsage]
+    # A correct password re-check elsewhere resets the user's confirm counter ...
+    auth._reset_confirm(db_session, user_id, at(seconds=1).now())  # pyright: ignore[reportPrivateUsage]
     # ... and a new failure is counted in it.
     auth.reserve_attempts(db_session, [slot], at(seconds=2).now(), auth_settings)
     auth.release_attempts(db_session, reserved)
-    row = _throttle(db_session, "account", "test@example.com")
+    row = _throttle(db_session, "confirm", str(user_id))
     assert row is not None and row.failure_count == 1  # the later failure is not erased
 
     ip_slot = auth.ThrottleSlot("ip", "192.0.2.1/32", timedelta(minutes=60), 20)
@@ -1464,3 +1574,17 @@ def test_change_password_refuses_the_current_password_as_the_new_one(
 def test_eight_characters_are_enough() -> None:
     # The minimum is 8 (it was 10 until 0.2.0); an uncommon 8-character password passes.
     validate_password("Zx9!q7pK", "alice@example.com", "Alice")
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (" Test@Example.COM ", ("test@example.com", "test@example.com")),
+        ("not an email", ("not an email", "invalid:not an email")),
+        ("x" * 400, ("x" * 320, "invalid:" + "x" * 320)),
+    ],
+)
+def test_login_keys_normalize_once_for_the_lookup_and_the_bucket(
+    raw: str, expected: tuple[str, str]
+) -> None:
+    assert auth._login_keys(raw) == expected  # pyright: ignore[reportPrivateUsage]

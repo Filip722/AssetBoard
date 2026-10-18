@@ -44,6 +44,7 @@ from assetboard.db.models.identity import ExternalIdentity, User, UserSession
 from assetboard.services import invitations
 from assetboard.services.auth import (
     AuthMethod,
+    Throttled,
     Verifier,
     confirm_password_with_factory,
     create_passwordless_user,
@@ -506,18 +507,23 @@ def sign_in_external(
     return outcome
 
 
-LinkStatus = Literal["linked", "failed", "disabled"]
+LinkStatus = Literal["linked", "failed", "throttled", "disabled"]
 
 
 @dataclass(frozen=True, slots=True)
 class LinkOutcome:
-    """``failed`` covers every refusal alike (wrong password, throttled, changed meanwhile)."""
+    """``failed`` covers every other refusal alike (wrong password, changed meanwhile).
+
+    ``throttled`` (until ``throttled_until``) names no more than the link page already does:
+    the identity provider's email has an account here.
+    """
 
     status: LinkStatus
     user_id: UUID | None = None
     session_id: str | None = None
     expires_at: datetime | None = None
     revoked_sessions: int = 0
+    throttled_until: datetime | None = None
 
 
 def link_identity(
@@ -534,7 +540,8 @@ def link_identity(
 ) -> LinkOutcome:
     """Link a verified identity to the account with the same email, after its password.
 
-    The password check is ``confirm_password_with_factory`` (login's throttle and dummy verify).
+    The password check is ``confirm_password_with_factory`` (the user's ``confirm`` throttle,
+    login's address throttle and dummy verify).
     On success every other session of that account is revoked: whoever created or used the
     account before (pre-hijacking) is signed out. Then the visitor is signed in.
     """
@@ -586,6 +593,8 @@ def link_identity(
         user_agent=user_agent,
         verify=verify,
     )
+    if isinstance(outcome, Throttled):
+        return LinkOutcome(status="throttled", throttled_until=outcome.until)
     return outcome or LinkOutcome(status="failed")
 
 

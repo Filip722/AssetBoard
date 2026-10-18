@@ -4,8 +4,8 @@
 {% block heading %}{{ _("Create an account") }}{% endblock %}
 {% block content %}
 <section class="panel max-w-xl p-6 sm:p-7">
-  {% if error %}<p class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-admin-error>{{ error }}</p>{% endif %}
-  <p class="text-sm text-muted dark:text-slate-300">{{ _("The account gets a temporary password, shown once after you create it. It must be changed at the first sign-in. The account starts without a workspace: invite it to one.") }}</p>
+  {% if error %}<p class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-admin-error>{{ error }}</p>{% endif %}
+  <p class="text-sm text-muted">{{ _("The account gets a temporary password, shown once after you create it. It must be changed at the first sign-in. The account starts without a workspace: invite it to one.") }}</p>
   <form method="post" action="{{ scoped_url(request, 'admin_user_new') }}" class="mt-6 space-y-4" novalidate data-admin-create-form>
     {{ csrf_input() }}
     {{ field("email", _("Email"), type="email", value=values.email, error=errors.get("email"), required=true, autocomplete="off", maxlength=320) }}

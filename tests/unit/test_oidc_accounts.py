@@ -277,7 +277,9 @@ def test_linking_needs_the_password_and_revokes_other_sessions(
     assert sign_in(db, settings, identity()).status == "signed_in"
 
 
-def test_a_wrong_password_is_counted_like_a_failed_login(db: WorkspaceDb, tmp_path: Path) -> None:
+def test_a_wrong_password_is_counted_in_the_users_confirm_bucket(
+    db: WorkspaceDb, tmp_path: Path
+) -> None:
     settings = oidc_settings(tmp_path, oidc_link_by_email=True)
     user_id = add_user(db, "ola@example.com")
     pending = pending_for(sign_in(db, settings, identity()))
@@ -287,11 +289,16 @@ def test_a_wrong_password_is_counted_like_a_failed_login(db: WorkspaceDb, tmp_pa
     assert identities(db) == []
     assert len(events(db, "auth.password_confirm_failure")) == 6
     assert events(db, "auth.password_confirm_failure")[0] == {"purpose": "oidc_link"}
-    # The account bucket is the login one: the right password is now throttled too.
-    assert do_link(db, settings, pending).status == "failed"
+    # The user's own confirm bucket (not the sign-in bucket of the email): the right password
+    # is now throttled too, and the outcome says until when (the page already names the
+    # account, so this discloses nothing).
+    throttled = do_link(db, settings, pending)
+    assert throttled.status == "throttled"
     with db.factory() as session:
-        counts = {row.key_type: row.failure_count for row in session.scalars(select(AuthThrottle))}
-    assert counts["account"] == 6
+        rows = {row.key_type: row for row in session.scalars(select(AuthThrottle))}
+    assert "account" not in rows
+    assert rows["confirm"].failure_count == 6
+    assert throttled.throttled_until == rows["confirm"].blocked_until is not None
     assert identities(db) == [] and sessions(db, user_id) == []
 
 

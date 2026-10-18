@@ -6,18 +6,18 @@
 <section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-settings-heading">
   <h2 id="workspace-settings-heading" class="text-base font-semibold">{{ _("General") }}</h2>
   {% if notice %}
-  <p class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status">{{ notice }}</p>
+  <p class="mt-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
   {% endif %}
   <form method="post" action="{{ scoped_url(request, 'workspace_settings') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>
     {{ csrf_input() }}
     <div class="sm:col-span-2">{{ field("name", _("Workspace name"), value=values.name, error=errors.get("name"), required=true, maxlength=max_name_length) }}</div>
     {% if values.base_currency_locked %}
     <div class="space-y-1.5" data-currency-locked>
-      <label for="base_currency" class="block text-sm font-medium text-ink dark:text-slate-200">{{ _("Base currency") }}</label>
+      <label for="base_currency" class="block text-sm font-medium text-ink">{{ _("Base currency") }}</label>
       <input type="hidden" name="base_currency" value="{{ values.base_currency }}">
-      <select id="base_currency" disabled aria-describedby="base_currency-help{% if errors.get('base_currency') %} base_currency-error{% endif %}" class="w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink dark:border-slate-700 dark:bg-slate-900 dark:text-white"><option selected>{{ values.base_currency }}</option></select>
-      <p id="base_currency-help" class="text-xs text-muted dark:text-slate-400">{{ _("Locked: transactions exist (deleted ones included), and their amounts are stored in this currency.") }}</p>
-      {% if errors.get("base_currency") %}<p id="base_currency-error" class="text-sm text-rose-700 dark:text-rose-300">{{ errors.get("base_currency") }}</p>{% endif %}
+      <select id="base_currency" disabled aria-describedby="base_currency-help{% if errors.get('base_currency') %} base_currency-error{% endif %}" class="form-select w-full"><option selected>{{ values.base_currency }}</option></select>
+      <p id="base_currency-help" class="text-xs text-muted">{{ _("Locked: transactions exist (deleted ones included), and their amounts are stored in this currency.") }}</p>
+      {% if errors.get("base_currency") %}<p id="base_currency-error" class="text-sm text-danger">{{ errors.get("base_currency") }}</p>{% endif %}
     </div>
     {% else %}
     {{ select("base_currency", _("Base currency"), currency_options, selected=values.base_currency, error=errors.get("base_currency")) }}
@@ -25,7 +25,7 @@
     {{ select("country_code", _("Country"), country_options, selected=values.country_code or "", error=errors.get("country_code"), blank=_("Not set")) }}
     {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone, error=errors.get("timezone")) }}
     {{ select("locale", _("Formatting default"), locales, selected=values.locale, error=errors.get("locale")) }}
-    <p class="text-xs text-muted dark:text-slate-400 sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
+    <p class="text-xs text-muted sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>
 </section>

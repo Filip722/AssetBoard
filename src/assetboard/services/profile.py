@@ -4,7 +4,8 @@ Every sensitive profile action (link, unlink, sign out everywhere) is confirmed 
 ``confirm_sensitive``, the single entry point:
 
 * A user with a password always confirms with it: ``confirm_password_with_factory``, the
-  primitive behind ``/login/link`` (login's throttle, dummy verify, audited failures), unchanged.
+  primitive behind ``/login/link`` (the ``confirm`` throttle, dummy verify, audited
+  failures), unchanged.
 * A user without a password (created through OIDC or the proxy) may instead rely on a fresh
   external session: the current session started through OIDC or the proxy at most
   ``FRESH_SESSION`` ago (its ``created_at``, not its last activity). This is weaker: a stolen
@@ -32,6 +33,7 @@ from assetboard.db.models.identity import ExternalIdentity, User, UserSession
 from assetboard.domain.identity import InvalidDisplayName, normalize_display_name
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.auth import (
+    Throttled,
     Verifier,
     confirm_password_with_factory,
     record_auth_event,
@@ -43,17 +45,19 @@ THEMES = ("system", "light", "dark")
 BROWSER_LOCALE = "browser"  # the profile's "Browser language" choice (stored as NULL)
 
 ConfirmMethod = Literal["password", "fresh_session", "none"]
-ConfirmStatus = Literal["confirmed", "failed", "stale", "busy"]
+ConfirmStatus = Literal["confirmed", "failed", "throttled", "stale", "busy"]
 
 
 @dataclass(frozen=True, slots=True)
 class ConfirmOutcome[T]:
-    """``failed``: wrong password or throttled (audited by the primitive). ``stale``: no
-    password and no fresh external session (nothing written). ``busy``: the database was
-    locked (set by the web entry point)."""
+    """``failed``: wrong password (audited by the primitive). ``throttled``: refused unchecked
+    until ``throttled_until``; the user is signed in, so saying so discloses nothing.
+    ``stale``: no password and no fresh external session (nothing written). ``busy``: the
+    database was locked (set by the web entry point)."""
 
     status: ConfirmStatus
     value: T | None = None
+    throttled_until: datetime | None = None
 
 
 def _fresh_external_session(row: UserSession | None, user_id: UUID, now: datetime) -> bool:
@@ -117,6 +121,8 @@ def confirm_sensitive[T](
             user_agent=user_agent,
             verify=verify,
         )
+        if isinstance(value, Throttled):
+            return ConfirmOutcome("throttled", throttled_until=value.until)
         if value is None:
             return ConfirmOutcome("failed")
         return ConfirmOutcome("confirmed", value)

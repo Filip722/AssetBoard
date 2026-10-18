@@ -23,9 +23,9 @@
 <body class="min-h-full">
   {% from "macros/components.html" import confirm_dialog, flashes %}
   <div class="min-h-screen lg:flex">
-    <aside class="border-b border-line bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+    <aside class="border-b border-line bg-surface px-4 py-4 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
       <a href="{{ scoped_url(request, 'home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
-        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-lg font-bold text-white" aria-hidden="true">A</span>
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-on-primary" aria-hidden="true">A</span>
         <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
       </a>
       <nav class="mt-7 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:flex-1 lg:flex-col" aria-label="{{ _('Main navigation') }}">
@@ -38,37 +38,37 @@
         <a class="nav-link" href="#loans"><span aria-hidden="true">▤</span>{{ _("Loans") }}</a>
         <span class="nav-link cursor-not-allowed opacity-50" aria-disabled="true"><span aria-hidden="true">✦</span>{{ _("FIRE projection") }}<span class="sr-only">{{ _("Unavailable") }}</span></span>
       </nav>
-      <div class="mt-4 flex items-center justify-between border-t border-line px-2 pt-4 dark:border-slate-800 lg:mt-8">
+      <div class="mt-4 flex items-center justify-between border-t border-line px-2 pt-4 lg:mt-8">
         <details class="group relative min-w-0">
           <summary class="flex cursor-pointer list-none items-center gap-3 rounded-xl px-1 py-1">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-accent dark:bg-emerald-950 dark:text-emerald-300" aria-hidden="true">◉</span>
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-ink" aria-hidden="true">◉</span>
             <span class="min-w-0">
               <span class="block truncate text-sm font-medium">{{ web_session.display_name if web_session else _("Your account") }}</span>
-              {% if workspace_nav %}<span class="block truncate text-xs text-muted dark:text-slate-400" data-current-workspace>{{ workspace_nav.current.name }}</span>{% endif %}
+              {% if workspace_nav %}<span class="block truncate text-xs text-muted" data-current-workspace>{{ workspace_nav.current.name }}</span>{% endif %}
             </span>
             <span class="text-xs text-muted" aria-hidden="true">⌃</span>
           </summary>
-          <div class="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-xl border border-line bg-white p-1 shadow-card dark:border-slate-700 dark:bg-slate-900">
+          <div class="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-xl border border-line bg-surface p-1 shadow-card">
             {% if workspace_nav and workspace_nav.role == "owner" %}
-            <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Workspace settings") }}</a>
-            <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Members") }}</a>
-            <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Audit log: workspace") }}</a>
+            <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Workspace settings") }}</a>
+            <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Members") }}</a>
+            <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Audit log: workspace") }}</a>
             {% endif %}
             {% if web_session and web_session.is_instance_admin %}
-            <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Users") }}</a>
-            <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Audit log: instance") }}</a>
+            <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Users") }}</a>
+            <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Audit log: instance") }}</a>
             {% endif %}
-            <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Profile") }}</a>
-            <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Account security") }}</a>
+            <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Profile") }}</a>
+            <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Account security") }}</a>
             {% if web_session %}
             <form method="post" action="{{ scoped_url(request, 'logout') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-              <button type="submit" data-sign-out class="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-canvas dark:hover:bg-slate-800">{{ _("Sign out") }}</button>
+              <button type="submit" data-sign-out class="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-subtle">{{ _("Sign out") }}</button>
             </form>
             {% endif %}
           </div>
         </details>
-        <button type="button" data-theme-toggle class="rounded-lg p-2 text-muted hover:bg-canvas dark:text-slate-300 dark:hover:bg-slate-800" aria-label="{{ _('Toggle dark mode') }}" title="{{ _('Toggle dark mode') }}">
+        <button type="button" data-theme-toggle class="rounded-lg p-2 text-muted hover:bg-subtle" aria-label="{{ _('Toggle dark mode') }}" title="{{ _('Toggle dark mode') }}">
           <span aria-hidden="true">◐</span>
         </button>
       </div>
@@ -77,24 +77,24 @@
       <div class="mx-auto max-w-6xl">
         <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-accent">{{ _("Personal finance") }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-ink">{{ _("Personal finance") }}</p>
             <h1 class="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>
           </div>
           {% if workspace_nav %}
           {% if workspace_nav.can_switch %}
           <form method="post" action="{{ scoped_url(request, 'workspace_switch') }}" class="flex items-center gap-2" data-workspace-switcher>
             <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-            <label for="workspace-switcher" class="text-sm text-muted dark:text-slate-300">{{ _("Workspace") }}</label>
-            <select id="workspace-switcher" name="workspace_id" data-autosubmit class="rounded-full border border-line bg-white px-3.5 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+            <label for="workspace-switcher" class="text-sm text-muted">{{ _("Workspace") }}</label>
+            <select id="workspace-switcher" name="workspace_id" data-autosubmit class="form-select rounded-full py-2">
               {% for choice in workspace_nav.choices %}
               <option value="{{ choice.id }}" {% if choice.id == workspace_nav.current.id %}selected{% endif %}>{{ choice.name }}</option>
               {% endfor %}
             </select>
-            <button type="submit" class="rounded-full border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-slate-800 dark:hover:bg-slate-800">{{ _("Switch") }}</button>
+            <button type="submit" class="rounded-full border border-line px-3 py-2 text-sm font-medium hover:bg-subtle">{{ _("Switch") }}</button>
           </form>
           {% else %}
-          <div class="rounded-full border border-line bg-white px-3.5 py-2 text-sm text-muted dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-            {{ _("Workspace") }} <span class="px-1 text-slate-300">/</span> {{ workspace_nav.current.name }}
+          <div class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm text-muted">
+            {{ _("Workspace") }} <span class="px-1 text-muted">/</span> {{ workspace_nav.current.name }}
           </div>
           {% endif %}
           {% endif %}

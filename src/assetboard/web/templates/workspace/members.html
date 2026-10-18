@@ -6,30 +6,30 @@
 <section class="panel p-6 sm:p-7" aria-labelledby="members-heading">
   <h2 id="members-heading" class="text-base font-semibold">{{ _("People in this workspace") }}</h2>
   {% if error %}
-  <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">{{ error }}</p>
+  <p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>
   {% endif %}
-  <ul class="mt-5 divide-y divide-line dark:divide-slate-800">
+  <ul class="mt-5 divide-y divide-line">
     {% for member in members %}
     <li class="flex flex-wrap items-center justify-between gap-4 py-4" data-member="{{ member.membership_id }}">
       <div class="min-w-0">
         <p class="truncate text-sm font-medium">{{ member.display_name }}{% if member.user_id == current_user_id %} <span class="text-xs text-muted">({{ _("you") }})</span>{% endif %}</p>
-        <p class="truncate text-xs text-muted dark:text-slate-400">{{ member.email }}</p>
+        <p class="truncate text-xs text-muted">{{ member.email }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <form method="post" action="{{ scoped_url(request, 'workspace_member_role', membership_id=member.membership_id|string) }}" class="flex items-center gap-2">
           {{ csrf_input() }}
           <label for="role-{{ member.membership_id }}" class="sr-only">{{ _("Role") }}</label>
-          <select id="role-{{ member.membership_id }}" name="role" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+          <select id="role-{{ member.membership_id }}" name="role" class="form-select pl-3 py-2">
             {% for value, label in roles %}
             <option value="{{ value }}" {% if value == member.role %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <button type="submit" class="rounded-xl border border-line px-3 py-2 text-sm font-medium hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ _("Change role") }}</button>
+          <button type="submit" class="rounded-xl border border-line px-3 py-2 text-sm font-medium hover:bg-subtle">{{ _("Change role") }}</button>
         </form>
         {% if member.user_id != current_user_id %}
         <form method="post" action="{{ scoped_url(request, 'workspace_member_remove', membership_id=member.membership_id|string) }}" data-confirm="{{ _('Remove %(name)s from this workspace?', name=member.display_name) }}">
           {{ csrf_input() }}
-          <button type="submit" data-remove-member class="rounded-xl px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950">{{ _("Remove") }}</button>
+          <button type="submit" data-remove-member class="rounded-xl px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft">{{ _("Remove") }}</button>
         </form>
         {% endif %}
       </div>
@@ -41,12 +41,12 @@
 <section class="panel mt-6 p-6 sm:p-7" aria-labelledby="invitations-heading">
   <h2 id="invitations-heading" class="text-base font-semibold">{{ _("Invitations") }}</h2>
   {% if created_link %}
-  <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status" data-created-invitation>
+  <div class="mt-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-created-invitation>
     <p class="font-medium">{{ _("Invitation link created. Copy it now: it is shown only once.") }}</p>
     <div class="mt-3 flex flex-wrap items-center gap-2">
       <label for="invitation-link" class="sr-only">{{ _("Invitation link") }}</label>
-      <input id="invitation-link" type="text" readonly value="{{ created_link }}" class="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-2 font-mono text-xs text-ink dark:border-slate-700 dark:bg-slate-950 dark:text-white">
-      <button type="button" data-copy-target="invitation-link" class="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-canvas dark:border-slate-700 dark:bg-slate-900 dark:text-white">{{ _("Copy") }}</button>
+      <input id="invitation-link" type="text" readonly value="{{ created_link }}" class="form-control px-3 min-w-0 flex-1 py-2 font-mono text-xs">
+      <button type="button" data-copy-target="invitation-link" class="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-subtle">{{ _("Copy") }}</button>
     </div>
   </div>
   {% endif %}
@@ -55,35 +55,35 @@
     {{ select("role", _("Role"), roles, selected=invite_values.role, error=invite_errors.get("role")) }}
     {{ field("email", _("Email (optional)"), type="email", value=invite_values.email, error=invite_errors.get("email"), autocomplete="off", maxlength=320) }}
     <div class="space-y-1.5">
-      <label for="expires_in_days" class="block text-sm font-medium text-ink dark:text-slate-200">{{ _("Valid for") }}</label>
-      <select id="expires_in_days" name="expires_in_days" {% if invite_errors.get("expires_in_days") %}aria-invalid="true" aria-describedby="expires_in_days-error"{% endif %} class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white">
+      <label for="expires_in_days" class="block text-sm font-medium text-ink">{{ _("Valid for") }}</label>
+      <select id="expires_in_days" name="expires_in_days" {% if invite_errors.get("expires_in_days") %}aria-invalid="true" aria-describedby="expires_in_days-error"{% endif %} class="form-select w-full">
         {% for days in expiry_choices %}
         <option value="{{ days }}" {% if days|string == invite_values.expires_in_days %}selected{% endif %}>{{ ngettext("%(num)d day", "%(num)d days", days) }}</option>
         {% endfor %}
       </select>
-      {% if invite_errors.get("expires_in_days") %}<p id="expires_in_days-error" class="text-sm text-rose-700 dark:text-rose-300">{{ invite_errors.get("expires_in_days") }}</p>{% endif %}
+      {% if invite_errors.get("expires_in_days") %}<p id="expires_in_days-error" class="text-sm text-danger">{{ invite_errors.get("expires_in_days") }}</p>{% endif %}
     </div>
-    <p class="text-xs text-muted dark:text-slate-400 sm:col-span-3">{{ _("With an email, only an account with that address can accept. Owner invitations must have one: an owner can change everything, including members.") }} {{ _("The email is not verified, so share the link only with the person you mean to invite.") }}</p>
-    <div class="sm:col-span-3"><button type="submit" class="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:bg-accent-dark">{{ _("Create invitation link") }}</button></div>
+    <p class="text-xs text-muted sm:col-span-3">{{ _("With an email, only an account with that address can accept. Owner invitations must have one: an owner can change everything, including members.") }} {{ _("The email is not verified, so share the link only with the person you mean to invite.") }}</p>
+    <div class="sm:col-span-3"><button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Create invitation link") }}</button></div>
   </form>
   <h3 class="mt-7 text-sm font-semibold">{{ _("Pending invitations") }} <span class="text-xs font-normal text-muted">({{ invitations|length }}/{{ max_pending }})</span></h3>
   {% if invitations %}
-  <ul class="mt-3 divide-y divide-line dark:divide-slate-800">
+  <ul class="mt-3 divide-y divide-line">
     {% for invitation in invitations %}
     <li class="flex flex-wrap items-center justify-between gap-4 py-3" data-invitation="{{ invitation.id }}">
       <div class="min-w-0 text-sm">
         <p class="font-medium">{{ role_labels[invitation.role] }}{% if invitation.email %} · <span class="text-muted">{{ invitation.email }}</span>{% endif %}</p>
-        <p class="text-xs text-muted dark:text-slate-400">{{ _("Expires %(date)s", date=invitation.expires_at.strftime("%Y-%m-%d %H:%M UTC")) }}</p>
+        <p class="text-xs text-muted">{{ _("Expires %(date)s", date=invitation.expires_at.strftime("%Y-%m-%d %H:%M UTC")) }}</p>
       </div>
       <form method="post" action="{{ scoped_url(request, 'workspace_invitation_revoke', invitation_id=invitation.id|string) }}" data-confirm="{{ _('Revoke this invitation link?') }}">
         {{ csrf_input() }}
-        <button type="submit" data-revoke-invitation class="rounded-xl px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950">{{ _("Revoke") }}</button>
+        <button type="submit" data-revoke-invitation class="rounded-xl px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft">{{ _("Revoke") }}</button>
       </form>
     </li>
     {% endfor %}
   </ul>
   {% else %}
-  <p class="mt-3 text-sm text-muted dark:text-slate-400">{{ _("No pending invitations.") }}</p>
+  <p class="mt-3 text-sm text-muted">{{ _("No pending invitations.") }}</p>
   {% endif %}
 </section>
 {% endblock %}

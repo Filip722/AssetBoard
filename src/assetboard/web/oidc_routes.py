@@ -58,6 +58,7 @@ from assetboard.web.security import (
     set_short_cookie,
     web_session,
 )
+from assetboard.web.throttle import retry_after, throttled_message
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -126,9 +127,7 @@ _PROTOCOL_PAGES = {
     "provider_unreachable": "unavailable",
     "discovery_failed": "unavailable",
 }
-LINK_FAILED = _(
-    "The password is not correct, or there were too many attempts. Try again later, or start over."
-)
+LINK_FAILED = _("The password is not correct. Try again, or start over.")
 LINK_EXPIRED = _("This confirmation expired. Start over to sign in.")
 
 
@@ -468,14 +467,16 @@ def _link_page(
     pending: PendingLink | None,
     *,
     error: str | None = None,
+    message: str | None = None,
     status_code: int = 200,
 ) -> Response:
+    """``error`` is a message key; ``message`` is already translated."""
     return render_template(
         request,
         "auth/link.html",
         context={
             "pending": pending,
-            "error": _t(request, error) if error else None,
+            "error": message or (_t(request, error) if error else None),
             "expired": _t(request, LINK_EXPIRED) if pending is None else None,
             # The sign-in page offers every method that is on.
             "start_url": "/login",
@@ -517,8 +518,21 @@ async def link_submit(request: Request, password: FormStr = "") -> Response:
         response = _link_page(request, pending, error=BUSY, status_code=503)
         response.headers["Retry-After"] = BUSY_RETRY_AFTER
         return response
+    if outcome.status == "throttled":
+        # The account is already named by this page, so the wait can be shown; still 401.
+        now = state.clock.now()
+        response = _link_page(
+            request,
+            pending,
+            message=throttled_message(outcome.throttled_until, now, request.state.locale),
+            status_code=401,
+        )
+        wait = retry_after(outcome.throttled_until, now)
+        if wait is not None:
+            response.headers["Retry-After"] = wait
+        return response
     if outcome.status != "linked" or outcome.session_id is None or outcome.expires_at is None:
-        # Wrong password, throttled, linking turned off meanwhile: one message for all.
+        # Wrong password, linking turned off meanwhile: one message for both.
         return _link_page(request, pending, error=LINK_FAILED, status_code=401)
     response = signed_in_redirect(
         request, oidc_next(pending.next_path), outcome.session_id, outcome.expires_at

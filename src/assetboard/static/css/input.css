@@ -2,35 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens: red, green and blue channels, so Tailwind's opacity modifiers work
+   (tailwind.config.js maps each colour name to its variable). Every text and background pair
+   meets WCAG AA; tests/unit/test_theme_tokens.py checks the ratios. */
 @layer base {
   :root {
     color-scheme: light;
+    --color-canvas: 250 250 250; /* #fafafa page */
+    --color-surface: 255 255 255; /* #ffffff cards, sidebar */
+    --color-subtle: 240 240 240; /* #f0f0f0 hover and quiet fills */
+    --color-field: 255 255 255; /* #ffffff form controls */
+    --color-line: 224 224 224; /* #e0e0e0 decorative borders */
+    --color-line-strong: 138 138 138; /* #8a8a8a form-control borders (3:1) */
+    --color-ink: 33 33 33; /* #212121 */
+    --color-muted: 97 97 97; /* #616161 */
+    --color-primary: 2 119 189; /* #0277bd button backgrounds */
+    --color-primary-hover: 1 87 155; /* #01579b */
+    --color-primary-ink: 2 106 167; /* #026aa7 links, active navigation */
+    --color-primary-soft: 225 245 254; /* #e1f5fe */
+    --color-on-primary: 255 255 255;
+    --color-accent: 255 152 0; /* #ff9800 backgrounds only, never text */
+    --color-on-accent: 33 33 33;
+    --color-success: 43 122 47; /* #2b7a2f income */
+    --color-success-soft: 232 245 233; /* #e8f5e9 */
+    --color-success-strong: 27 94 32; /* #1b5e20 */
+    --color-success-line: 200 230 201; /* #c8e6c9 */
+    --color-danger: 198 40 40; /* #c62828 expense, errors */
+    --color-danger-soft: 255 235 238; /* #ffebee */
+    --color-danger-strong: 183 28 28; /* #b71c1c */
+    --color-danger-line: 255 205 210; /* #ffcdd2 */
+    --color-warning-soft: 255 243 224; /* #fff3e0 */
+    --color-warning-strong: 138 75 0; /* #8a4b00 */
+    --color-warning-line: 255 224 178; /* #ffe0b2 */
+    --color-inverse: 33 33 33; /* #212121 toasts */
+    --color-on-inverse: 255 255 255;
+    --color-inverse-link: 79 195 247; /* #4fc3f7 */
   }
 
   :root.dark {
     color-scheme: dark;
+    --color-canvas: 17 17 17; /* #111111 */
+    --color-surface: 28 28 28; /* #1c1c1c */
+    --color-subtle: 42 42 42; /* #2a2a2a */
+    --color-field: 17 17 17; /* #111111 */
+    --color-line: 51 51 51; /* #333333 */
+    --color-line-strong: 107 107 107; /* #6b6b6b */
+    --color-ink: 225 225 225; /* #e1e1e1 */
+    --color-muted: 158 158 158; /* #9e9e9e */
+    --color-primary: 2 119 189; /* #0277bd */
+    --color-primary-hover: 1 87 155; /* #01579b */
+    --color-primary-ink: 3 169 244; /* #03a9f4 */
+    --color-primary-soft: 13 42 58; /* #0d2a3a */
+    --color-on-primary: 255 255 255;
+    --color-accent: 255 152 0; /* #ff9800 */
+    --color-on-accent: 17 17 17;
+    --color-success: 129 199 132; /* #81c784 */
+    --color-success-soft: 19 42 23; /* #132a17 */
+    --color-success-strong: 165 214 167; /* #a5d6a7 */
+    --color-success-line: 31 68 36; /* #1f4424 */
+    --color-danger: 239 154 154; /* #ef9a9a */
+    --color-danger-soft: 59 20 22; /* #3b1416 */
+    --color-danger-strong: 255 205 210; /* #ffcdd2 */
+    --color-danger-line: 92 31 34; /* #5c1f22 */
+    --color-warning-soft: 58 42 12; /* #3a2a0c */
+    --color-warning-strong: 255 204 128; /* #ffcc80 */
+    --color-warning-line: 90 65 19; /* #5a4113 */
+    --color-inverse: 42 42 42; /* #2a2a2a */
+    --color-on-inverse: 225 225 225; /* #e1e1e1 */
+    --color-inverse-link: 3 169 244; /* #03a9f4 */
   }
 
   body {
-    @apply bg-canvas text-ink antialiased dark:bg-slate-950 dark:text-slate-100;
+    @apply bg-canvas text-ink antialiased;
   }
 
   button,
   a {
-    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+    @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-ink;
   }
 }
 
 @layer components {
   .panel {
-    @apply rounded-2xl border border-line bg-white shadow-card dark:border-slate-800 dark:bg-slate-900;
+    @apply rounded-2xl border border-line bg-surface shadow-card;
   }
 
   .nav-link {
-    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-subtle hover:text-ink;
   }
 
   .nav-link[aria-current="page"] {
-    @apply bg-emerald-50 text-accent dark:bg-emerald-950/60 dark:text-emerald-300;
+    @apply bg-primary-soft text-primary-ink;
+  }
+
+  /* Text inputs and selects share one look; templates add only width and size. */
+  .form-control,
+  .form-select {
+    @apply rounded-xl border border-line-strong bg-field px-3.5 py-2.5 text-sm text-ink shadow-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-subtle disabled:text-muted;
+  }
+
+  /* The browser's own arrow sits against the right edge and ignores padding, so selects draw
+     their chevron as a background image (img-src allows data:) with room on the right. */
+  .form-select {
+    @apply appearance-none bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3e%3cpath d='M6 8l4 4 4-4' stroke='%23616161' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-size: 1.25rem 1.25rem;
+  }
+
+  :root.dark .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3e%3cpath d='M6 8l4 4 4-4' stroke='%239e9e9e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e");
+  }
+
+  /* The system draws its own arrow; both selectors, or the dark chevron (higher specificity)
+     would show a second one. */
+  @media (forced-colors: active) {
+    .form-select,
+    :root.dark .form-select {
+      appearance: auto;
+      background-image: none;
+    }
   }
 }

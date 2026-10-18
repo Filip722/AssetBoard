@@ -14,11 +14,11 @@
   <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}" referrerpolicy="no-referrer">
   <script src="{{ static_url(request, 'js/theme.js') }}" referrerpolicy="no-referrer"></script>
 </head>
-<body class="min-h-full bg-canvas dark:bg-slate-950">
+<body class="min-h-full bg-canvas">
   <main id="main-content" class="flex min-h-screen items-center justify-center px-4 py-10">
     <div class="w-full {% block width %}max-w-md{% endblock %}">
       <p class="mb-6 flex items-center justify-center gap-3">
-        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-lg font-bold text-white" aria-hidden="true">A</span>
+        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-on-primary" aria-hidden="true">A</span>
         <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
       </p>
       <section class="panel p-6 sm:p-8">

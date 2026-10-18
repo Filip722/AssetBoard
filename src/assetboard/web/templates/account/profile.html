@@ -4,10 +4,10 @@
 {% block heading %}{{ _("Profile") }}{% endblock %}
 {% block content %}
 {% if notice %}
-<p class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status" data-profile-notice>{{ notice }}</p>
+<p class="mb-6 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-profile-notice>{{ notice }}</p>
 {% endif %}
 {% if error %}
-<p class="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-profile-error>{{ error }}</p>
+<p class="mb-6 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-profile-error>{{ error }}</p>
 {% endif %}
 <div class="grid gap-6 lg:grid-cols-2">
   <section class="panel p-6 sm:p-7" aria-labelledby="profile-heading">
@@ -19,23 +19,23 @@
       {{ select("theme", _("Theme"), themes, selected=values.theme, error=errors.get("theme")) }}
       {{ primary_button(_("Save")) }}
     </form>
-    <p class="mt-4 text-xs text-muted dark:text-slate-400">{{ _("The dark-mode button changes the theme on one device only.") }}
-      <button type="button" data-theme-reset class="font-semibold text-accent">{{ _("Use the saved theme on this device") }}</button>
+    <p class="mt-4 text-xs text-muted">{{ _("The dark-mode button changes the theme on one device only.") }}
+      <button type="button" data-theme-reset class="font-semibold text-primary-ink">{{ _("Use the saved theme on this device") }}</button>
     </p>
   </section>
 
   <section class="panel p-6 sm:p-7" aria-labelledby="password-heading">
     <h2 id="password-heading" class="text-base font-semibold">{{ _("Password and devices") }}</h2>
-    <p class="mt-2 text-sm text-muted dark:text-slate-400">
+    <p class="mt-2 text-sm text-muted">
       {% if has_password %}{{ _("Change your password or sign out other devices.") }}{% else %}{{ _("This account has no password. You can still sign out other devices.") }}{% endif %}
     </p>
-    <p class="mt-4"><a class="font-semibold text-accent" href="{{ scoped_url(request, 'account_password') }}">{{ _("Account security") }}</a></p>
+    <p class="mt-4"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'account_password') }}">{{ _("Account security") }}</a></p>
   </section>
 
   <section class="panel p-6 sm:p-7 lg:col-span-2" aria-labelledby="identities-heading" data-identities>
     <h2 id="identities-heading" class="text-base font-semibold">{{ _("Sign-in methods") }}</h2>
     {% if identities %}
-    <ul class="mt-4 divide-y divide-line dark:divide-slate-800">
+    <ul class="mt-4 divide-y divide-line">
       {% for identity in identities %}
       <li class="flex flex-wrap items-start justify-between gap-4 py-4" data-identity="{{ identity.kind }}">
         <div class="min-w-0 text-sm">
@@ -46,8 +46,8 @@
           {% else %}
           <p class="font-medium">{{ _("Earlier identity provider (%(host)s)", host=issuer_host(identity.issuer)) }}</p>
           {% endif %}
-          {% if identity.email_at_link %}<p class="text-muted dark:text-slate-400">{{ identity.email_at_link }}</p>{% endif %}
-          <p class="text-xs text-muted dark:text-slate-400">{{ _("Linked on %(date)s", date=identity.linked_at.date().isoformat()) }}{% if not identity.current %} · {{ _("not usable with the current settings") }}{% endif %}</p>
+          {% if identity.email_at_link %}<p class="text-muted">{{ identity.email_at_link }}</p>{% endif %}
+          <p class="text-xs text-muted">{{ _("Linked on %(date)s", date=identity.linked_at.date().isoformat()) }}{% if not identity.current %} · {{ _("not usable with the current settings") }}{% endif %}</p>
         </div>
         <form method="post" action="{{ scoped_url(request, 'account_unlink', identity_id=identity.id) }}" class="flex flex-wrap items-end gap-3" data-unlink-form>
           {{ csrf_input() }}
@@ -57,7 +57,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="mt-4 text-sm text-muted dark:text-slate-400">{{ _("No identity provider or proxy sign-in is linked to this account.") }}</p>
+    <p class="mt-4 text-sm text-muted">{{ _("No identity provider or proxy sign-in is linked to this account.") }}</p>
     {% endif %}
 
     {% if can_link_oidc %}

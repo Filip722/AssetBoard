@@ -82,8 +82,8 @@ answers 404 to their form posts. It cannot be combined with `ASSETBOARD_ALLOW_RE
 Before turning it on, make sure an administrator can sign in through the provider.
 
 `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN=true` keeps password sign-in for instance administrators
-at `/login/local`, which no page links to. It has the same throttling and the same error
-message as `/login`; a non-administrator's correct password fails exactly like a wrong one. If
+at `/login/local`, which no page links to. It has the same throttling and the same messages
+as `/login`; a non-administrator's correct password fails exactly like a wrong one. If
 the provider is down and you did not enable it, `assetboard create-admin` still works from the
 command line.
 

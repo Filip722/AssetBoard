@@ -60,8 +60,11 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
 
 - One process only: the setup token, the hashing limit and the "setup closed" cache live in
   memory, so the app must run as a single Uvicorn worker.
-- No user enumeration through sign-in: unknown email, wrong password and throttled attempts get
-  the same response.
+- No user enumeration through sign-in: unknown email and wrong password get the same response.
+  A throttled attempt says so, with the wait ("Too many attempts. Try again in N minutes."); the
+  sign-in bucket is keyed by the normalized email, counted the same way whether or not an
+  account has it, and decays with time only; nothing the account's owner does resets it, so it
+  looks the same for every email (amendment of 2026-10-17).
 - A failed sign-in returns 401 without `WWW-Authenticate`: no HTTP authentication scheme is
   offered (the form is the only way in), and the 401 lets log-based tools such as fail2ban or
   proxy rules count failures without parsing the page.
@@ -76,8 +79,8 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
     entries have 8 or more characters (51 had 10 or more under the original minimum).
   - **Shared address bucket**: without a correct `ASSETBOARD_TRUSTED_PROXIES`, clients behind a
     proxy or Docker port publishing share one per-address budget.
-  - **Throttled responses are fast**, which reveals that throttling applies (not whether the
-    account exists).
+  - **Throttled responses are fast and say so**, which reveals that throttling applies (not
+    whether the account exists; see the amendment of 2026-10-17).
   - **Cookie injection over plain HTTP.** On an `http://` `BASE_URL`, cookies have no `__Host-`
     protection, so a network attacker (or a sibling host on the same domain) can plant an
     anonymous CSRF cookie and forge a matching token, which fixes the anonymous token. This only
@@ -105,7 +108,8 @@ ADR-0014 adds OIDC sign-in. For local authentication this means:
   administrators.
 - **Password confirmation.** Linking an OIDC identity to an account that has a password needs
   that password once. The check reuses login's per-account and per-address throttle and dummy
-  verify; F1.5 reuses it for sensitive profile actions.
+  verify; F1.5 reuses it for sensitive profile actions. (Since 2026-10-17 the per-account part
+  is a separate per-user `confirm` bucket; see that amendment.)
 - **Sessions record how they started** (`auth_method`: `password` or `oidc`).
 
 ## Amendment (2026-10-12): proxy header authentication (F1.4)
@@ -123,7 +127,8 @@ ADR-0015 adds reverse-proxy header authentication. For local authentication this
 - **One confirmation entry point.** Linking or unlinking a sign-in method and signing out other
   devices are confirmed through `services.profile.confirm_sensitive`. An account with a password
   always confirms with it, through the existing `confirm_password_with_factory` primitive
-  (login's throttle, dummy verify, audited failures), unchanged.
+  (login's throttle, dummy verify, audited failures), unchanged. (Since 2026-10-17 it uses the
+  per-user `confirm` bucket instead of the sign-in one.)
 - **Accounts without a password** (created through OIDC or the proxy) confirm with a fresh
   external session instead: the current session started through OIDC or the proxy at most
   10 minutes ago (`UserSession.created_at`, not its last activity). **This is weaker than a
@@ -163,3 +168,101 @@ user-chosen passwords that are checked against a list of commonly used ones. The
 common-password list, the identity check (not the email name or display name) and the
 throttles are unchanged. Existing passwords are unaffected; the rule applies when a password is
 set or changed. Temporary passwords are still 16 characters.
+
+## Amendment (2026-10-17): a separate message for throttled attempts
+
+Sign-in used one message for every failure ("The email or password is not correct, or there
+were too many attempts"), which told someone who had simply mistyped their password to wait,
+and someone who had to wait nothing about how long. Now:
+
+- An ordinary failure (unknown email, wrong password, a non-administrator at `/login/local`)
+  says "The email or password is not correct."
+- Only an attempt that a blocked bucket refused says "Too many attempts. Try again in N
+  minutes." N is the longest remaining block of the buckets involved, from the injected clock,
+  rounded up to whole minutes; "Try again later" if it cannot be computed. The attempt that
+  sets the block was verified, so it still gets the ordinary message.
+
+### Buckets
+
+- **Sign-in (`account`)**, per normalized email (or `invalid:<input>` for malformed input):
+  **every attempt counts, successful ones included**; 5 free attempts by default, then the
+  usual backoff. It counts in a fixed window, the address bucket's
+  (`ASSETBOARD_AUTH_IP_WINDOW_MINUTES`, 60 minutes by default): when the window has passed,
+  the next attempt starts a new count. **Nothing resets it**, and an attempt is taken back only
+  when no verify outcome exists yet (the hashing gate was saturated, or an error came before
+  the verify), which says nothing about the account.
+- **Password re-check (`confirm`)**, per user id: password change, password confirmation of
+  sensitive actions (profile, administration, signing out other devices) and the password step
+  of linking an identity provider or proxy sign-in by email. Same free failures and backoff, no
+  window (it expires when idle for 24 hours, like every row), and reset by a correct password.
+  These flows are reachable only by a signed-in user or for an email the identity provider
+  proved, which the page already names, so this bucket's state discloses nothing. They never
+  touch the sign-in bucket.
+- **Address (`ip`)**, unchanged: login and password confirmation count there, and a
+  successful attempt is taken back. It is keyed by the requester, so that reveals nothing
+  about the account.
+
+Why successful sign-ins count: an attempt is counted when it is reserved, before its password
+is verified (ADR-0007), and stays reserved while the verify runs (about 0.1 s here, up to a
+second on small hardware, and longer if someone floods the hashing gate). If a success then
+took its attempt back, a probe of the same email during the verify would see a count, or a
+block, that vanished afterwards; only an email with an account can succeed, so that would
+reveal it. Counting every attempt makes the outcome of a verify invisible to everyone but the
+person who made it.
+
+The Argon2id parameters are pinned in code (`PRODUCTION_ARGON2_PARAMETERS`, the RFC 9106
+low-memory profile: t=3, m=64 MiB, p=4), and the dummy hash uses the same ones, so a library
+upgrade cannot make real and dummy verifies take different times. Changing them is a
+deliberate migration, documented in an ADR and the upgrade notes: existing hashes are rehashed
+at their next successful sign-in.
+
+The window is the address bucket's rather than the 15-minute backoff cap: with a 15-minute
+window an attacker would get 5 fresh guesses per email every 15 minutes (20 an hour); with 60
+minutes it is 5 an hour plus the backoff, the same rate the address bucket allows per network.
+Reusing the setting keeps one sign-in window to explain and tune.
+
+### Why the throttled message reveals no account
+
+- The sign-in bucket is reserved before the user is looked up, unknown users go through the
+  same dummy verify, and a blocked attempt is answered from read-only lookups of the buckets
+  before the user table is read. An unknown email is counted, backed off and blocked exactly
+  like a known one.
+- Its state depends only on the sign-in attempts made against that email (each counted the
+  same, whatever its verify said) and on time. Password changes and confirmations go to the
+  `confirm` bucket. So an attacker who builds up an email's counter, waits out the block and
+  tries again gets the same answer whether or not the owner signed in meanwhile, and whether
+  or not the account exists, and a probe during someone's sign-in sees the same as one after
+  it. Tests send the same request sequences (attacker guesses, sign-ins with the owner's
+  password, changes and confirmations, right or wrong) for a known and an unknown email and
+  require identical outcomes and bucket state; a threaded test probes during an in-flight
+  sign-in; a mutation test checks that a reset or a take-back on success would be caught; and
+  a failed sign-in runs the same queries for both.
+- What remains visible is that *someone* made sign-in attempts against an email (a block the
+  observer did not cause). Anyone can make those against any address, existing or not, so this
+  says nothing about the account. Timing tells the same thing as before: a blocked attempt is
+  fast, an unblocked one costs one Argon2 verify, for every email alike.
+
+### Trade-off
+
+The owner's own attempts share the budget: 5 sign-in attempts per email per hour are free,
+**successful ones included**, and mistyped passwords are not cleared by a later success. A
+person who signs in more than 5 times within the hour (several devices, a script) reaches the
+backoff: the 6th attempt still goes through, then a 1-minute pause, doubling. The wait is
+shown, and the limit and window are configurable. A deliberate lockout by an attacker is
+bounded by the 15-minute backoff cap as before (and, as before, a correct password does not
+get through while the email is blocked).
+
+A possible future improvement, not part of this change: a long-lived device cookie set at a
+successful sign-in, so that attempts from a device that has signed in before use their own
+budget (as in OWASP's "device cookies" guidance) and the owner is not locked out by an
+attacker's guesses.
+
+The status stays **401** (not 429) with a `Retry-After` header in seconds: the 401 is what
+log-based tools such as fail2ban count, and a 429 would let a throttled attacker's continued
+attempts drop out of those filters. Change-password keeps its existing 429.
+
+The same split applies where the account is already known, so nothing is disclosed: password
+confirmation of sensitive actions (profile, administration, signing out other devices) and the
+password step of linking an identity provider or proxy sign-in by email. They return 401 with
+`Retry-After` when throttled. Registration and invitation sign-up keep their own per-address
+message.

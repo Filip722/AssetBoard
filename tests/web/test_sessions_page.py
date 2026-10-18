@@ -8,13 +8,15 @@ import logging
 import re
 import time
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.orm import sessionmaker
 
+from assetboard.clock import FixedClock
 from assetboard.db.engine import create_database_engine, immediate_transaction
 from assetboard.db.models.identity import AuthThrottle, User, UserSession
 from assetboard.services.auth import session_id_hash
@@ -24,7 +26,8 @@ from assetboard.web.security import safe_next
 if TYPE_CHECKING:
     from conftest import CountingHasher, WebHarness
 
-LOGIN_FAILED = "The email or password is not correct, or there were too many attempts."
+LOGIN_FAILED = "The email or password is not correct."
+THROTTLED_ONE_MINUTE = "Too many attempts. Try again in 1 minute."
 
 
 def _login(client: TestClient, web: WebHarness, email: str, password: str, **extra: str):
@@ -86,16 +89,77 @@ def test_login_failures_are_identical(web: WebHarness) -> None:
         web.complete_setup(app)
         unknown = _login(client, web, "nobody@example.com", "wrong password")
         wrong = _login(client, web, web.admin_email, "wrong password")
-        for _ in range(app.state.settings.auth_account_free_failures):
-            _login(client, web, web.admin_email, "wrong password")
-        throttled = _login(client, web, web.admin_email, web.admin_password)
-    assert unknown.status_code == wrong.status_code == throttled.status_code == 401
-    assert all("www-authenticate" not in r.headers for r in (unknown, wrong, throttled))
+    assert unknown.status_code == wrong.status_code == 401
+    assert all("www-authenticate" not in r.headers for r in (unknown, wrong))
+    assert all("retry-after" not in r.headers for r in (unknown, wrong))
     assert _strip_tokens(unknown.text).replace("nobody@example.com", "X") == _strip_tokens(
         wrong.text
     ).replace(web.admin_email, "X")
-    assert _strip_tokens(throttled.text) == _strip_tokens(wrong.text)
-    assert LOGIN_FAILED in wrong.text
+    assert LOGIN_FAILED in wrong.text and "Too many attempts" not in wrong.text
+
+
+def _attempts(web: WebHarness, app: FastAPI, address: str, email: str, count: int) -> list[Any]:
+    # The app is already started (lifespan) by the caller's client.
+    client = TestClient(app, client=(address, 1000))
+    return [_login(client, web, email, "wrong password") for _ in range(count)]
+
+
+def _started(web: WebHarness, app: FastAPI) -> TestClient:
+    client = TestClient(app)
+    client.__enter__()
+    web.complete_setup(app)
+    app.state.clock = FixedClock("2026-10-17T12:00:00+00:00")
+    return client
+
+
+def test_throttling_is_reported_identically_for_known_and_unknown_emails(web: WebHarness) -> None:
+    app = web.app()
+    started = _started(web, app)
+    try:
+        free = app.state.settings.auth_account_free_failures
+        # Separate addresses, so only each email's account bucket is involved.
+        known = _attempts(web, app, "192.0.2.40", web.admin_email, free + 3)
+        unknown = _attempts(web, app, "192.0.2.41", "nobody@example.com", free + 3)
+        # The right password is refused the same way while the block lasts.
+        right = TestClient(app, client=("192.0.2.40", 1000))
+        right_password = _login(right, web, web.admin_email, web.admin_password)
+    finally:
+        started.__exit__(None, None, None)
+
+    def shape(response: Any) -> tuple[int, str | None, bool, bool]:
+        return (
+            response.status_code,
+            response.headers.get("retry-after"),
+            LOGIN_FAILED in response.text,
+            THROTTLED_ONE_MINUTE in response.text,
+        )
+
+    plain = (401, None, True, False)
+    throttled = (401, "60", False, True)
+    # Free + 1 ordinary failures (the last one sets the block), then the throttled message:
+    # the same sequence, status, header and wait whether or not the account exists.
+    assert [shape(r) for r in known] == [plain] * (free + 1) + [throttled] * 2
+    assert [shape(r) for r in unknown] == [shape(r) for r in known]
+    assert _strip_tokens(known[-1].text).replace(web.admin_email, "X") == _strip_tokens(
+        unknown[-1].text
+    ).replace("nobody@example.com", "X")
+    assert shape(right_password) == throttled
+
+
+def test_the_throttled_message_counts_minutes_up_and_is_translated(web: WebHarness) -> None:
+    app = web.app(auth_throttle_base_seconds=150)
+    started = _started(web, app)
+    try:
+        free = app.state.settings.auth_account_free_failures
+        responses = _attempts(web, app, "192.0.2.42", "nobody@example.com", free + 2)
+        client = TestClient(app, client=("192.0.2.42", 1000), headers={"accept-language": "pl"})
+        polish = _login(client, web, "nobody@example.com", "x")
+    finally:
+        started.__exit__(None, None, None)
+    assert responses[-1].headers["retry-after"] == "150"
+    assert "Too many attempts. Try again in 3 minutes." in responses[-1].text
+    assert polish.status_code == 401
+    assert "Zbyt wiele prób. Spróbuj ponownie za 3 minuty." in polish.text
 
 
 @pytest.mark.parametrize(
@@ -324,8 +388,9 @@ def test_busy_hashing_returns_503_with_retry_after_on_every_auth_route(web: WebH
         assert response.status_code == 503, response.text
         assert response.headers["retry-after"] == "5"
         assert "The server is busy" in response.text
-    # Each request released what it reserved.
+    # Each busy request released what it reserved; the one count left is the successful
+    # sign-in in between (every sign-in attempt counts).
     account = _throttle(app, "account", web.admin_email)
-    assert account is None or account.failure_count == 0
+    assert account is not None and account.failure_count == 1
     register_row = _throttle(app, "register", "192.0.2.40/32")
     assert register_row is not None and register_row.failure_count == 0

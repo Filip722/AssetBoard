@@ -45,9 +45,8 @@ from assetboard.services.workspace_options import (
     locale_codes,
     timezone_names,
 )
-from assetboard.web.confirm import BUSY as CONFIRM_BUSY
-from assetboard.web.confirm import CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
-from assetboard.web.errors import BUSY_RETRY_AFTER, error_response, is_htmx_fragment_request
+from assetboard.web.confirm import confirm_view, refusal, run_confirmed
+from assetboard.web.errors import error_response, is_htmx_fragment_request
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     clear_csrf_cookie,
@@ -62,6 +61,7 @@ from assetboard.web.security import (
     set_session_cookie,
     web_session,
 )
+from assetboard.web.throttle import retry_after, throttled_message
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -106,10 +106,7 @@ ERROR_FIELDS = {
     "invalid_workspace_name": "workspace_name",
     "invalid_workspace_settings": "base_currency",
 }
-LOGIN_FAILED = _(
-    "The email or password is not correct, or there were too many attempts. "
-    "Check your details or try again later."
-)
+LOGIN_FAILED = _("The email or password is not correct.")
 SETUP_RACE = _("Setup was already completed, or is being completed. Reload to continue.")
 LOCALE_NAMES = {"en": "English", "pl": "Polski"}
 
@@ -325,12 +322,21 @@ async def setup_submit(
 # Sign in and out
 
 
+def _login_error(request: Request, *, error: bool, throttled_until: datetime | None) -> str | None:
+    """Throttled only when a bucket refused the attempt; never a hint that an account exists."""
+    if throttled_until is not None:
+        now = _state(request).clock.now()
+        return throttled_message(throttled_until, now, request.state.locale)
+    return _t(request, LOGIN_FAILED) if error else None
+
+
 def _login_page(
     request: Request,
     *,
     email: str = "",
     next_path: str = "",
     error: bool = False,
+    throttled_until: datetime | None = None,
     status: int = 200,
     break_glass: bool = False,
 ) -> Response:
@@ -345,7 +351,7 @@ def _login_page(
         context={
             "email": email,
             "next_path": safe_next(next_path, default=""),
-            "error": _t(request, LOGIN_FAILED) if error else None,
+            "error": _login_error(request, error=error, throttled_until=throttled_until),
             "registration_enabled": settings.allow_registration and not break_glass,
             "password_login": break_glass or not settings.oidc_only,
             "form_action": "login_local" if break_glass else "login",
@@ -396,14 +402,21 @@ async def _password_sign_in(
         require_instance_admin=break_glass,
     )
     if not outcome.succeeded or outcome.session_id is None:
-        return _login_page(
+        # Throttled attempts keep the 401 that log-based tools count (ADR-0012), plus a
+        # Retry-After; the page says how long to wait.
+        response = _login_page(
             request,
             email=email,
             next_path=next_path,
             error=True,
+            throttled_until=outcome.throttled_until,
             status=401,
             break_glass=break_glass,
         )
+        wait = retry_after(outcome.throttled_until, state.clock.now())
+        if wait is not None:
+            response.headers["Retry-After"] = wait
+        return response
     session_id = outcome.session_id
     expires_at = await run_in_threadpool(session_expiry, state.session_factory, session_id)
     if expires_at is None:
@@ -625,9 +638,12 @@ async def _password_page(
     request: Request,
     *,
     errors: dict[str, str] | None = None,
+    translated_errors: dict[str, str] | None = None,
     notice: str | None = None,
     status_code: int = 200,
 ) -> Response:
+    """``errors`` holds message keys (translated here); ``translated_errors`` and ``notice`` are
+    already in the request's language (for example a message with the throttle wait)."""
     current = _require_session(request)
     has_password = await run_in_threadpool(
         user_has_password, _state(request).session_factory, current.user_id
@@ -636,7 +652,10 @@ async def _password_page(
         request,
         "auth/password.html",
         context={
-            "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
+            "errors": {
+                **{field: _t(request, message) for field, message in (errors or {}).items()},
+                **(translated_errors or {}),
+            },
             "notice": notice,
             "no_password": None if has_password else _t(request, NO_PASSWORD),
             "confirm": await confirm_view(request, current),
@@ -696,11 +715,20 @@ async def password_submit(
     if outcome.status == "no_password":
         return await _password_page(request, status_code=400)
     if outcome.status == "throttled":
-        return await _password_page(
+        now = state.clock.now()
+        response = await _password_page(
             request,
-            errors={"current_password": _("Too many attempts. Try again later.")},
+            translated_errors={
+                "current_password": throttled_message(
+                    outcome.throttled_until, now, request.state.locale
+                )
+            },
             status_code=429,
         )
+        wait = retry_after(outcome.throttled_until, now)
+        if wait is not None:
+            response.headers["Retry-After"] = wait
+        return response
     if outcome.status == "invalid_new":
         code = outcome.error.code if outcome.error else ""
         return await _password_page(
@@ -737,21 +765,22 @@ async def logout_others(request: Request, confirm_password: FormStr = "") -> Res
     )
     fragment = is_htmx_fragment_request(request)
     if outcome.status != "confirmed" or outcome.value is None:
-        key, status = {
-            "busy": (CONFIRM_BUSY, 503),
-            "stale": (CONFIRM_STALE, 403),
-        }.get(outcome.status, (CONFIRM_FAILED, 401))
+        refused = refusal(request, outcome)
         if fragment:
             response = render_template(
                 request,
                 "auth/notice_fragment.html",
-                context={"notice": _t(request, key), "failed": True},
-                status_code=status,
+                context={"notice": refused.message, "failed": True},
+                status_code=refused.status_code,
             )
         else:
-            response = await _password_page(request, errors={"confirm": key}, status_code=status)
-        if status == 503:
-            response.headers["Retry-After"] = BUSY_RETRY_AFTER
+            response = await _password_page(
+                request,
+                translated_errors={"confirm": refused.message},
+                status_code=refused.status_code,
+            )
+        if refused.retry_after is not None:
+            response.headers["Retry-After"] = refused.retry_after
         return response
     notice = gettext("Other sessions signed out: %(count)d.", request.state.locale) % {
         "count": outcome.value

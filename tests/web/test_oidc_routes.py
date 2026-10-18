@@ -568,9 +568,46 @@ def test_linking_after_the_flag_was_turned_off_fails_generically(web: WebHarness
             data={"csrf_token": o.web.csrf(page.text), "password": o.web.admin_password},
         )
         assert response.status_code == 401
-        assert "The password is not correct, or there were too many attempts" in response.text
+        assert "The password is not correct. Try again, or start over." in response.text
+        assert "retry-after" not in response.headers
         with o.db() as session:
             assert session.scalars(select(ExternalIdentity)).all() == []
+
+
+def test_a_throttled_link_says_how_long_to_wait(web: WebHarness) -> None:
+    with start_link(web) as o:
+        page = o.client.get("/login/link")
+        token = o.web.csrf(page.text)
+        responses = [
+            o.client.post("/login/link", data={"csrf_token": token, "password": "nope"})
+            for _ in range(o.app.state.settings.auth_account_free_failures + 2)
+        ]
+        assert [r.status_code for r in responses] == [401] * len(responses)
+        assert "The password is not correct. Try again, or start over." in responses[0].text
+        assert "Too many attempts" not in responses[0].text
+        assert "Too many attempts. Try again in 1 minute." in responses[-1].text
+        assert responses[-1].headers["retry-after"] == "60"
+        with o.db() as session:
+            assert session.scalars(select(ExternalIdentity)).all() == []
+
+
+def test_break_glass_login_reports_throttling_like_login(web: WebHarness) -> None:
+    with oidc_app(web, oidc_only=True, allow_local_admin_login=True) as o:
+        responses = []
+        for _ in range(o.app.state.settings.auth_account_free_failures + 2):
+            token = o.web.csrf(o.client.get("/login/local").text)
+            responses.append(
+                o.client.post(
+                    "/login/local",
+                    data={"csrf_token": token, "email": "nobody@example.com", "password": "x"},
+                    follow_redirects=False,
+                )
+            )
+    assert [r.status_code for r in responses] == [401] * len(responses)
+    assert "The email or password is not correct." in responses[0].text
+    assert "retry-after" not in responses[0].headers
+    assert "Too many attempts. Try again in 1 minute." in responses[-1].text
+    assert responses[-1].headers["retry-after"] == "60"
 
 
 def test_link_page_without_a_pending_link_asks_to_start_over(oidc: Oidc) -> None:

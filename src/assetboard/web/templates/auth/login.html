@@ -4,7 +4,7 @@
 {% block heading %}{{ _("Sign in") }}{% endblock %}
 {% block content %}
 {% if error %}
-<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert">{{ error }}</p>
+<p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>
 {% endif %}
 {% if proxy_user %}
 <div class="mt-6" data-proxy-sign-in>{{ link_button(_("Continue as %(user)s", user=proxy_user), proxy_start_url) }}</div>
@@ -13,7 +13,7 @@
 <div class="mt-6" data-oidc-sign-in>{{ link_button(_("Continue with %(provider)s", provider=oidc_provider), oidc_start_url) }}</div>
 {% endif %}
 {% if password_login %}
-{% if oidc_provider or proxy_user %}<p class="mt-6 text-center text-xs text-muted dark:text-slate-400">{{ _("or sign in with your password") }}</p>{% endif %}
+{% if oidc_provider or proxy_user %}<p class="mt-6 text-center text-xs text-muted">{{ _("or sign in with your password") }}</p>{% endif %}
 <form method="post" action="{{ scoped_url(request, form_action) }}" class="mt-6 space-y-4" novalidate>
   {{ csrf_input() }}
   {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
@@ -23,6 +23,6 @@
 </form>
 {% endif %}
 {% if registration_enabled %}
-<p class="mt-6 text-center text-sm text-muted dark:text-slate-400">{{ _("No account yet?") }} <a class="font-semibold text-accent" href="{{ scoped_url(request, 'register') }}">{{ _("Create an account") }}</a></p>
+<p class="mt-6 text-center text-sm text-muted">{{ _("No account yet?") }} <a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'register') }}">{{ _("Create an account") }}</a></p>
 {% endif %}
 {% endblock %}

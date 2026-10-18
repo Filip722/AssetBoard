@@ -20,7 +20,7 @@ from assetboard.db.models.identity import (
     User,
     UserSession,
 )
-from assetboard.services import profile
+from assetboard.services import auth, profile
 from assetboard.services.auth import argon2_hash, create_user_session, session_id_hash
 from assetboard.services.external_identity import PROXY_PROVIDER
 from assetboard.services.profile import (
@@ -184,6 +184,26 @@ def test_the_password_branch_is_the_existing_primitive(db: WorkspaceDb, tmp_path
     assert audits(db, "auth.password_confirm_failure") == [{"purpose": "test"}]
     outcome = confirm(db, settings, user_id, session_hash, PASSWORD)
     assert (outcome.status, outcome.value) == ("confirmed", "password")
+
+
+def test_a_throttled_confirmation_says_so_and_is_not_verified(
+    db: WorkspaceDb, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = make_settings(tmp_path)
+    user_id = add_user(db)
+    session_hash = add_session(db, settings, user_id, "oidc")
+    for _ in range(settings.auth_account_free_failures + 1):
+        assert confirm(db, settings, user_id, session_hash, "wrong").status == "failed"
+    verified: list[str] = []
+    real = auth.verify_password
+    monkeypatch.setattr(
+        auth, "verify_password", lambda encoded, pw: verified.append(pw) or real(encoded, pw)
+    )
+    outcome = confirm(db, settings, user_id, session_hash, PASSWORD)
+    assert outcome.status == "throttled" and outcome.value is None
+    expected = db.clock.now() + timedelta(seconds=settings.auth_throttle_base_seconds)
+    assert outcome.throttled_until == expected
+    assert verified == []
 
 
 def test_a_stale_session_writes_nothing(db: WorkspaceDb, tmp_path: Path) -> None:

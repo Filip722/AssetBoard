@@ -4,6 +4,6 @@
 {% block title %}{{ _("Sign-in") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Sign-in did not complete") }}{% endblock %}
 {% block content %}
-<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-oidc-failure>{{ message }}</p>
-<p class="mt-6 text-center text-sm"><a class="font-semibold text-accent" href="{{ scoped_url(request, 'login') }}" rel="noreferrer">{{ _("Back to sign-in") }}</a></p>
+<p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-oidc-failure>{{ message }}</p>
+<p class="mt-6 text-center text-sm"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'login') }}" rel="noreferrer">{{ _("Back to sign-in") }}</a></p>
 {% endblock %}

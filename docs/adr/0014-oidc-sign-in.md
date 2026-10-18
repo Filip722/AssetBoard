@@ -63,7 +63,9 @@ need the provider at startup.
      registered, so an unverified claim cannot probe for accounts.
   3. If an account with the same email exists, it is linked only with
      `ASSETBOARD_OIDC_LINK_BY_EMAIL` **and that account's password entered once** on a
-     confirmation page (login's throttle and dummy verify, a generic error).
+     confirmation page (login's throttle and dummy verify, a generic error; since 2026-10-17
+     the user's own `confirm` bucket and login's address bucket, and a throttled attempt shows
+     the wait, see ADR-0012).
      Linking revokes the account's other sessions. Accounts without a password are never
      linked by email. Every other case gets "an account with this email exists; sign in with
      your password, then link from your profile" (linking from the profile comes in F1.5).
@@ -93,7 +95,7 @@ need the provider at startup.
 - **Local sign-in.** `ASSETBOARD_OIDC_ONLY` hides password sign-in and registration; it
   refuses to start together with `ALLOW_REGISTRATION`. `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN`
   keeps `/login/local` for instance administrators as a break-glass route, with the same
-  throttle and generic error as `/login`.
+  throttle and messages as `/login`.
 - **RP-initiated logout** (`ASSETBOARD_OIDC_RP_LOGOUT`). Sign-out ends the local session, then
   shows a page that continues to the provider's `end_session_endpoint` with `client_id` and
   `post_logout_redirect_uri=<BASE_URL>/login`. A page, not a redirect: Chromium applies

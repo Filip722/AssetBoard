@@ -21,6 +21,7 @@ from sqlalchemy.exc import OperationalError
 from assetboard.cli import serve_app
 from assetboard.db.models.identity import AuditEvent, ExternalIdentity, User, UserSession
 from assetboard.i18n.locale import SUPPORTED_LOCALES
+from assetboard.services import profile
 from assetboard.services.auth import argon2_hash
 from assetboard.services.external_identity import PROXY_PROVIDER
 from assetboard.services.oidc import OidcClient
@@ -348,6 +349,52 @@ def test_every_sensitive_post_needs_confirmation(h: Harness, action: str, passwo
     assert not any("oidc_flow" in cookie for cookie in response.headers.get_list("set-cookie"))
     assert (h.identities(), h.sessions()) == before
     assert h.audits("auth.password_confirm_failure")  # the primitive audits failures
+
+
+@pytest.mark.parametrize("htmx", [False, True])
+def test_a_throttled_confirmation_says_how_long_to_wait(h: Harness, htmx: bool) -> None:
+    client = admin(h)
+    headers = {"HX-Request": "true"} if htmx else {}
+
+    def post(password: str) -> Response:
+        return client.post(
+            "/account/logout-others",
+            data={"csrf_token": h.token(client, "/account/password"), "confirm_password": password},
+            headers=headers,
+        )
+
+    free = h.app.state.settings.auth_account_free_failures
+    wrong = [post("wrong password") for _ in range(free + 1)]
+    right = post(h.web.admin_password)
+    assert all(r.status_code == 401 for r in [*wrong, right])
+    assert "The password is not correct." in wrong[0].text
+    assert "Too many attempts" not in wrong[-1].text and "retry-after" not in wrong[-1].headers
+    assert "Too many attempts. Try again in 1 minute." in right.text
+    assert right.headers["retry-after"] == "60"
+
+
+@pytest.mark.parametrize("action", ["link_oidc", "link_proxy", "unlink"])
+def test_profile_actions_show_the_throttled_wait(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    client = admin(h)
+    path, headers = sensitive_posts(h, client)[action]
+    until = h.app.state.clock.now() + timedelta(seconds=150)
+    with monkeypatch.context() as m:
+        m.setattr(
+            confirm,
+            "confirm_sensitive",
+            lambda *_a, **_k: profile.ConfirmOutcome("throttled", throttled_until=until),
+        )
+        response = client.post(
+            path,
+            data={"csrf_token": h.token(client), "confirm_password": h.web.admin_password},
+            headers=headers,
+            follow_redirects=False,
+        )
+    assert response.status_code == 401
+    assert "Too many attempts. Try again in 3 minutes." in response.text
+    assert 148 <= int(response.headers["retry-after"]) <= 150
 
 
 def test_a_stale_external_session_is_refused_without_an_audit_row(h: Harness) -> None:

@@ -109,7 +109,34 @@ def test_change_password_is_throttled(signed_in: TestClient, web: WebHarness) ->
     for _ in range(6):
         _change(signed_in, web, "wrong current", NEW_PASSWORD)
     throttled = _change(signed_in, web, web.admin_password, NEW_PASSWORD)
-    assert throttled.status_code == 429 and "Too many attempts" in throttled.text
+    assert throttled.status_code == 429
+    assert "Too many attempts. Try again in 1 minute." in throttled.text
+    assert throttled.headers["retry-after"] == "60"
+    # Translated once, in the request's language, with the right plural form.
+    signed_in.headers["accept-language"] = "pl"
+    polish = _change(signed_in, web, web.admin_password, NEW_PASSWORD)
+    assert polish.status_code == 429
+    assert "Zbyt wiele prób. Spróbuj ponownie za 1 minutę." in polish.text
+
+
+def test_a_throttled_logout_others_shows_the_wait_in_the_page_language(
+    signed_in: TestClient, web: WebHarness
+) -> None:
+    def post(password: str):
+        return signed_in.post(
+            "/account/logout-others",
+            data={
+                "csrf_token": web.page_token(signed_in, "/account/password"),
+                "confirm_password": password,
+            },
+        )
+
+    for _ in range(6):
+        post("wrong password")
+    signed_in.headers["accept-language"] = "pl"
+    throttled = post(web.admin_password)
+    assert throttled.status_code == 401 and throttled.headers["retry-after"] == "60"
+    assert "Zbyt wiele prób. Spróbuj ponownie za 1 minutę." in throttled.text
 
 
 def test_no_password_session_id_or_csrf_token_is_logged(

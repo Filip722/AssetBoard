@@ -13,6 +13,17 @@ AssetBoard is a single FastAPI process with server-rendered pages. Code is layer
 Decisions are recorded in [ADRs](adr/README.md). Tenant isolation is described in
 [ADR-0003](adr/0003-workspaces-and-tenant-isolation.md).
 
+## Colours and themes
+
+Colours are named tokens (`canvas`, `surface`, `subtle`, `ink`, `muted`, `line`, `primary`,
+`accent`, `success`, `danger`, `warning`, `inverse`, ...). Their values are CSS variables set
+once for the light theme (`:root`) and once for the dark theme (`:root.dark`) in
+`static/css/input.css`; `tailwind.config.js` maps each name to its variable. Templates use only
+token classes and no `dark:` colour variants, so changing a colour is a one-place edit followed
+by `make css`. `tests/unit/test_theme_tokens.py` checks WCAG AA contrast for every text and
+background pair in both themes and that templates use no other colours. Form controls use the
+shared `form-control` and `form-select` classes.
+
 ## Workspaces, Context and roles
 
 Every signed-in request that works on workspace data gets a `Context(user, workspace, role,

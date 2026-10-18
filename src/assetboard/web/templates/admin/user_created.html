@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel max-w-xl p-6 sm:p-7" data-admin-created>
   <p class="text-sm">{{ _("The account %(email)s was created. Give this temporary password to %(name)s; it is shown only now and must be changed at the first sign-in.", email=email, name=display_name) }}</p>
-  <p class="mt-4 rounded-xl border border-line bg-canvas px-4 py-3 font-mono text-base dark:border-slate-700 dark:bg-slate-950" data-temporary-password>{{ password }}</p>
-  <p class="mt-6 text-sm"><a class="text-accent" href="{{ scoped_url(request, 'admin_users') }}">{{ _("Back to users") }}</a></p>
+  <p class="mt-4 rounded-xl border border-line bg-subtle px-4 py-3 font-mono text-base" data-temporary-password>{{ password }}</p>
+  <p class="mt-6 text-sm"><a class="text-primary-ink" href="{{ scoped_url(request, 'admin_users') }}">{{ _("Back to users") }}</a></p>
 </section>
 {% endblock %}

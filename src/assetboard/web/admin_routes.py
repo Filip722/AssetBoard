@@ -44,13 +44,7 @@ from assetboard.services.admin_users import (
 )
 from assetboard.services.auth import WebSession, argon2_hash, create_user_with_temporary_password
 from assetboard.services.profile import ConfirmMethod
-from assetboard.web.confirm import (
-    BUSY,
-    CONFIRM_FAILED,
-    CONFIRM_STALE,
-    confirm_view,
-    run_confirmed,
-)
+from assetboard.web.confirm import Refusal, confirm_view, refusal, run_confirmed
 from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.rendering import render_template
 from assetboard.web.security import client_host, require_csrf, web_session
@@ -163,12 +157,10 @@ async def _users_page(
     )
 
 
-def _refusal(status: str) -> tuple[str, int]:
-    if status == "busy":
-        return BUSY, 503
-    if status == "stale":
-        return CONFIRM_STALE, 403
-    return CONFIRM_FAILED, 401
+def _with_retry_after(response: Response, refused: Refusal) -> Response:
+    if refused.retry_after is not None:
+        response.headers["Retry-After"] = refused.retry_after
+    return response
 
 
 @router.get("/admin/users", name="admin_users")
@@ -252,10 +244,11 @@ async def action_submit(
         request, current, purpose=f"admin_{chosen}", password=confirm_password, action=apply
     )
     if outcome.status != "confirmed" or outcome.value is None:
-        message, status = _refusal(outcome.status)
-        return await _confirm_page(
-            request, current, chosen, target, error=_t(request, message), status_code=status
+        refused = refusal(request, outcome)
+        page = await _confirm_page(
+            request, current, chosen, target, error=refused.message, status_code=refused.status_code
         )
+        return _with_retry_after(page, refused)
     if outcome.value == "not_found":
         raise HTTPException(status_code=404)
     message = _t(request, ACTION_RESULTS[outcome.value])
@@ -363,10 +356,11 @@ async def new_user_submit(
         request, current, purpose="admin_create_user", password=confirm_password, action=create
     )
     if outcome.status != "confirmed" or outcome.value is None:
-        message, status = _refusal(outcome.status)
-        return await _new_user_page(
-            request, current, values=values, error=_t(request, message), status_code=status
+        refused = refusal(request, outcome)
+        page = await _new_user_page(
+            request, current, values=values, error=refused.message, status_code=refused.status_code
         )
+        return _with_retry_after(page, refused)
     if outcome.value == "email_taken":
         return await _new_user_page(
             request,

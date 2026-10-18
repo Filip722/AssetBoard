@@ -4,14 +4,14 @@
 {% block heading %}{{ _("Invitation") }}{% endblock %}
 {% block content %}
 {% if error %}
-<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100" role="alert" data-invite-error>{{ error }}</p>
+<p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-invite-error>{{ error }}</p>
 {% endif %}
 {% if notice %}
-<p class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100" role="status">{{ notice }}</p>
+<p class="mt-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
 {% endif %}
 {% if preview %}
-<p class="mt-4 text-sm text-muted dark:text-slate-300" data-invite-summary>{{ _("You are invited to join %(workspace)s as %(role)s.", workspace=preview.workspace_name, role=role_name) }}</p>
-{% if preview.email_locked %}<p class="mt-2 text-xs text-muted dark:text-slate-400">{{ _("This invitation can only be accepted with the email address it was sent to.") }}</p>{% endif %}
+<p class="mt-4 text-sm text-muted" data-invite-summary>{{ _("You are invited to join %(workspace)s as %(role)s.", workspace=preview.workspace_name, role=role_name) }}</p>
+{% if preview.email_locked %}<p class="mt-2 text-xs text-muted">{{ _("This invitation can only be accepted with the email address it was sent to.") }}</p>{% endif %}
 {% if signed_in %}
 <form method="post" action="{{ scoped_url(request, 'invite_accept', token=token) }}" class="mt-6">
   {{ csrf_input() }}
@@ -24,7 +24,7 @@
 {% if oidc_provider %}
 <div class="mt-6" data-oidc-sign-in>{{ link_button(_("Continue with %(provider)s", provider=oidc_provider), oidc_start_url) }}</div>
 {% endif %}
-<p class="mt-6 text-sm">{{ _("Already have an account?") }} <a class="font-semibold text-accent" href="{{ login_url }}" rel="noreferrer">{{ _("Sign in to accept") }}</a></p>
+<p class="mt-6 text-sm">{{ _("Already have an account?") }} <a class="font-semibold text-primary-ink" href="{{ login_url }}" rel="noreferrer">{{ _("Sign in to accept") }}</a></p>
 {% if local_sign_up %}
 <h2 class="mt-6 text-base font-semibold">{{ _("Create an account") }}</h2>
 <form method="post" action="{{ scoped_url(request, 'invite_register', token=token) }}" class="mt-4 space-y-4" novalidate>

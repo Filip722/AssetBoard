@@ -193,6 +193,17 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             guest.close()
             # A signed-in member accepting a second link: told they already belong.
             page.goto(f"{base}/workspace/members", wait_until="networkidle")
+            # Selects draw their own chevron with room on the right (0.2 polish).
+            select_style = page.locator("#expires_in_days").evaluate(
+                "el => { const s = getComputedStyle(el);"
+                " return [s.appearance, s.paddingRight, s.backgroundImage.slice(0, 4)]; }"
+            )
+            assert select_style == ["none", "40px", "url("], select_style
+            create_button = page.get_by_role("button", name="Create invitation link")
+            assert (
+                create_button.evaluate("el => getComputedStyle(el).backgroundColor")
+                == "rgb(2, 119, 189)"
+            )
             page.get_by_role("button", name="Create invitation link").click()
             second_link = base + urlsplit(page.locator("#invitation-link").input_value()).path
             page.goto(second_link, wait_until="networkidle")
@@ -200,9 +211,23 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             expect(page.get_by_text("You are already a member of this workspace.")).to_be_visible()
             page.goto(f"{base}/", wait_until="networkidle")
 
+            body_background = "() => getComputedStyle(document.body).backgroundColor"
+            assert page.evaluate(body_background) == "rgb(250, 250, 250)"
             page.get_by_role("button", name="Toggle dark mode").click()
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")
             assert page.evaluate("localStorage.getItem('theme')") == "dark"
+            assert page.evaluate(body_background) == "rgb(17, 17, 17)"
+            # In forced-colors mode only the system arrow shows, in the dark theme too.
+            page.emulate_media(forced_colors="active")
+            page.goto(f"{base}/workspace/members", wait_until="networkidle")
+            assert page.locator("html").evaluate("el => el.classList.contains('dark')")
+            forced = page.locator("#expires_in_days").evaluate(
+                "el => { const s = getComputedStyle(el);"
+                " return [s.appearance, s.backgroundImage]; }"
+            )
+            assert forced == ["auto", "none"], forced
+            page.emulate_media(forced_colors="none")
+            page.goto(f"{base}/", wait_until="networkidle")
             page.reload(wait_until="networkidle")
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")
 

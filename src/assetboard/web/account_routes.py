@@ -27,6 +27,7 @@ from assetboard.services.profile import (
     BROWSER_LOCALE,
     THEMES,
     ConfirmMethod,
+    ConfirmOutcome,
     has_current_oidc_identity,
     link_identity_to_user,
     linked_identities,
@@ -34,8 +35,7 @@ from assetboard.services.profile import (
     update_profile,
 )
 from assetboard.services.proxy_auth import proxy_identity_owner
-from assetboard.web.confirm import BUSY, CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
-from assetboard.web.errors import BUSY_RETRY_AFTER
+from assetboard.web.confirm import confirm_view, refusal, run_confirmed
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     client_host,
@@ -226,15 +226,13 @@ async def profile_submit(
     return Response(status_code=303, headers={"Location": "/account"})
 
 
-async def _refused(request: Request, status: str) -> Response:
+async def _refused(request: Request, outcome: ConfirmOutcome[Any]) -> Response:
     """The profile page for a confirmation that did not go through."""
-    if status == "busy":
-        response = await _profile_page(request, error=_t(request, BUSY), status_code=503)
-        response.headers["Retry-After"] = BUSY_RETRY_AFTER
-        return response
-    if status == "stale":
-        return await _profile_page(request, error=_t(request, CONFIRM_STALE), status_code=403)
-    return await _profile_page(request, error=_t(request, CONFIRM_FAILED), status_code=401)
+    refused = refusal(request, outcome)
+    response = await _profile_page(request, error=refused.message, status_code=refused.status_code)
+    if refused.retry_after is not None:
+        response.headers["Retry-After"] = refused.retry_after
+    return response
 
 
 # Linking
@@ -260,7 +258,7 @@ async def link_oidc(request: Request, confirm_password: FormStr = "") -> Respons
         action=lambda _session, _user, method: method,
     )
     if outcome.status != "confirmed" or outcome.value is None:
-        return await _refused(request, outcome.status)
+        return await _refused(request, outcome)
     try:
         authorization = await run_in_threadpool(client.begin)
     except OidcError:
@@ -325,7 +323,7 @@ async def link_proxy(request: Request, confirm_password: FormStr = "") -> Respon
         request, current, purpose="profile_link_proxy", password=confirm_password, action=link
     )
     if outcome.status != "confirmed":
-        return await _refused(request, outcome.status)
+        return await _refused(request, outcome)
     if outcome.value == "one_per_provider":
         return await _profile_page(
             request, error=_t(request, ONE_PER_PROVIDER["proxy"]), status_code=409
@@ -368,7 +366,7 @@ async def unlink(request: Request, identity_id: str, confirm_password: FormStr =
         request, current, purpose="profile_unlink", password=confirm_password, action=remove
     )
     if outcome.status != "confirmed":
-        return await _refused(request, outcome.status)
+        return await _refused(request, outcome)
     if outcome.value == "not_found":
         raise HTTPException(status_code=404)
     if outcome.value == "last_method":

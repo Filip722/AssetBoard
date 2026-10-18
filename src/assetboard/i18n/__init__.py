@@ -21,4 +21,9 @@ def gettext(message: str, locale: str) -> str:
     return translations_for(locale).gettext(message)
 
 
-__all__ = ["gettext", "translations_for"]
+def ngettext(singular: str, plural: str, n: int, locale: str) -> str:
+    """The plural form for ``n`` in ``locale`` (Polish has three)."""
+    return translations_for(locale).ngettext(singular, plural, n)
+
+
+__all__ = ["gettext", "ngettext", "translations_for"]

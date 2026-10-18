@@ -731,9 +731,7 @@ msgstr ""
 msgid "Check the details and try again."
 msgstr ""
 
-msgid ""
-"The email or password is not correct, or there were too many attempts. "
-"Check your details or try again later."
+msgid "The email or password is not correct."
 msgstr ""
 
 msgid "Setup was already completed, or is being completed. Reload to continue."
@@ -754,9 +752,6 @@ msgid ""
 msgstr ""
 
 msgid "Your password was changed. Other devices were signed out."
-msgstr ""
-
-msgid "Too many attempts. Try again later."
 msgstr ""
 
 #, python-format
@@ -823,9 +818,7 @@ msgstr ""
 msgid "Suggested categories added."
 msgstr ""
 
-msgid ""
-"The password is not correct, or there were too many attempts. Try again "
-"later."
+msgid "The password is not correct."
 msgstr ""
 
 msgid "The server is busy. Try again in a moment."
@@ -964,9 +957,7 @@ msgstr ""
 msgid "Too many accounts were created from your network. Try again later."
 msgstr ""
 
-msgid ""
-"The password is not correct, or there were too many attempts. Try again "
-"later, or start over."
+msgid "The password is not correct. Try again, or start over."
 msgstr ""
 
 msgid "This confirmation expired. Start over to sign in."
@@ -992,6 +983,15 @@ msgid ""
 "Your browser did not keep the sign-in. Open this site at its configured "
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
+
+msgid "Too many attempts. Try again later."
+msgstr ""
+
+#, python-format
+msgid "Too many attempts. Try again in %(num)d minute."
+msgid_plural "Too many attempts. Try again in %(num)d minutes."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Choose a supported currency."
 msgstr ""
@@ -1790,5 +1790,24 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "At least 10 characters. Common passwords are not accepted."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The email or password is not "
+#~ "correct, or there were too many "
+#~ "attempts. Check your details or try "
+#~ "again later."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The password is not correct, or "
+#~ "there were too many attempts. Try "
+#~ "again later."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The password is not correct, or "
+#~ "there were too many attempts. Try "
+#~ "again later, or start over."
 #~ msgstr ""
 
