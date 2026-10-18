@@ -77,7 +77,7 @@ def test_invitation_token_is_absent_from_every_log(
             app.state.session_factory,
             _owner_context(app),
             role="viewer",
-            email=None,
+            email="newbie@example.com",
             expires_in_days=7,
         ).token
         page, login, registered, reused, missing = _walk_invitation_flow(base_url, token)

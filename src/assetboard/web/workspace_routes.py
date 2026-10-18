@@ -74,7 +74,7 @@ MEMBER_ERRORS = {
 }
 INVITATION_ERRORS = {
     "invalid_email": _("Enter a valid email address."),
-    "owner_requires_email": _("Owner invitations must be locked to an email address."),
+    "email_required": _("Enter the email address of the person you invite."),
     "invalid_expiry": _("Choose how long the link stays valid."),
     "invalid_role": _("Choose a role."),
     "too_many_invitations": _(
@@ -330,7 +330,7 @@ async def invitation_create(
         try:
             created = await run_in_threadpool(
                 lambda: create_invitation(
-                    factory, ctx, role=role, email=email or None, expires_in_days=days
+                    factory, ctx, role=role, email=email, expires_in_days=days
                 )
             )
         except InvalidInvitation as exc:

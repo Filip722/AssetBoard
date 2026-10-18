@@ -12,7 +12,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - `UserSession(id_hash, user_id, created_at, last_seen_at, expires_at, user_agent, ip_prefix)`
 - `Workspace(id, name, base_currency, locale, timezone, country_code, created_at)`
 - `Membership(workspace_id, user_id, role)`; unique `(workspace_id, user_id)`
-- `Invitation(id, workspace_id, token_hash, role, email?, expires_at, used_at?, created_by)`
+- `Invitation(id, workspace_id, token_hash, role, email?, expires_at, used_at?, created_by)`; `email` is required for every new invitation since pre-release A (NULL only on older rows)
 - `AuditEvent(...)` as defined in the overview §3.9
 
 ---
@@ -63,7 +63,7 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - `require_role("editor")`-style guard used in services; roles `owner > editor > viewer`.
 - **Tenant isolation test:** a parametrized test discovers every mapped class with `workspace_id` and, using two workspaces, verifies that user B can never read, update or delete user A's rows through the repository API. Adding a new workspace-owned model without a repository fails this test (by design).
 - Workspace settings page (owner): name, base currency, timezone, country, default locale. Members page (owner): list, change role, remove (cannot remove the last owner).
-- Invitations: owner creates an invite link (role, expiry, optional email lock); invitee registers or logs in and accepts; token stored hashed, single use.
+- Invitations: owner creates an invite link (role, expiry, email lock); invitee registers or logs in and accepts; token stored hashed, single use. (Changed in pre-release A: the email lock was optional except for owner invitations; it is now required for every role.)
 
 **Delivery and decisions (2026-10-12)**
 - Split into two PRs. **Part A:** Context, selected workspace in the session, role guards,
@@ -101,9 +101,13 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     at most 50 pending invitations per workspace.
   - Invitation sign-up works even when open registration is off and never creates an own
     workspace.
-  - Owner invitations require an email lock. The locked address is never displayed or
-    pre-filled. A wrong email is counted per invitation (`failed_email_attempts`) and the
-    invitation is revoked after 5. The lock is not proof of ownership.
+  - Every invitation requires an email lock (owner decision 2026-10-18, pre-release A; before,
+    only owner invitations did). Invitations created earlier without one stay valid for any
+    account until they expire, are used or are revoked; the members page marks them "Anyone
+    with the link". The locked address is never displayed or pre-filled on the invitee side
+    (the owner sees it in the pending list). A wrong email is counted per invitation
+    (`failed_email_attempts`) and the invitation is revoked after 5. The lock is not proof of
+    ownership.
   - An existing member is told so; the role is unchanged and the invitation not consumed.
   - Invalid links (expired, revoked, used, unknown or malformed) all look the same.
   - The token is in the URL path. The request log redacts it, uvicorn's access log is off, and

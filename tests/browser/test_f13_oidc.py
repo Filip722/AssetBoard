@@ -131,7 +131,11 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
             clock=app.state.clock,
         )
         token = create_invitation(
-            app.state.session_factory, owner, role="viewer", email=None, expires_in_days=7
+            app.state.session_factory,
+            owner,
+            role="viewer",
+            email="guest@example.com",
+            expires_in_days=7,
         ).token
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()

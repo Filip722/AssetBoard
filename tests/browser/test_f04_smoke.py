@@ -156,7 +156,7 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
 
             # Invitation links in a real browser: the forms must pass the Origin check, so the
             # invite pages may not use "no-referrer" (it makes browsers send Origin: null).
-            page.get_by_label("Email (optional)").fill("")
+            page.get_by_label("Email", exact=True).fill("guest@example.com")
             page.get_by_role("button", name="Create invitation link").click()
             # The link is built from BASE_URL; open its path on this test server.
             link = base + urlsplit(page.locator("#invitation-link").input_value()).path
@@ -204,6 +204,7 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
                 create_button.evaluate("el => getComputedStyle(el).backgroundColor")
                 == "rgb(2, 119, 189)"
             )
+            page.get_by_label("Email", exact=True).fill("admin@example.com")
             page.get_by_role("button", name="Create invitation link").click()
             second_link = base + urlsplit(page.locator("#invitation-link").input_value()).path
             page.goto(second_link, wait_until="networkidle")

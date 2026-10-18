@@ -415,7 +415,7 @@ def test_account_creation_uses_the_registration_throttle(db: WorkspaceDb, tmp_pa
 # Invitations
 
 
-def invite(db: WorkspaceDb, email: str | None = None, role: str = "editor") -> str:
+def invite(db: WorkspaceDb, email: str = "ola@example.com", role: str = "editor") -> str:
     if "olga" not in db.users:
         db.add_member("olga", "owner")
     return create_invitation(

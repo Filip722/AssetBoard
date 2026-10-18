@@ -468,7 +468,7 @@ def test_the_member_column_with_the_real_writers(h: Harness) -> None:
         "/workspace/invitations",
         data={
             "role": "viewer",
-            "email": "",
+            "email": "joiner@example.com",
             "expires_in_days": "7",
             "csrf_token": h.token(client, "/workspace/members"),
         },

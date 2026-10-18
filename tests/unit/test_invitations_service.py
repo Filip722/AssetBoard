@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import inspect
+import re
 from collections.abc import Iterator
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 
 from assetboard.clock import FixedClock
-from assetboard.db.models.identity import AuditEvent, Invitation, Membership
+from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
+from assetboard.db.repositories import InvitationRepository
 from assetboard.services import invitations, workspaces
 from assetboard.services.context import Role
 from assetboard.services.invitations import (
@@ -49,10 +51,26 @@ def team(db: WorkspaceDb) -> WorkspaceDb:
     return db
 
 
-def _invite(db: WorkspaceDb, role: str = "editor", email: str | None = None, days: int = 7) -> str:
+def _invite(
+    db: WorkspaceDb, role: str = "editor", email: str = "newbie@example.com", days: int = 7
+) -> str:
     return create_invitation(
         db.factory, db.ctx("olga", "owner"), role=role, email=email, expires_in_days=days
     ).token
+
+
+def _legacy_invite(db: WorkspaceDb, role: str = "editor", days: int = 7) -> str:
+    """An invitation without an email, as created before the lock became mandatory."""
+    token, token_hash = invitations.new_token()
+    with db.factory() as session, session.begin():
+        InvitationRepository(session, db.ctx("olga", "owner")).create(
+            token_hash=token_hash,
+            role=role,
+            email=None,
+            expires_at=db.clock.now() + timedelta(days=days),
+            created_by_user_id=db.users["olga"],
+        )
+    return token
 
 
 def _accept(db: WorkspaceDb, token: str, key: str, email: str | None = None) -> Any:
@@ -92,7 +110,11 @@ def test_constants_match_the_agreed_policy() -> None:
 
 def test_create_invitation_stores_only_the_token_hash(team: WorkspaceDb) -> None:
     created = create_invitation(
-        team.factory, team.ctx("olga", "owner"), role="editor", email=None, expires_in_days=7
+        team.factory,
+        team.ctx("olga", "owner"),
+        role="editor",
+        email="newbie@example.com",
+        expires_in_days=7,
     )
     assert invitations.TOKEN_PATTERN.fullmatch(created.token)
     assert created.expires_at == team.clock.now() + timedelta(days=7)
@@ -102,7 +124,7 @@ def test_create_invitation_stores_only_the_token_hash(team: WorkspaceDb) -> None
     assert created.token not in dump and created.token not in events
     assert hash_token(created.token) in dump and hash_token(created.token) not in events
     assert _events(team) == [
-        ("invitation.created", {"role": "editor", "email_locked": False, "expires_in_days": 7})
+        ("invitation.created", {"role": "editor", "email_locked": True, "expires_in_days": 7})
     ]
     assert [i.id for i in list_invitations(team.factory, team.ctx("olga", "owner"))] == [created.id]
 
@@ -110,11 +132,13 @@ def test_create_invitation_stores_only_the_token_hash(team: WorkspaceDb) -> None
 @pytest.mark.parametrize(
     ("kwargs", "field", "code"),
     [
-        ({"role": "owner", "email": None}, "email", "owner_requires_email"),
-        ({"role": "owner", "email": "  "}, "email", "owner_requires_email"),
+        ({"role": "owner", "email": ""}, "email", "email_required"),
+        ({"role": "owner", "email": "  "}, "email", "email_required"),
+        ({"role": "editor", "email": ""}, "email", "email_required"),
+        ({"role": "viewer", "email": " \t "}, "email", "email_required"),
         ({"role": "editor", "email": "not-an-email"}, "email", "invalid_email"),
         (
-            {"role": "editor", "email": None, "expires_in_days": 2},
+            {"role": "editor", "email": "a@example.com", "expires_in_days": 2},
             "expires_in_days",
             "invalid_expiry",
         ),
@@ -161,13 +185,34 @@ def test_revoke_audits_and_invalidates(team: WorkspaceDb) -> None:
         _accept(team, token, "newbie")
 
 
+def test_creating_an_invitation_looks_up_no_account(team: WorkspaceDb) -> None:
+    # Enumeration safety: the owner learns nothing about which addresses are registered.
+    statements: list[str] = []
+
+    def record(_conn: Any, _cursor: Any, statement: str, *_args: Any) -> None:
+        statements.append(statement)
+
+    engine = team.factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        for email in ("ivy@example.com", "nobody@example.com"):
+            _invite(team, email=email)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert any("INSERT INTO invitations" in s for s in statements)
+    users = re.compile(rf"\b(?:FROM|JOIN)\s+{User.__tablename__}\b")
+    assert not [s for s in statements if users.search(s)]
+    created = [data for action, data in _events(team) if action == "invitation.created"]
+    assert created[0] == created[1]
+
+
 # Accepting
 
 
 def test_accept_creates_the_membership_and_uses_the_invitation(team: WorkspaceDb) -> None:
     token = _invite(team, role="editor")
     preview = preview_invitation(team.factory, token, clock=team.clock)
-    assert (preview.workspace_name, preview.role, preview.email_locked) == ("Home", "editor", False)
+    assert (preview.workspace_name, preview.role, preview.email_locked) == ("Home", "editor", True)
     joined = _accept(team, token, "newbie")
     assert joined == team.workspace_id
     assert team.roles()["newbie"] == "editor"
@@ -179,7 +224,7 @@ def test_accept_creates_the_membership_and_uses_the_invitation(team: WorkspaceDb
         {"user_id": str(team.users["newbie"]), "role": "editor"},
     ) in _events(team)
     with pytest.raises(InvitationInvalid):  # single use
-        _accept(team, token, "other")
+        _accept(team, token, "other", email="newbie@example.com")
 
 
 def test_accept_builds_its_scope_from_the_invitation_row_only() -> None:
@@ -202,7 +247,7 @@ def test_accept_joins_the_invitations_workspace_not_the_users_current_one(
         team.factory,
         team.ctx("otto", "owner", workspace_id=other),
         role="viewer",
-        email=None,
+        email="ivy@example.com",
         expires_in_days=7,
     ).token
     assert _accept(team, token, "ivy") == other
@@ -227,15 +272,17 @@ def test_invalid_invitations_look_the_same(team: WorkspaceDb, state: str) -> Non
         invitation = _invitation(team, token)
         revoke_invitation(team.factory, team.ctx("olga", "owner"), invitation_id=invitation.id)
     elif state == "used":
-        _accept(team, token, "first")
+        _accept(team, token, "first", email="newbie@example.com")
     elif state == "unknown":
         token = "A" * 43
     else:
         token = token[:-1] + "!"
     for call in (
         lambda: preview_invitation(team.factory, token, clock=team.clock),
-        lambda: _accept(team, token, "late"),
-        lambda: check_for_sign_up(team.factory, token, email="x@example.com", clock=team.clock),
+        lambda: _accept(team, token, "late", email="newbie@example.com"),
+        lambda: check_for_sign_up(
+            team.factory, token, email="newbie@example.com", clock=team.clock
+        ),
     ):
         with pytest.raises(InvitationInvalid):
             call()
@@ -294,3 +341,32 @@ def test_owner_only_functions_live_in_services_workspaces() -> None:
     # The owner matrix test in test_workspaces_service.py introspects that module.
     for name in ("create_invitation", "list_invitations", "revoke_invitation"):
         assert getattr(workspaces, name).__module__ == workspaces.__name__
+
+
+# Invitations created before the email lock became mandatory (pre-release A)
+
+
+def test_a_legacy_unlocked_invitation_is_listed_without_an_email(team: WorkspaceDb) -> None:
+    _legacy_invite(team)
+    [pending] = list_invitations(team.factory, team.ctx("olga", "owner"))
+    assert pending.email is None
+
+
+def test_a_legacy_unlocked_invitation_can_still_be_accepted_by_any_account(
+    team: WorkspaceDb,
+) -> None:
+    token = _legacy_invite(team, role="viewer")
+    assert preview_invitation(team.factory, token, clock=team.clock).email_locked is False
+    check_for_sign_up(team.factory, token, email="whoever@example.com", clock=team.clock)
+    assert _accept(team, token, "zed") == team.workspace_id
+    assert team.roles()["zed"] == "viewer"
+    assert _invitation(team, token).failed_email_attempts == 0
+
+
+def test_a_legacy_unlocked_invitation_stops_working_when_it_expires(team: WorkspaceDb) -> None:
+    token = _legacy_invite(team, days=1)
+    team.clock = FixedClock((team.clock.now() + timedelta(days=1)).isoformat())
+    with pytest.raises(InvitationInvalid):
+        preview_invitation(team.factory, token, clock=team.clock)
+    with pytest.raises(InvitationInvalid):
+        _accept(team, token, "late")

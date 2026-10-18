@@ -1181,8 +1181,8 @@ msgstr ""
 msgid "You cannot remove yourself from the workspace."
 msgstr "Nie możesz usunąć siebie z obszaru roboczego."
 
-msgid "Owner invitations must be locked to an email address."
-msgstr "Zaproszenia dla właścicieli muszą być powiązane z adresem e-mail."
+msgid "Enter the email address of the person you invite."
+msgstr "Podaj adres e-mail osoby, którą zapraszasz."
 
 msgid "Choose how long the link stays valid."
 msgstr "Wybierz, jak długo link ma być ważny."
@@ -1918,9 +1918,6 @@ msgstr "Link z zaproszeniem"
 msgid "Copy"
 msgstr "Kopiuj"
 
-msgid "Email (optional)"
-msgstr "E-mail (opcjonalnie)"
-
 msgid "Valid for"
 msgstr "Ważny przez"
 
@@ -1931,14 +1928,8 @@ msgstr[0] "%(num)d dzień"
 msgstr[1] "%(num)d dni"
 msgstr[2] "%(num)d dni"
 
-msgid ""
-"With an email, only an account with that address can accept. Owner "
-"invitations must have one: an owner can change everything, including "
-"members."
-msgstr ""
-"Z adresem e-mail zaproszenie może przyjąć tylko konto z tym adresem. "
-"Zaproszenia dla właścicieli muszą go mieć: właściciel może zmienić "
-"wszystko, łącznie z członkami."
+msgid "Only an account with this email address can accept the invitation."
+msgstr "Zaproszenie może przyjąć tylko konto z tym adresem e-mail."
 
 msgid ""
 "The email is not verified, so share the link only with the person you "
@@ -1952,6 +1943,16 @@ msgstr "Utwórz link z zaproszeniem"
 
 msgid "Pending invitations"
 msgstr "Oczekujące zaproszenia"
+
+msgid "Anyone with the link"
+msgstr "Każdy, kto ma link"
+
+msgid ""
+"Created before invitations required an email; anyone with the link can "
+"use it until it expires."
+msgstr ""
+"Utworzone, zanim zaproszenia wymagały adresu e-mail; każdy, kto ma link, "
+"może go użyć do czasu wygaśnięcia."
 
 #, python-format
 msgid "Expires %(date)s"
@@ -2014,6 +2015,24 @@ msgstr "Zapisz ustawienia"
 #~ msgstr ""
 #~ "Hasło jest nieprawidłowe albo było zbyt"
 #~ " wiele prób. Spróbuj ponownie później."
+
+#~ msgid "Owner invitations must be locked to an email address."
+#~ msgstr "Zaproszenia dla właścicieli muszą być powiązane z adresem e-mail."
+
+#~ msgid "Email (optional)"
+#~ msgstr "E-mail (opcjonalnie)"
+
+#~ msgid ""
+#~ "With an email, only an account "
+#~ "with that address can accept. Owner "
+#~ "invitations must have one: an owner "
+#~ "can change everything, including members."
+#~ msgstr ""
+#~ "Z adresem e-mail zaproszenie może "
+#~ "przyjąć tylko konto z tym adresem. "
+#~ "Zaproszenia dla właścicieli muszą go "
+#~ "mieć: właściciel może zmienić wszystko, "
+#~ "łącznie z członkami."
 
 #~ msgid "Entries and planned values for this month will appear here."
 #~ msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."

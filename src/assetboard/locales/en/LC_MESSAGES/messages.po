@@ -1114,7 +1114,7 @@ msgstr ""
 msgid "You cannot remove yourself from the workspace."
 msgstr ""
 
-msgid "Owner invitations must be locked to an email address."
+msgid "Enter the email address of the person you invite."
 msgstr ""
 
 msgid "Choose how long the link stays valid."
@@ -1803,9 +1803,6 @@ msgstr ""
 msgid "Copy"
 msgstr ""
 
-msgid "Email (optional)"
-msgstr ""
-
 msgid "Valid for"
 msgstr ""
 
@@ -1815,10 +1812,7 @@ msgid_plural "%(num)d days"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid ""
-"With an email, only an account with that address can accept. Owner "
-"invitations must have one: an owner can change everything, including "
-"members."
+msgid "Only an account with this email address can accept the invitation."
 msgstr ""
 
 msgid ""
@@ -1830,6 +1824,14 @@ msgid "Create invitation link"
 msgstr ""
 
 msgid "Pending invitations"
+msgstr ""
+
+msgid "Anyone with the link"
+msgstr ""
+
+msgid ""
+"Created before invitations required an email; anyone with the link can "
+"use it until it expires."
 msgstr ""
 
 #, python-format
@@ -1932,6 +1934,19 @@ msgstr ""
 #~ "The password is not correct, or "
 #~ "there were too many attempts. Try "
 #~ "again later, or start over."
+#~ msgstr ""
+
+#~ msgid "Owner invitations must be locked to an email address."
+#~ msgstr ""
+
+#~ msgid "Email (optional)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With an email, only an account "
+#~ "with that address can accept. Owner "
+#~ "invitations must have one: an owner "
+#~ "can change everything, including members."
 #~ msgstr ""
 
 #~ msgid "Nothing in this month yet"

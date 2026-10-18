@@ -184,7 +184,7 @@ def invite(p: Proxy) -> str:
             clock=p.app.state.clock,
         )
     return create_invitation(
-        p.app.state.session_factory, ctx, role="editor", email=None, expires_in_days=7
+        p.app.state.session_factory, ctx, role="editor", email="ola@example.com", expires_in_days=7
     ).token
 
 

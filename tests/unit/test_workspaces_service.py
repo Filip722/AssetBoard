@@ -82,7 +82,7 @@ SERVICE_CALLS: dict[str, ServiceCall] = {
     ),
     "list_invitations": lambda db, ctx: list_invitations(db.factory, ctx),
     "create_invitation": lambda db, ctx: create_invitation(
-        db.factory, ctx, role=Role.EDITOR, email=None, expires_in_days=7
+        db.factory, ctx, role=Role.EDITOR, email="x@example.com", expires_in_days=7
     ),
     "revoke_invitation": lambda db, ctx: revoke_invitation(db.factory, ctx, invitation_id=uuid4()),
 }

@@ -81,8 +81,9 @@ Workspace owners add people from **Members** with an invitation link. AssetBoard
 copy the link (it is shown only once) and share it privately. The link works once and expires
 after 1, 7 or 30 days. Whoever opens it can sign in, or create an account even when
 `ASSETBOARD_ALLOW_REGISTRATION` is off; an account created this way joins only that workspace.
-An invitation can be locked to an email address; owner invitations must be. The lock is not
-proof that the person controls that address, since email addresses are not verified. See
+Every invitation is locked to an email address: only an account with that address can accept
+it. The lock is not proof that the person controls that address, since email addresses are not
+verified. See
 [ADR-0013](adr/0013-invitation-links.md).
 
 ### Database schema state
@@ -201,6 +202,13 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### Unreleased: every invitation needs an email address (pre-release A)
+
+- Owners must now enter the invitee's email address for every invitation, not only for owner
+  invitations. Links created earlier without an address keep working, for any account, until
+  they expire (30 days at most), are used or are revoked; the members page marks them "Anyone
+  with the link". No setting or migration.
 
 ### Unreleased: new look and sign-in messages (0.2 polish)
 

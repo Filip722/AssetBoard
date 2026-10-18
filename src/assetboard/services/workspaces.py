@@ -88,7 +88,7 @@ class CreatedInvitation:
     id: UUID
     token: str
     role: str
-    email: str | None
+    email: str
     expires_at: datetime
 
 
@@ -96,7 +96,7 @@ class CreatedInvitation:
 class PendingInvitation:
     id: UUID
     role: str
-    email: str | None
+    email: str | None  # None only for invitations created before the lock became mandatory
     expires_at: datetime
     created_at: datetime
 
@@ -305,22 +305,26 @@ def create_invitation(
     ctx: Context,
     *,
     role: Role | str,
-    email: str | None,
+    email: str,
     expires_in_days: int,
 ) -> CreatedInvitation:
-    """Create a single-use invitation link. Owner invitations must be locked to an email."""
+    """Create a single-use invitation link, locked to an email address (every role).
+
+    Invitations created before the lock became mandatory may have no email; they stay usable
+    until they expire, are used or are revoked (``services.invitations`` accepts them). No
+    account is looked up here, so creating an invitation reveals nothing about which addresses
+    are registered.
+    """
     require_role(ctx, Role.OWNER)
     invited_role = Role(role)
     if expires_in_days not in INVITATION_EXPIRY_DAYS:
         raise InvalidInvitation("expires_in_days", "invalid_expiry")
-    locked_email: str | None = None
-    if email and email.strip():
-        try:
-            locked_email = normalize_email(email)
-        except InvalidEmail as exc:
-            raise InvalidInvitation("email", "invalid_email") from exc
-    if invited_role is Role.OWNER and locked_email is None:
-        raise InvalidInvitation("email", "owner_requires_email")
+    if not email.strip():
+        raise InvalidInvitation("email", "email_required")
+    try:
+        locked_email = normalize_email(email)
+    except InvalidEmail as exc:
+        raise InvalidInvitation("email", "invalid_email") from exc
     token, token_hash = new_token()
     now = ctx.clock.now()
     expires_at = now + timedelta(days=expires_in_days)
@@ -346,7 +350,7 @@ def create_invitation(
             ts=now,
             data={
                 "role": invited_role.value,
-                "email_locked": locked_email is not None,
+                "email_locked": True,  # always, since pre-release A
                 "expires_in_days": expires_in_days,
             },
         )

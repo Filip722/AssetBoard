@@ -15,9 +15,14 @@ from httpx import Response
 from sqlalchemy import select, update
 from sqlalchemy.exc import OperationalError
 
-from assetboard.db.models.identity import AuthThrottle, Invitation, Membership, User
+from assetboard.db.models.identity import AuditEvent, AuthThrottle, Invitation, Membership, User
 from assetboard.services.hash_gate import HashGateBusy
-from assetboard.services.invitations import MAX_FAILED_EMAIL_ATTEMPTS, AlreadyMember, hash_token
+from assetboard.services.invitations import (
+    MAX_FAILED_EMAIL_ATTEMPTS,
+    AlreadyMember,
+    hash_token,
+    new_token,
+)
 from assetboard.web import invite_routes
 from tests.conftest import ADMIN_PASSWORD, OwnerApp, WebHarness
 
@@ -27,7 +32,7 @@ MISMATCH = "This invitation was sent to a different email address."
 
 
 def create_link(owner: OwnerApp, **form: str) -> str:
-    data = {"role": "editor", "email": "", "expires_in_days": "7"} | form
+    data = {"role": "editor", "email": "newbie@example.com", "expires_in_days": "7"} | form
     response = owner.post("/workspace/invitations", data, token_from="/workspace/members")
     assert response.status_code == 200, response.text
     match = TOKEN_IN_LINK.search(response.text)
@@ -69,17 +74,94 @@ def test_create_invitation_shows_link_once_and_stores_only_the_hash(owner: Owner
         assert invitation.token_hash == hash_token(token)
 
 
-def test_owner_invitation_requires_an_email_lock(owner: OwnerApp) -> None:
+@pytest.mark.parametrize("role", ["owner", "editor", "viewer"])
+def test_every_invitation_requires_an_email(owner: OwnerApp, role: str) -> None:
     page = owner.client.get("/workspace/members").text
-    assert "Owner invitations must have one" in page
+    assert 'name="email" type="email" value=""' in page and "Email (optional)" not in page
+    assert "Only an account with this email address can accept the invitation." in page
+    for email in ("", "   "):
+        response = owner.post(
+            "/workspace/invitations",
+            {"role": role, "email": email, "expires_in_days": "7"},
+            token_from="/workspace/members",
+        )
+        assert response.status_code == 400
+        assert "Enter the email address of the person you invite." in response.text
+    with owner.db() as session:
+        assert session.scalars(select(Invitation)).all() == []
+    assert create_link(owner, role=role, email="next.person@example.com")
+
+
+def test_the_missing_email_error_is_translated(owner: OwnerApp) -> None:
+    owner.client.headers["Accept-Language"] = "pl"
     response = owner.post(
         "/workspace/invitations",
-        {"role": "owner", "email": "", "expires_in_days": "7"},
+        {"role": "editor", "email": "", "expires_in_days": "7"},
         token_from="/workspace/members",
     )
     assert response.status_code == 400
-    assert "Owner invitations must be locked to an email address." in response.text
-    assert create_link(owner, role="owner", email="next.owner@example.com")
+    assert "Enter the email address of the person you invite." not in response.text
+    assert "Podaj adres e-mail osoby, którą zapraszasz." in response.text
+
+
+def test_invitations_for_registered_and_unknown_addresses_look_the_same(owner: OwnerApp) -> None:
+    owner.add_user("bea")
+    for email in ("bea@example.com", "stranger@example.com"):
+        response = owner.post(
+            "/workspace/invitations",
+            {"role": "viewer", "email": email, "expires_in_days": "7"},
+            token_from="/workspace/members",
+        )
+        assert response.status_code == 200
+        created = response.text.split("data-created-invitation", 1)[1].split("</div>", 1)[0]
+        assert TOKEN_IN_LINK.search(created) and email not in created
+    with owner.db() as session:
+        events = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "invitation.created")
+        ).all()
+    assert [event.data for event in events] == [events[0].data] * 2
+
+
+def test_a_legacy_unlocked_invitation_is_marked_and_still_works(owner: OwnerApp) -> None:
+    token, token_hash = new_token()
+    with owner.db() as session, session.begin():
+        session.add(
+            Invitation(
+                workspace_id=owner.home_id,
+                token_hash=token_hash,
+                role="viewer",
+                email=None,  # created before every invitation needed an email
+                expires_at=owner.app.state.clock.now() + timedelta(days=7),
+                failed_email_attempts=0,
+                created_by_user_id=owner.admin_id,
+            )
+        )
+    members = owner.client.get("/workspace/members").text
+    assert members.count("data-unlocked-invitation") == 1
+    assert "Anyone with the link" in members
+    assert members.count("data-unlocked-explanation") == 1
+    assert (
+        "Created before invitations required an email; anyone with the link can use it until "
+        "it expires." in members
+    )
+    owner.client.headers["Accept-Language"] = "pl"
+    polish = owner.client.get("/workspace/members").text
+    assert "Każdy, kto ma link" in polish
+    assert "Utworzone, zanim zaproszenia wymagały adresu e-mail" in polish
+    del owner.client.headers["Accept-Language"]
+    owner.add_user("bea")
+    with anonymous(owner) as client:
+        assert owner.web.sign_in(client, email="bea@example.com").status_code == 303
+        page = client.get(f"/invite/{token}")
+        assert "can only be accepted with the email address" not in page.text
+        accepted = client.post(
+            f"/invite/{token}/accept",
+            data={"csrf_token": owner.web.csrf(page.text)},
+            follow_redirects=False,
+        )
+        assert accepted.status_code == 303
+    assert owner.roles()["bea"] == "viewer"
+    assert "data-unlocked-invitation" not in owner.client.get("/workspace/members").text
 
 
 @pytest.mark.parametrize(
@@ -94,7 +176,7 @@ def test_owner_invitation_requires_an_email_lock(owner: OwnerApp) -> None:
     ],
 )
 def test_invitation_form_errors(owner: OwnerApp, form: dict[str, str], message: str) -> None:
-    data = {"role": "editor", "email": "", "expires_in_days": "7"} | form
+    data = {"role": "editor", "email": "newbie@example.com", "expires_in_days": "7"} | form
     response = owner.post("/workspace/invitations", data, token_from="/workspace/members")
     assert response.status_code == 400
     assert message in response.text
@@ -142,7 +224,7 @@ def test_signed_out_invite_page_offers_sign_in_and_registration(owner: OwnerApp)
 
 
 def test_sign_in_returns_to_the_invitation(owner: OwnerApp) -> None:
-    token = create_link(owner)
+    token = create_link(owner, email="bea@example.com")
     bea = owner.add_user("bea")
     with anonymous(owner) as client:
         login = client.get(f"/login?next=%2Finvite%2F{token}")
@@ -184,7 +266,7 @@ def test_accept_needs_sign_in(owner: OwnerApp) -> None:
 
 
 def test_already_member_is_told_and_the_invitation_stays_unused(owner: OwnerApp) -> None:
-    token = create_link(owner, role="viewer")
+    token = create_link(owner, role="viewer", email="admin@example.com")
     page = owner.client.get(f"/invite/{token}")
     response = owner.client.post(
         f"/invite/{token}/accept", data={"csrf_token": owner.web.csrf(page.text)}
@@ -263,7 +345,7 @@ def test_register_email_mismatch_is_counted_then_revokes(roomy: OwnerApp) -> Non
 
 
 def test_register_with_an_existing_email_is_rejected(roomy: OwnerApp) -> None:
-    token = create_link(roomy)
+    token = create_link(roomy, email="bea@example.com")
     roomy.add_user("bea")
     with anonymous(roomy) as client:
         response = register(client, roomy.web, token, email="bea@example.com")

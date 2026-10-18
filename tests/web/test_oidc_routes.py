@@ -128,7 +128,7 @@ def add_user(
         return user.id
 
 
-def invite(o: Oidc, role: str = "editor", email: str | None = None) -> str:
+def invite(o: Oidc, role: str = "editor", email: str = "ola@example.com") -> str:
     with o.db() as session:
         admin = session.scalars(select(User).where(User.email == o.web.admin_email)).one()
         workspace = session.scalars(select(Workspace)).one()
