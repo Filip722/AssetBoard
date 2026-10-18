@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input, empty_state with context %}
-{# The month page (F2.5): navigation, picker, closed state, close/reopen. F2.2-F2.4 fill the
-   ``month_body`` block with entries, planned values and the summary. No inline script or style. #}
+{% from "macros/components.html" import csrf_input with context %}
+{# The month page (F2.5): navigation, picker, closed state, close/reopen. The ``month_body``
+   block holds the summary (F2.4, #month-summary) and the transaction tables (F2.2,
+   months/_ledger.html); F2.3 adds planned values. No inline script or style. #}
 {% block title %}{{ month_heading }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
 {% block content %}
@@ -9,7 +10,7 @@
 {% set nav_off = "inline-flex items-center gap-1 rounded-full border border-line px-3.5 py-2 text-sm font-medium opacity-50" %}
 <div class="space-y-6" data-month="{{ view.month }}">
   {% if notice %}
-  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
   {% endif %}
   {% if error %}
   <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
@@ -65,7 +66,18 @@
   {% endif %}
 
   {% block month_body %}
-  {{ empty_state(_("Nothing in this month yet"), _("Entries and planned values for this month will appear here.")) }}
+  {% from "months/_ledger.html" import section with context %}
+  {% if deleted %}
+  {# Undo for browsers without JavaScript (with JavaScript, the undo toast offers it). #}
+  <form method="post" action="{{ scoped_url(request, 'transaction_undo', month=view.month|string, transaction_id=deleted|string) }}" class="flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-deleted-notice>
+    {{ csrf_input() }}
+    <span>{{ _("Entry deleted.") }}</span>
+    <button type="submit" data-undo class="font-semibold underline">{{ _("Undo") }}</button>
+  </form>
+  {% endif %}
+  <p id="ledger-status" class="sr-only" role="status" data-ledger-status></p>
+  {% include "months/_summary.html" %}
+  {% for s in ledger.sections %}{{ section(s) }}{% endfor %}
   {% endblock %}
 </div>
 {% endblock %}

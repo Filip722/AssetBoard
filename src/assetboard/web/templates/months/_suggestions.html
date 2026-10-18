@@ -1,0 +1,5 @@
+{# Earlier descriptions for the autocomplete list (F2.2 part B); app.js opens the list and moves
+   the active option. Picking one sets the description and, when known, its category. #}
+{% for s in suggestions %}
+<li id="{{ list_id }}-{{ loop.index }}" role="option" aria-selected="false" data-description="{{ s.description }}" data-category-id="{{ s.category_id or '' }}" class="cursor-pointer px-3 py-1.5 aria-selected:bg-primary-soft aria-selected:text-primary-ink">{{ s.description }}</li>
+{% endfor %}

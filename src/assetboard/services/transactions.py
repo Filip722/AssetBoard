@@ -543,6 +543,28 @@ def undo_delete(
     return run_immediate(factory, write)
 
 
+def pending_undo(
+    factory: sessionmaker[Session], ctx: Context, transaction_id: UUID
+) -> DeletedTransaction | None:
+    """The deletion of ``transaction_id`` while it can still be undone, else ``None``.
+
+    ``None`` for a live row, a deletion older than ``UNDO_WINDOW``, an unknown id or another
+    workspace's row. The month page offers Undo (without JavaScript) only for these.
+    """
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        row = TransactionRepository(session, ctx).get(transaction_id)
+        if row is None or row.deleted_at is None:
+            return None
+        if ctx.clock.now() - row.deleted_at > UNDO_WINDOW:
+            return None
+        return DeletedTransaction(
+            id=row.id,
+            month=YearMonth.from_date(row.date),
+            undo_until=row.deleted_at + UNDO_WINDOW,
+        )
+
+
 # Seams used by other services
 
 

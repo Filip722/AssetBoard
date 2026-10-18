@@ -106,7 +106,7 @@ def test_invalid_or_out_of_range_months_are_not_found(months: OwnerApp, path: st
 def test_empty_and_future_months_render(months: OwnerApp) -> None:
     for path in ("/m/2026-10", "/m/2030-05", "/m/1950-02"):
         page = _page(months, path)
-        assert "Nothing in this month yet" in page
+        assert "No expenses in this month." in page and "No income in this month." in page
 
 
 def test_the_month_name_follows_the_language(months: OwnerApp) -> None:

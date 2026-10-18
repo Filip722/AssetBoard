@@ -1,0 +1,4 @@
+{# The month summary (F2.4 builds it: planned / actual / difference). ``summary`` comes from
+   web.ledger.summary_context. Every transaction write sends this block out of band, so its
+   totals refresh without a reload. Empty until F2.4. #}
+<div id="month-summary" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}></div>

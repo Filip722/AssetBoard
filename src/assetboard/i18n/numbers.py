@@ -145,3 +145,14 @@ def format_money(money: Money, locale: str) -> str:
         )
     except UnknownCurrencyError as exc:
         raise ValueError(f"Unsupported currency: {money.currency}") from exc
+
+
+def format_amount_input(money: Money, locale: str) -> str:
+    """The amount for an input field: the locale's decimal sign, no grouping, no currency.
+
+    ``parse_amount`` reads it back unchanged in the same locale: ``1234,56`` (pl),
+    ``1234.56`` (en), ``1234`` (JPY).
+    """
+    decimal_symbol = get_decimal_symbol(_normalize_number_locale(locale))
+    text = format(money.to_decimal(), "f")
+    return text.replace(".", decimal_symbol)

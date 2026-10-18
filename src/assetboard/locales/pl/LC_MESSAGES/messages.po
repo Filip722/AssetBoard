@@ -929,6 +929,77 @@ msgid "Viewer"
 msgstr "Przeglądający"
 
 msgid ""
+"Enter a day of the month (1-31) or a date such as 2026-10-07 or "
+"07.10.2026."
+msgstr ""
+"Podaj dzień miesiąca (1-31) albo datę, na przykład 2026-10-07 lub "
+"07.10.2026."
+
+msgid "That month has no such day."
+msgstr "Ten miesiąc nie ma takiego dnia."
+
+msgid "Enter a date between the years 1900 and 2199."
+msgstr "Podaj datę z lat 1900-2199."
+
+msgid "The amount must be greater than zero."
+msgstr "Kwota musi być większa od zera."
+
+msgid "The amount is too large."
+msgstr "Kwota jest za duża."
+
+#, python-format
+msgid "Too many decimal places for %(currency)s."
+msgstr "Za dużo miejsc po przecinku dla waluty %(currency)s."
+
+msgid "The description contains characters that are not allowed."
+msgstr "Opis zawiera niedozwolone znaki."
+
+#, python-format
+msgid "Use at most %(max)d characters."
+msgstr "Użyj najwyżej %(max)d znaków."
+
+msgid "Choose a category."
+msgstr "Wybierz kategorię."
+
+msgid "Choose one of the listed categories."
+msgstr "Wybierz jedną z kategorii z listy."
+
+msgid "This category is archived. Choose another one."
+msgstr "Ta kategoria jest zarchiwizowana. Wybierz inną."
+
+msgid "Choose an expense category."
+msgstr "Wybierz kategorię wydatków."
+
+msgid "Choose an income category."
+msgstr "Wybierz kategorię przychodów."
+
+#, python-format
+msgid "%(month)s is closed. Choose a date in an open month."
+msgstr "Miesiąc %(month)s jest zamknięty. Wybierz datę w otwartym miesiącu."
+
+msgid "The entry was not saved. Check the marked fields."
+msgstr "Wpis nie został zapisany. Sprawdź oznaczone pola."
+
+msgid "Expenses"
+msgstr "Wydatki"
+
+msgid "No expenses in this month."
+msgstr "Brak wydatków w tym miesiącu."
+
+msgid "No income in this month."
+msgstr "Brak przychodów w tym miesiącu."
+
+msgid "Add an expense category first."
+msgstr "Najpierw dodaj kategorię wydatków."
+
+msgid "Add an income category first."
+msgstr "Najpierw dodaj kategorię przychodów."
+
+#, python-format
+msgid "%(name)s (archived)"
+msgstr "%(name)s (zarchiwizowana)"
+
+msgid ""
 "This month is closed. Its entries and planned values cannot change until "
 "an owner reopens it."
 msgstr ""
@@ -941,6 +1012,12 @@ msgstr "Wpisz miesiąc w formacie RRRR-MM, na przykład 2026-10."
 msgid "Future months cannot be closed; they stay open for planning."
 msgstr "Przyszłych miesięcy nie można zamykać; pozostają otwarte do planowania."
 
+msgid "This entry no longer exists. It may have been deleted elsewhere."
+msgstr "Ten wpis już nie istnieje. Mógł zostać usunięty gdzie indziej."
+
+msgid "Too late to undo: the entry stays deleted."
+msgstr "Za późno na cofnięcie: wpis pozostaje usunięty."
+
 msgid "Month closed."
 msgstr "Miesiąc zamknięty."
 
@@ -952,6 +1029,19 @@ msgstr "Ten miesiąc był już zamknięty."
 
 msgid "This month is already open."
 msgstr "Ten miesiąc jest już otwarty."
+
+msgid "Entry added."
+msgstr "Dodano wpis."
+
+msgid "Entry saved."
+msgstr "Zapisano wpis."
+
+msgid "Entry restored."
+msgstr "Przywrócono wpis."
+
+#, python-format
+msgid "Entry saved in %(month)s."
+msgstr "Wpis zapisano w miesiącu: %(month)s."
 
 msgid ""
 "This sign-in expired, or another sign-in was started in a different tab. "
@@ -1055,6 +1145,18 @@ msgid_plural "Too many attempts. Try again in %(num)d minutes."
 msgstr[0] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minutę."
 msgstr[1] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minuty."
 msgstr[2] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minut."
+
+msgid "Entry deleted."
+msgstr "Usunięto wpis."
+
+msgid "Too late to undo"
+msgstr "Za późno na cofnięcie"
+
+msgid "The deletion can no longer be undone: the entry stays deleted."
+msgstr "Usunięcia nie można już cofnąć: wpis pozostaje usunięty."
+
+msgid "Not saved"
+msgstr "Nie zapisano"
 
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
@@ -1175,9 +1277,6 @@ msgstr "Podsumowanie miesiąca"
 
 msgid "Planned and actual amounts will appear here."
 msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
-
-msgid "Expenses"
-msgstr "Wydatki"
 
 msgid "Keep your monthly spending in view."
 msgstr "Śledź miesięczne wydatki."
@@ -1686,6 +1785,41 @@ msgstr ""
 "tożsamości albo otwierając dowolną stronę przez serwer proxy). Potem masz"
 " na to 10 minut."
 
+msgid "Day"
+msgstr "Dzień"
+
+msgid "Description"
+msgstr "Opis"
+
+msgid "Earlier descriptions"
+msgstr "Wcześniejsze opisy"
+
+msgid "Choose a category"
+msgstr "Wybierz kategorię"
+
+msgid "archived"
+msgstr "zarchiwizowana"
+
+#, python-format
+msgid "Edit the entry of %(date)s, %(amount)s"
+msgstr "Edytuj wpis z %(date)s, %(amount)s"
+
+#, python-format
+msgid "Delete the entry of %(date)s, %(amount)s"
+msgstr "Usuń wpis z %(date)s, %(amount)s"
+
+msgid ""
+"Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). "
+"Tab moves to the next field, Enter saves, Esc clears the row or cancels "
+"an edit."
+msgstr ""
+"Dzień: dzień tego miesiąca (7) albo pełna data (2026-10-07 lub "
+"07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
+"czyści wiersz lub anuluje edycję."
+
+msgid "Undo"
+msgstr "Cofnij"
+
 msgid "Closed"
 msgstr "Zamknięty"
 
@@ -1759,12 +1893,6 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
-
-msgid "Nothing in this month yet"
-msgstr "W tym miesiącu nic jeszcze nie ma"
-
-msgid "Entries and planned values for this month will appear here."
-msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
@@ -1886,4 +2014,7 @@ msgstr "Zapisz ustawienia"
 #~ msgstr ""
 #~ "Hasło jest nieprawidłowe albo było zbyt"
 #~ " wiele prób. Spróbuj ponownie później."
+
+#~ msgid "Entries and planned values for this month will appear here."
+#~ msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 

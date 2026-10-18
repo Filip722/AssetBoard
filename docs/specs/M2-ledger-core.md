@@ -117,6 +117,59 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   `previous_date` / `previous_amount` when those change. Group "Transactions" in the workspace
   audit log.
 
+**As built (F2.2 part B: the month-page UI)**
+- Templates: `months/_ledger.html` (macros; the input, button and error classes are set once
+  there), `_section.html`, `_row.html`, `_suggestions.html`, `_summary.html`; view models and
+  messages in `web.ledger`, routes in `web.transaction_routes`. The tables are real `<table>`s:
+  a form cannot wrap a row, so each entry/edit `<form>` sits in the actions cell and its inputs
+  join it with the `form` attribute. The entry row is at the bottom of each table. Day and
+  amount are text inputs (`inputmode` numeric/decimal); the amount of an edit row is written by
+  `i18n.numbers.format_amount_input` (locale decimal sign, no grouping) and read back by
+  `parse_amount`.
+- Routes: `POST /m/{month}/transactions` (create, with `direction`), `GET
+  /m/{month}/transactions/{id}/edit` and `/row` (open/cancel an edit; one-row swaps),
+  `POST /m/{month}/transactions/{id}` (update), `/delete`, `/undo`, and `GET
+  /transactions/suggestions?direction=&description=` (`role="option"` items). **Deviation from
+  "row swaps":** writes return the whole table section (`#ledger-expense` / `#ledger-income`),
+  since rows are ordered by date and an edit can move a row or send it to another month; only
+  opening and cancelling an edit swap one row. Every write response also carries, out of band,
+  `#month-summary` (an empty placeholder: **F2.4 fills `web.ledger.summary_context` and
+  `months/_summary.html`**) and the screen-reader status line `#ledger-status`.
+- Without JavaScript every form posts and redirects (303); a refused save re-renders the whole
+  page (400/409) with the values and messages; `?edit=<id>` opens a row for editing,
+  `?deleted=<id>` shows "Entry deleted." with an Undo form, `?saved_in=YYYY-MM` links an entry
+  saved to another month. Autocomplete needs JavaScript (no fallback).
+- `MonthClosed`: when the **viewed** month was closed meanwhile the page is stale, so the route
+  answers 303 (HTMX: 409 with `HX-Redirect`) to `?error=month_closed`, which shows
+  `MONTH_CLOSED_MESSAGE`; a full date in **another**, closed month is a message on the day field
+  (409) and keeps the typed values. A row that no longer exists reloads with "This entry no
+  longer exists" (`?error=transaction_gone`).
+- Keyboard and focus (`static/js/app.js`, delegated listeners on `data-*` hooks, no Alpine
+  components): Enter submits from text fields (implicit submission) and from the category
+  select; Esc closes an open suggestion list, else clears the entry row or cancels an edit. The
+  server marks the element to focus after a swap with `data-autofocus` (new entry row's day after
+  a save or delete, the first invalid field after a refusal, the edit row's day, the row's Edit
+  button after a save or cancel). The description input is an ARIA combobox; arrows move the
+  active option, Enter or a click picks it and pre-selects its category.
+- **Product decisions (owner, 2026-10-18):** after a save the next entry row **keeps the day**
+  of the entry just saved (per table): as a day number when it is in the viewed month, else as
+  typed; the focus is in the day field with its text selected, so typing replaces it and Tab
+  keeps it. Without JavaScript the 303 carries it as `?entry=<direction>&day=<day>` (validated
+  against the day forms `parse_entry_date` reads; anything else is ignored). No delete
+  confirmation (undo replaces it); no totals in part B (F2.4); the undo toast is **strict**
+  (`data-toast-strict`: no pause on hover or focus, since the server window does not pause) and
+  counts down the time the server still allows (from `undo_until`); after a delete the focus
+  goes to the table's entry day field (its heading when the table has no entry row). A click
+  after the window says "Too late to undo". The no-JS Undo form is shown only for a row of this
+  month whose deletion can still be undone (`services.transactions.pending_undo`).
+- **Typing on during a save (review, 2026-10-18):** on `htmx:beforeRequest` from an entry form
+  (its values are already serialised) `app.js` resets the entry row at once (the day kept by the
+  rule above) and focuses the day field; before a 2xx swap of a table section (also an
+  out-of-band one, as after an undo) it keeps the entry row's values, focused field and
+  selection, and puts them into the new row after the swap instead of the server's
+  `data-autofocus`. On a 4xx the server's echo of the submitted values and messages wins; if
+  sending fails, the submitted values come back.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -170,6 +223,9 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
 - Clicking a category filters the transaction tables to that category.
 - Golden example (must be a test): budget Food 550.00; transactions Food 50.00 + 500.00 → actual 550.00, difference 0.00; budget Travel 5 350.00 with 4 323.00 spent → difference 1 027.00; income Salary planned 3 000.00, actual 3 400.00 → difference +400.00.
 - Categories with actuals but no planned line are shown with planned 0.00 (never hidden).
+- **From F2.2:** render the summary in `months/_summary.html` from
+  `web.ledger.summary_context(ledger)`; every transaction write already sends `#month-summary`
+  out of band, so the totals refresh without a reload.
 
 **Agent prompt**
 ```

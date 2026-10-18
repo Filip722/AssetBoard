@@ -57,6 +57,7 @@ from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed
+from assetboard.web.transaction_routes import router as transaction_router
 from assetboard.web.workspace_routes import router as workspace_router
 
 # Short lock wait for the best-effort session activity write; a busy database skips it.
@@ -177,6 +178,7 @@ def create_app(
     app.include_router(workspace_router)
     app.include_router(category_router)
     app.include_router(month_router)
+    app.include_router(transaction_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)
     app.include_router(proxy_router)

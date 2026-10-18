@@ -1,14 +1,18 @@
 """Month pages (F2.5): ``/m/YYYY-MM`` with navigation, the month picker, closing and reopening.
 
-The page is the shell that F2.2-F2.4 fill (transactions, planned values, summary). Authorization
-happens in ``services.months``; plain form posts redirect (303) back to the month, so the page
-works without JavaScript. Every state-changing route is covered by the router-level
-``require_csrf`` dependency.
+The page is the shell that F2.2-F2.4 fill: F2.2 adds the transaction tables
+(``web.ledger``; the writes are in ``web.transaction_routes``), F2.3 planned values and F2.4
+the summary. Authorization happens in ``services.months``; plain form posts redirect (303)
+back to the month, so the page works without JavaScript. Every state-changing route is covered
+by the router-level ``require_csrf`` dependency.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import replace
 from typing import Annotated
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -19,6 +23,7 @@ from assetboard.db.repositories import NotFound
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month, format_month_heading
+from assetboard.services.context import Context
 from assetboard.services.months import (
     MonthError,
     close_month,
@@ -26,7 +31,16 @@ from assetboard.services.months import (
     get_month,
     reopen_month,
 )
+from assetboard.services.transactions import get_transaction, pending_undo
 from assetboard.web.context import CurrentContext
+from assetboard.web.ledger import (
+    DIRECTIONS,
+    ENTRY_DAY,
+    SectionState,
+    build_ledger,
+    edit_values,
+    summary_context,
+)
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -48,13 +62,19 @@ ERRORS = {
     "invalid_month": _("Enter a month as YYYY-MM, for example 2026-10."),
     "month_in_future": _("Future months cannot be closed; they stay open for planning."),
     "month_closed": MONTH_CLOSED_MESSAGE,
+    "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
+    "undo_expired": _("Too late to undo: the entry stays deleted."),
 }
 NOTICES = {
     "closed": _("Month closed."),
     "reopened": _("Month reopened."),
     "already_closed": _("This month was already closed."),
     "already_open": _("This month is already open."),
+    "transaction_added": _("Entry added."),
+    "transaction_saved": _("Entry saved."),
+    "transaction_restored": _("Entry restored."),
 }
+SAVED_IN = _("Entry saved in %(month)s.")
 
 
 def _t(request: Request, message: str) -> str:
@@ -95,28 +115,120 @@ async def month_current(
     return RedirectResponse(_month_path(request, target), status_code=303)
 
 
-@router.get("/m/{month}", name="month")
-async def month_page(
-    request: Request, ctx: CurrentContext, month: str, notice: str = "", error: str = ""
-) -> Response:
-    target = _parse(month)
-    view = await run_in_threadpool(get_month, request.app.state.session_factory, ctx, target)
+def month_context(
+    request: Request,
+    ctx: Context,
+    target: YearMonth,
+    *,
+    notice: str = "",
+    error: str = "",
+    states: Mapping[str, SectionState] | None = None,
+    deleted: UUID | None = None,
+    saved_in: YearMonth | None = None,
+) -> dict[str, object]:
+    """The month page's context (blocking: run in a thread). ``states`` carry the transaction
+    tables' form values and messages; ``deleted`` offers Undo (pages without JavaScript) while
+    that row of this month can still be restored."""
+    factory = request.app.state.session_factory
+    view = get_month(factory, ctx, target)
     locale = request.state.locale
     closed_on = None
     if view.closed_at is not None:
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
         closed_on = format_day(local, locale)
-    context: dict[str, object] = {
+    ledger = build_ledger(factory, ctx, request, view, states)
+    pending = None
+    if deleted is not None and ledger.can_write:
+        pending = pending_undo(factory, ctx, deleted)
+        if pending is not None and pending.month != target:
+            pending = None
+    notice_text = _t(request, NOTICES[notice]) if notice in NOTICES else None
+    saved_in_href = None
+    if saved_in is not None and saved_in != target:
+        notice_text = _t(request, SAVED_IN) % {"month": format_month(saved_in, locale)}
+        saved_in_href = _month_path(request, saved_in)
+    return {
         "view": view,
         "month_heading": format_month_heading(view.month, locale),  # heading and title
         "month_name": format_month(view.month, locale),  # in sentences (confirmations)
         "prev_name": format_month(view.prev, locale) if view.prev else None,
         "next_name": format_month(view.next, locale) if view.next else None,
         "closed_on": closed_on,
-        "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice": notice_text,
+        "notice_href": saved_in_href,
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
+        "ledger": ledger,
+        "summary": summary_context(ledger),
+        "deleted": pending.id if pending is not None else None,
     }
+
+
+def _optional_uuid(value: str) -> UUID | None:
+    try:
+        return UUID(value) if value else None
+    except ValueError:
+        return None
+
+
+def _optional_month(value: str) -> YearMonth | None:
+    try:
+        return YearMonth.parse(value) if value else None
+    except InvalidMonth:
+        return None
+
+
+@router.get("/m/{month}", name="month")
+async def month_page(
+    request: Request,
+    ctx: CurrentContext,
+    month: str,
+    notice: str = "",
+    error: str = "",
+    edit: str = "",
+    deleted: str = "",
+    saved_in: str = "",
+    entry: str = "",
+    day: str = "",
+) -> Response:
+    """The month page. For browsers without JavaScript: ``?edit=<id>`` opens a row for
+    editing, ``?deleted=<id>`` offers Undo, ``?entry=<direction>&day=<day>`` prefills that
+    table's entry row with the day just used. ``?saved_in=YYYY-MM`` links an entry saved to
+    another month."""
+    target = _parse(month)
+    states: dict[str, SectionState] = {}
+    editing = _optional_uuid(edit)
+    if editing is not None:
+        states = await run_in_threadpool(edit_states, request, ctx, target, editing)
+    if entry in DIRECTIONS and ENTRY_DAY.fullmatch(day):
+        kept = SectionState(entry_values={"day": day}, focus="entry:day")
+        if entry in states:
+            kept = replace(states[entry], entry_values=kept.entry_values)
+        states[entry] = kept
+    context = await run_in_threadpool(
+        lambda: month_context(
+            request,
+            ctx,
+            target,
+            notice=notice,
+            error=error,
+            states=states,
+            deleted=_optional_uuid(deleted),
+            saved_in=_optional_month(saved_in),
+        )
+    )
     return render_template(request, "months/page.html", context=context)
+
+
+def edit_states(
+    request: Request, ctx: Context, month: YearMonth, transaction_id: UUID
+) -> dict[str, SectionState]:
+    """The section state that opens ``transaction_id`` for editing (none if it is gone)."""
+    try:
+        row = get_transaction(request.app.state.session_factory, ctx, transaction_id)
+    except NotFound:
+        return {}
+    values = edit_values(row, month, request.state.locale)
+    return {row.direction: SectionState(editing=row.id, edit_values=values, focus="edit:day")}
 
 
 @router.post("/m/{month}/close", name="month_close")

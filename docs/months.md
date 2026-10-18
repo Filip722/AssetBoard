@@ -1,10 +1,11 @@
 # Months
 
 Your money is tracked month by month. Open "Month" in the main navigation: it shows the current
-month. Every month has its own address, such as `/m/2026-10` for October 2026, so you can
-bookmark it. The address names only the month, not the workspace: whoever opens the link sees
-that month in the workspace they currently have selected. A member who belongs only to your
-workspace sees your month; a member of several workspaces may need to switch first.
+month, with its expenses and income (see [Transactions](transactions.md)). Every month has its
+own address, such as `/m/2026-10` for October 2026, so you can bookmark it. The address names
+only the month, not the workspace: whoever opens the link sees that month in the workspace they
+currently have selected. A member who belongs only to your workspace sees your month; a member
+of several workspaces may need to switch first.
 
 "The current month" is the month of today's date in the workspace's time zone (Workspace
 settings → Time zone). Just after midnight on the 1st, the new month begins at that time in that

@@ -42,6 +42,7 @@ from assetboard.services.transactions import (
     delete_transaction,
     get_transaction,
     list_month,
+    pending_undo,
     suggest_descriptions,
     undo_delete,
     update_transaction,
@@ -805,3 +806,15 @@ def test_workspace_has_transactions_counts_deleted_rows(team: WorkspaceDb) -> No
     view = _add(team, _category(team, "Food"))
     delete_transaction(team.factory, team.ctx("ed", "editor"), view.id)
     assert has()
+
+
+def test_pending_undo_reports_a_deletion_only_within_the_window(team: WorkspaceDb) -> None:
+    view = _add(team, _category(team, "Food"))
+    editor = team.ctx("ed", "editor")
+    assert pending_undo(team.factory, editor, view.id) is None  # live row
+    deleted = delete_transaction(team.factory, editor, view.id)
+    _clock(team).at = deleted.undo_until - timedelta(microseconds=1)
+    assert pending_undo(team.factory, team.ctx("vic", "viewer"), view.id) == deleted
+    _clock(team).at = deleted.undo_until  # the next now() is 1 µs past the window
+    assert pending_undo(team.factory, editor, view.id) is None
+    assert pending_undo(team.factory, editor, uuid4()) is None

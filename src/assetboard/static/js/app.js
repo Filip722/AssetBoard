@@ -51,7 +51,11 @@ function startToastTimer(toast) {
   if (!(toast instanceof HTMLElement) || !toast.matches("[data-toast]") || toastTimers.has(toast)) {
     return;
   }
-  const remaining = toast.querySelector("[data-toast-undo]") ? 10000 : 5000;
+  // An undo toast is strict: the server's undo window does not pause, so neither does it.
+  const strict = toast.hasAttribute("data-toast-strict");
+  const given = Number(toast.dataset.toastSeconds);
+  const seconds = toast.dataset.toastSeconds !== undefined && Number.isFinite(given) ? given : 10;
+  const remaining = strict || toast.querySelector("[data-toast-undo]") ? seconds * 1000 : 5000;
   const timer = { remaining, startedAt: 0, timeoutId: 0 };
   const pauseReasons = new Set();
   const resume = () => {
@@ -70,12 +74,23 @@ function startToastTimer(toast) {
     pauseReasons.delete(reason);
     resume();
   };
-  toast.addEventListener("mouseenter", () => pause("hover"));
-  toast.addEventListener("mouseleave", () => unpause("hover"));
-  toast.addEventListener("focusin", () => pause("focus"));
-  toast.addEventListener("focusout", (event) => {
-    if (!toast.contains(event.relatedTarget)) unpause("focus");
-  });
+  if (strict) {
+    const countdown = toast.querySelector("[data-toast-countdown]");
+    const end = Date.now() + remaining;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      if (countdown) countdown.textContent = String(left);
+      if (left > 0 && toast.isConnected) window.setTimeout(tick, 250);
+    };
+    tick();
+  } else {
+    toast.addEventListener("mouseenter", () => pause("hover"));
+    toast.addEventListener("mouseleave", () => unpause("hover"));
+    toast.addEventListener("focusin", () => pause("focus"));
+    toast.addEventListener("focusout", (event) => {
+      if (!toast.contains(event.relatedTarget)) unpause("focus");
+    });
+  }
   toastTimers.set(toast, timer);
   resume();
 }
@@ -163,5 +178,306 @@ document.addEventListener("click", async (event) => {
     await navigator.clipboard.writeText(input.value);
   } catch {
     // Without clipboard access the selected text can still be copied by hand.
+  }
+});
+
+// Month page transaction tables (F2.2): entry and edit rows, focus after a swap, and the
+// description autocomplete (an ARIA combobox). Everything hangs off data-* attributes, so it
+// keeps working after HTMX swaps without any set-up; the forms also work without this script.
+
+// The server marks the element to focus after a swap (or on a page with a refused form).
+function focusRequested() {
+  const element = document.querySelector("[data-autofocus]");
+  if (!(element instanceof HTMLElement)) return;
+  element.removeAttribute("data-autofocus");
+  element.focus();
+  if (element instanceof HTMLInputElement) element.select();
+}
+document.addEventListener("htmx:load", (event) => {
+  restoreEntryRows();
+  focusRequested();
+  // HTMX sets up swapped-in content a moment after the swap: a description typed into the new
+  // row before that asks for its suggestions now.
+  const active = document.activeElement;
+  if (
+    active instanceof HTMLInputElement &&
+    active.matches("[data-suggest-input]") &&
+    active.value &&
+    event.target instanceof Element &&
+    event.target.contains(active)
+  ) {
+    active.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+});
+
+// Entry rows survive swaps of their table. After Enter the row is reset at once (the request
+// already holds its values), so typing goes on; whatever is typed before the response arrives
+// is carried into the new section with the focus and the selection. The same holds when
+// another write or an undo replaces the section. A refused save (4xx) shows the server's echo
+// of the submitted values and messages instead.
+const entryStash = new Map(); // section id -> {section, values, focus, selection}
+
+function entryRowOf(section) {
+  return section instanceof Element ? section.querySelector("[data-entry-row]") : null;
+}
+
+function snapshotEntryRow(section, row) {
+  const values = {};
+  row.querySelectorAll("[data-ledger-field]").forEach((field) => {
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+      values[field.name] = field.value;
+    }
+  });
+  const active = document.activeElement;
+  const focus = active instanceof HTMLElement && row.contains(active) ? active.id : null;
+  const selection =
+    focus && active instanceof HTMLInputElement
+      ? [active.selectionStart, active.selectionEnd, active.selectionDirection]
+      : null;
+  return { section, values, focus, selection };
+}
+
+function stashSection(section) {
+  if (!(section instanceof HTMLElement) || !section.matches("[data-ledger]")) return;
+  const row = entryRowOf(section);
+  if (row) entryStash.set(section.id, snapshotEntryRow(section, row));
+}
+
+function restoreEntryRows() {
+  for (const [id, snapshot] of entryStash) {
+    const section = document.getElementById(id);
+    if (!section || section === snapshot.section) continue; // not swapped yet
+    entryStash.delete(id);
+    const row = entryRowOf(section);
+    if (!row) continue;
+    row.querySelectorAll("[data-ledger-field]").forEach((field) => {
+      const value = snapshot.values[field.getAttribute("name") ?? ""];
+      if (value !== undefined && "value" in field) field.value = value;
+    });
+    const field = snapshot.focus ? document.getElementById(snapshot.focus) : null;
+    if (!(field instanceof HTMLElement) || !row.contains(field)) continue;
+    section.querySelectorAll("[data-autofocus]").forEach((e) => e.removeAttribute("data-autofocus"));
+    field.focus();
+    if (field instanceof HTMLInputElement && snapshot.selection) {
+      try {
+        field.setSelectionRange(...snapshot.selection);
+      } catch {
+        // Not every input type has a selection.
+      }
+    }
+  }
+}
+
+document.addEventListener("htmx:beforeSwap", (event) => {
+  const section = event.detail?.target;
+  if (!(section instanceof HTMLElement) || !section.matches("[data-ledger]")) return;
+  const status = event.detail.xhr?.status ?? 0;
+  if (status >= 200 && status < 300) stashSection(section);
+  else entryStash.delete(section.id); // the server's echo wins
+});
+document.addEventListener("htmx:oobBeforeSwap", (event) => stashSection(event.detail?.target));
+document.addEventListener("htmx:afterSwap", restoreEntryRows);
+
+// The day the next entry keeps (owner decision): a full date in the viewed month becomes its
+// day number, anything else stays as typed. The server applies the same rule.
+function keptDay(text) {
+  const value = text.trim();
+  const month = document.querySelector("[data-month]")?.getAttribute("data-month") ?? "";
+  let match = /^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})$/.exec(value);
+  let parts = match ? [match[1], match[2], match[3]] : null;
+  match = /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{4})$/.exec(value);
+  if (match) parts = [match[3], match[2], match[1]];
+  if (parts && `${parts[0]}-${parts[1].padStart(2, "0")}` === month) return String(Number(parts[2]));
+  return value;
+}
+
+const submittedEntries = new Map(); // entry form id -> values sent (restored if sending fails)
+
+document.addEventListener("htmx:beforeRequest", (event) => {
+  const form = event.detail?.elt;
+  if (!(form instanceof HTMLFormElement) || !form.matches("[data-entry-form]")) return;
+  const row = document.getElementById(`${form.id}-row`);
+  if (!row) return;
+  submittedEntries.set(form.id, snapshotEntryRow(null, row).values);
+  const day = row.querySelector("[name='day']");
+  const kept = day instanceof HTMLInputElement ? keptDay(day.value) : "";
+  clearEntryRow(row);
+  if (day instanceof HTMLInputElement) {
+    day.value = kept;
+    day.select();
+  }
+});
+
+document.addEventListener("htmx:sendError", (event) => {
+  const form = event.detail?.elt;
+  if (!(form instanceof HTMLFormElement) || !submittedEntries.has(form.id)) return;
+  const values = submittedEntries.get(form.id);
+  document.getElementById(`${form.id}-row`)?.querySelectorAll("[data-ledger-field]").forEach((field) => {
+    const value = values[field.getAttribute("name") ?? ""];
+    if (value !== undefined && "value" in field) field.value = value;
+  });
+});
+
+function suggestionList(input) {
+  return document.getElementById(input.getAttribute("aria-controls") ?? "");
+}
+
+function suggestionOptions(list) {
+  return Array.from(list?.querySelectorAll("[role='option']") ?? []);
+}
+
+function closeSuggestions(input) {
+  const list = suggestionList(input);
+  input.setAttribute("aria-expanded", "false");
+  input.removeAttribute("aria-activedescendant");
+  if (!list) return;
+  list.hidden = true;
+  suggestionOptions(list).forEach((option) => option.setAttribute("aria-selected", "false"));
+}
+
+function openSuggestions(input) {
+  const list = suggestionList(input);
+  if (!list || suggestionOptions(list).length === 0) {
+    closeSuggestions(input);
+    return;
+  }
+  list.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+}
+
+function moveSuggestion(input, step) {
+  const options = suggestionOptions(suggestionList(input));
+  if (options.length === 0) return;
+  openSuggestions(input);
+  const current = options.findIndex((option) => option.getAttribute("aria-selected") === "true");
+  const next = current < 0 ? (step > 0 ? 0 : options.length - 1) : (current + step + options.length) % options.length;
+  options.forEach((option, index) => option.setAttribute("aria-selected", String(index === next)));
+  input.setAttribute("aria-activedescendant", options[next].id);
+  // Scroll the list only: scrollIntoView would also scroll the table's wrapper.
+  const option = options[next];
+  const list = suggestionList(input);
+  if (list && option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;
+  else if (list && option.offsetTop + option.offsetHeight > list.scrollTop + list.clientHeight) {
+    list.scrollTop = option.offsetTop + option.offsetHeight - list.clientHeight;
+  }
+}
+
+// Picking a suggestion sets the description and pre-selects its most used category.
+function pickSuggestion(input, option) {
+  input.value = option.dataset.description ?? option.textContent ?? "";
+  input.dataset.picked = input.value;
+  const select = input.form?.elements.namedItem("category_id");
+  const categoryId = option.dataset.categoryId;
+  if (
+    select instanceof HTMLSelectElement &&
+    categoryId &&
+    Array.from(select.options).some((choice) => choice.value === categoryId)
+  ) {
+    select.value = categoryId;
+  }
+  closeSuggestions(input);
+  input.focus();
+}
+
+document.addEventListener("htmx:afterSwap", (event) => {
+  const list = event.detail?.target;
+  if (!(list instanceof HTMLElement) || !list.matches("[data-suggestions]")) return;
+  const input = document.querySelector(`[aria-controls="${list.id}"]`);
+  if (!(input instanceof HTMLInputElement)) return;
+  // Show the list only while the field has focus and was not just filled from it.
+  if (document.activeElement === input && input.dataset.picked !== input.value) {
+    input.removeAttribute("aria-activedescendant");
+    openSuggestions(input);
+  } else {
+    closeSuggestions(input);
+  }
+});
+
+document.addEventListener("focusout", (event) => {
+  const input = event.target;
+  if (input instanceof HTMLInputElement && input.matches("[data-suggest-input]")) {
+    closeSuggestions(input);
+  }
+});
+
+// mousedown would move the focus away (and close the list) before the click lands.
+document.addEventListener("mousedown", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-suggestions] [role='option']")) {
+    event.preventDefault();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const option = event.target.closest("[data-suggestions] [role='option']");
+  if (!(option instanceof HTMLElement)) return;
+  const list = option.closest("[data-suggestions]");
+  const input = document.querySelector(`[aria-controls="${list?.id}"]`);
+  if (input instanceof HTMLInputElement) pickSuggestion(input, option);
+});
+
+// Esc in the entry row clears it (fields and messages); the row keeps the focus.
+function clearEntryRow(row) {
+  row.querySelectorAll("[data-ledger-field]").forEach((field) => {
+    if (field instanceof HTMLSelectElement) field.selectedIndex = 0;
+    else if (field instanceof HTMLInputElement) field.value = "";
+    field.removeAttribute("aria-invalid");
+    const hint = field.getAttribute("data-describedby");
+    if (hint) field.setAttribute("aria-describedby", hint);
+    else field.removeAttribute("aria-describedby");
+    if (field instanceof HTMLInputElement && field.matches("[data-suggest-input]")) {
+      delete field.dataset.picked;
+      closeSuggestions(field);
+    }
+  });
+  row.querySelectorAll("[data-field-error]").forEach((message) => message.remove());
+  row.closest("[data-ledger]")?.querySelector("[data-ledger-error]")?.remove();
+  row.querySelector("[name='day']")?.focus();
+}
+
+function handleSuggestionKey(input, event) {
+  const expanded = input.getAttribute("aria-expanded") === "true";
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (suggestionOptions(suggestionList(input)).length === 0) return false;
+    event.preventDefault();
+    moveSuggestion(input, event.key === "ArrowDown" ? 1 : -1);
+    return true;
+  }
+  if (!expanded) return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeSuggestions(input);
+    return true;
+  }
+  if (event.key === "Enter") {
+    const active = document.getElementById(input.getAttribute("aria-activedescendant") ?? "");
+    if (!active) return false; // nothing chosen: Enter saves the row
+    event.preventDefault();
+    pickSuggestion(input, active);
+    return true;
+  }
+  return false;
+}
+
+document.addEventListener("keydown", (event) => {
+  const field = event.target;
+  if (!(field instanceof HTMLElement)) return;
+  const row = field.closest("[data-ledger-row-form]");
+  if (!row) return;
+  if (field instanceof HTMLInputElement && field.matches("[data-suggest-input]")) {
+    if (handleSuggestionKey(field, event)) return;
+  }
+  if (event.key === "Enter" && field instanceof HTMLSelectElement) {
+    // A select does not submit on Enter by itself; text fields do (implicit submission).
+    event.preventDefault();
+    field.form?.requestSubmit();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    if (row.hasAttribute("data-edit-row")) {
+      const cancel = row.querySelector("[data-edit-cancel]");
+      if (cancel instanceof HTMLElement) cancel.click();
+    } else {
+      clearEntryRow(row);
+    }
   }
 });

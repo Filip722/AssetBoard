@@ -325,13 +325,10 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
                 page.get_by_role("button", name="Undo").click()
             assert undo.value.status == 204
             assert request_log.count("undo") == 1
+            # An undo toast is strict (F2.2): hovering or focusing it does not pause it.
             page.mouse.move(1, 1)
             assert page.evaluate("window.__toastTimerCalls.length") == 1
-            assert page.evaluate("window.__toastTimerClears.length") == 1
-            page.locator("#smoke-error-trigger").focus()
-            resumed_delay = page.evaluate("window.__toastTimerCalls.at(-1).delay")
-            assert page.evaluate("window.__toastTimerCalls.length") == 2
-            assert 0 < resumed_delay <= 10000
+            assert page.evaluate("window.__toastTimerClears.length") == 0
 
             page.locator("#smoke-short-toast-trigger").click()
             short_toast = page.locator(
@@ -339,6 +336,12 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             )
             expect(short_toast).to_be_visible()
             assert page.evaluate("window.__toastTimerCalls.at(-1).delay") == 5000
+            # Other toasts pause while hovered and resume with the time left.
+            short_toast.hover()
+            assert page.evaluate("window.__toastTimerClears.length") == 1
+            page.mouse.move(1, 1)
+            assert page.evaluate("window.__toastTimerCalls.length") == 3
+            assert 0 < page.evaluate("window.__toastTimerCalls.at(-1).delay") <= 5000
 
             page.locator("#smoke-error-trigger").click()
             error_toast = page.locator('#toast-container [data-toast][role="alert"]')

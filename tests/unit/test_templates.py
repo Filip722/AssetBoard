@@ -35,6 +35,19 @@ def test_undo_toast_uses_htmx_out_of_band_swap() -> None:
     assert rendered.count('data-toast role="status"') == 2
     assert 'hx-post="/undo"' in rendered
     assert "Undo" in rendered
+    # Undo toasts are strict (no pause on hover or focus) and are replaced by the undo response.
+    assert rendered.count('data-toast-strict data-toast-seconds="10"') == 2
+    assert rendered.count('hx-target="closest [data-toast]" hx-swap="outerHTML"') == 2
+    assert rendered.count("data-toast-countdown>10</span>") == 2
+
+
+def test_a_toast_without_undo_is_not_strict() -> None:
+    templates = templates_for("en")
+    rendered = templates.env.from_string(
+        '{% from "macros/components.html" import toast %}{{ toast("Saved", None, "Undo") }}'
+    ).render()
+
+    assert "data-toast-strict" not in rendered and "data-toast-countdown" not in rendered
 
 
 def test_vendored_javascript_matches_documented_hashes() -> None:

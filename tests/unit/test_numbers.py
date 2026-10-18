@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 
 from assetboard.domain.money import Money
 from assetboard.i18n.locale import resolve_locale
-from assetboard.i18n.numbers import format_money, parse_amount
+from assetboard.i18n.numbers import format_amount_input, format_money, parse_amount
 
 
 @pytest.mark.parametrize("locale", ["en", "pl", "de"])
@@ -163,3 +163,30 @@ def test_parse_amount_rejects_a_leading_zero_group_in_en(text: str) -> None:
     """In ``en`` the comma groups thousands: "0,001" is neither 1 nor 0.001."""
     with pytest.raises(ValueError, match="valid amount"):
         parse_amount(text, "en")
+
+
+@pytest.mark.parametrize(
+    ("currency", "amount", "locale", "expected"),
+    [
+        ("EUR", 123456, "en", "1234.56"),
+        ("EUR", 123456, "pl", "1234,56"),
+        ("EUR", 5, "pl", "0,05"),
+        ("EUR", 1250, "de", "12,50"),
+        ("JPY", 1234, "en", "1234"),
+        ("KWD", 1234567, "pl", "1234,567"),
+    ],
+)
+def test_format_amount_input_writes_the_locale_decimal_without_grouping(
+    currency: str, amount: int, locale: str, expected: str
+) -> None:
+    assert format_amount_input(Money(amount, currency), locale) == expected
+
+
+@pytest.mark.parametrize("locale", ["en", "pl", "de"])
+@pytest.mark.parametrize("currency", ["EUR", "JPY", "KWD"])
+@given(amount=st.integers(min_value=1, max_value=10**15 - 1))
+def test_format_amount_input_round_trips_through_parse_amount(
+    locale: str, currency: str, amount: int
+) -> None:
+    money = Money(amount, currency)
+    assert parse_amount(format_amount_input(money, locale), locale) == money.to_decimal()
