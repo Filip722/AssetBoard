@@ -1,4 +1,39 @@
-{# The month summary (F2.4 builds it: planned / actual / difference). ``summary`` comes from
-   web.ledger.summary_context. Every transaction write sends this block out of band, so its
-   totals refresh without a reload. Empty until F2.4. #}
-<div id="month-summary" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}></div>
+{# The month summary (#month-summary). F2.3 fills it with the plan (months/_plan.html): per
+   category the planned value, editable inline; F2.4 adds actual and difference, totals, KPIs
+   and bars. ``summary`` is web.plan.SummaryView (web.plan.summary_context). Every transaction
+   write sends this block out of band (``summary_oob``); app.js keeps a half-typed planned value
+   and its focus across that swap. #}
+{% from "months/_plan.html" import plan_row, banner, copied_text, skipped_text with context %}
+<section id="month-summary" class="panel p-4 sm:p-6" aria-labelledby="month-summary-heading" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <h2 id="month-summary-heading" class="text-base font-semibold">{{ _("Plan") }}</h2>
+  {% if summary.copied %}
+  <div class="mt-2 text-sm" data-plan-copied>
+    <p>{{ copied_text(summary.copied) }}</p>
+    {% if summary.copied.skipped %}<p class="text-muted">{{ skipped_text(summary.copied) }}</p>{% endif %}
+  </div>
+  {% endif %}
+  {{ banner() }}
+  {% if summary.groups %}
+  <div class="mt-3 overflow-x-auto">
+    <table class="w-full min-w-[20rem] text-sm">
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="py-2 pr-2 font-medium">{{ _("Category") }}</th>
+          <th scope="col" class="w-40 py-2 text-right font-medium">{{ _("Planned") }}</th>
+        </tr>
+      </thead>
+      {% for g in summary.groups %}
+      <tbody class="divide-y divide-line" data-plan-group="{{ g.key }}">
+        <tr><th scope="rowgroup" colspan="2" class="pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
+        {% for r in g.rows %}{{ plan_row(r) }}{% endfor %}
+      </tbody>
+      {% endfor %}
+    </table>
+  </div>
+  {% if summary.can_write %}
+  <p id="plan-hint" class="mt-2 text-xs text-muted">{{ _("Enter or leaving the field saves a planned value; 0 or an empty field removes it. Esc restores the saved value.") }}</p>
+  {% endif %}
+  {% else %}
+  <p class="mt-3 text-sm text-muted" data-plan-empty>{{ _("Add categories to plan this month.") }} <a href="{{ scoped_url(request, 'categories') }}" class="font-medium text-primary-ink underline">{{ _("Categories") }}</a></p>
+  {% endif %}
+</section>

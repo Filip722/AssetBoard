@@ -1,0 +1,7 @@
+{# One planned cell's row after a save (F2.3 part B), with the copy banner and the status line
+   out of band. ``row_view`` is None when the row left the plan (an archived or transfer
+   category's line was removed): the swap then removes the row. #}
+{% from "months/_plan.html" import plan_row, banner with context %}
+{% if row_view %}{{ plan_row(row_view) }}{% endif %}
+{{ banner(oob=true) }}
+<p id="plan-status" hx-swap-oob="innerHTML">{{ status }}</p>

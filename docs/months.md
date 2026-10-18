@@ -22,6 +22,30 @@ zone, not at midnight UTC.
 Every month from January 1900 to December 2199 can be opened, including months with no data yet
 and future months, which you can use for planning.
 
+## Planning a month
+
+The **Plan** block at the top of the month page lists your categories in groups: Expenses,
+Saved / invested, Income and Withdrawn from savings. Type the amount you plan for a category in
+its **Planned** field:
+
+- **Enter** saves and moves to the next category; leaving the field (Tab or a click elsewhere)
+  saves too. Amounts are typed as for entries (`550`, `1 234,56`, `12,5`).
+- **0** or an empty field removes the planned value. **Esc** puts back the saved value.
+- Transfers are not part of the plan. A planned value of a category that was later archived or
+  turned into a transfer stays visible (marked, or under "Transfers (not counted)") so you can
+  change or remove it, but such categories take no new planned values.
+
+When a month has no planned values yet and the previous month has some, the block offers **Copy
+plan from <previous month>**. One click copies them all; it never overwrites a planned value
+that already exists, and it leaves out archived and transfer categories (and says how many).
+To have this happen by itself, an owner can turn on "Copy the previous month's plan when a month
+is opened for the first time" in [Workspace settings](workspace-settings.md): then the current
+month or a later one is filled the first time an editor or owner opens it, once. A month you
+emptied on purpose stays empty, and past months always use the button.
+
+Viewers see the planned values but cannot change them. Changes are recorded in the workspace
+audit log under "Planned values".
+
 ## Closing a month
 
 When a month is done, close it so nothing in it changes by accident:

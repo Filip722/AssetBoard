@@ -999,6 +999,9 @@ msgstr ""
 msgid "Too late to undo: the entry stays deleted."
 msgstr ""
 
+msgid "This category no longer exists. It may have been deleted elsewhere."
+msgstr ""
+
 msgid "Month closed."
 msgstr ""
 
@@ -1018,6 +1021,12 @@ msgid "Entry saved."
 msgstr ""
 
 msgid "Entry restored."
+msgstr ""
+
+msgid "Planned value saved."
+msgstr ""
+
+msgid "Planned value removed."
 msgstr ""
 
 #, python-format
@@ -1073,6 +1082,24 @@ msgid "The password is not correct. Try again, or start over."
 msgstr ""
 
 msgid "This confirmation expired. Start over to sign in."
+msgstr ""
+
+msgid "Saved / invested"
+msgstr ""
+
+msgid "Withdrawn from savings"
+msgstr ""
+
+msgid "Transfers (not counted)"
+msgstr ""
+
+msgid "A planned value cannot be negative."
+msgstr ""
+
+msgid "This category is archived: it takes no new planned values."
+msgstr ""
+
+msgid "Transfers are not counted in the plan: this category takes none."
 msgstr ""
 
 msgid ""
@@ -1734,7 +1761,58 @@ msgid ""
 "an edit."
 msgstr ""
 
+#, python-format
+msgid "Planned for %(name)s"
+msgstr ""
+
+msgid "Not planned"
+msgstr ""
+
+msgid "This month has no plan yet."
+msgstr ""
+
+#, python-format
+msgid "Copy plan from %(month)s"
+msgstr ""
+
+msgid ""
+"Nothing was copied: every category that can take a planned value already "
+"has one."
+msgstr ""
+
+#, python-format
+msgid "%(num)d planned value was copied from %(month)s (workspace setting)."
+msgid_plural "%(num)d planned values were copied from %(month)s (workspace setting)."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Copied %(num)d planned value from %(month)s."
+msgid_plural "Copied %(num)d planned values from %(month)s."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(num)d planned value of an archived or transfer category was not copied."
+msgid_plural "%(num)d planned values of archived or transfer categories were not copied."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Undo"
+msgstr ""
+
+msgid "Plan"
+msgstr ""
+
+msgid "Planned"
+msgstr ""
+
+msgid ""
+"Enter or leaving the field saves a planned value; 0 or an empty field "
+"removes it. Esc restores the saved value."
+msgstr ""
+
+msgid "Add categories to plan this month."
 msgstr ""
 
 msgid "Closed"

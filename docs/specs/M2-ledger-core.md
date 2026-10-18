@@ -134,8 +134,8 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   "row swaps":** writes return the whole table section (`#ledger-expense` / `#ledger-income`),
   since rows are ordered by date and an edit can move a row or send it to another month; only
   opening and cancelling an edit swap one row. Every write response also carries, out of band,
-  `#month-summary` (an empty placeholder: **F2.4 fills `web.ledger.summary_context` and
-  `months/_summary.html`**) and the screen-reader status line `#ledger-status`.
+  `#month-summary` (F2.3 fills it with the plan, `web.plan.summary_context`; **F2.4 adds the
+  actual and difference columns** to `months/_summary.html`) and the screen-reader status line `#ledger-status`.
 - Without JavaScript every form posts and redirects (303); a refused save re-renders the whole
   page (400/409) with the values and messages; `?edit=<id>` opens a row for editing,
   `?deleted=<id>` shows "Entry deleted." with an Undo form, `?saved_in=YYYY-MM` links an entry
@@ -269,6 +269,48 @@ part B)**
   (not counted)" so they can be removed); removing every line with no transaction unlocks the
   base currency; every cell save is audited; copy strictly from the immediately previous month.
 
+**As built (F2.3 part B: the month-page UI)**
+- **Deviation from "the summary's planned cells":** F2.4 builds the summary after F2.3, so F2.3
+  builds the summary block's frame: `#month-summary` (`months/_summary.html`, heading "Plan")
+  with F2.4's groups as `<tbody>`s and two columns, Category and Planned. **F2.4 adds Actual and
+  Difference to these rows**, plus totals, KPIs, bars and sorting. View models and messages are
+  in `web.plan` (`build_summary`, `summary_context`; this replaces F2.2's placeholder
+  `web.ledger.summary_context`), routes in `web.plan_routes`, macros in `months/_plan.html`.
+- Each planned cell is a one-input `<form>` inside its `<td>` (`hx-trigger="change, submit"`,
+  `hx-target` its row): without JavaScript Enter submits it (implicit submission) and the page
+  redirects (303, `?notice=plan_saved|plan_removed#plan-<category>`); a refused value re-renders
+  the page (400) with what was typed and the message, focused. With HTMX the response is that
+  row (400 for a refused value, without moving the focus: the user may be typing in the next
+  cell) with the copy banner `#plan-banner` and the screen-reader line `#plan-status` out of
+  band. Viewers and closed months see the amounts as text ("—" when not planned).
+- Routes: `POST /m/{month}/plan/{category_id}` (`plan_set`, field `amount`), `POST
+  /m/{month}/plan/copy` (`plan_copy`; HTMX: the whole `#month-summary`, focus on the first cell;
+  without JavaScript 303 with `?plan_copied=N&plan_skipped=M`). A month closed meanwhile: 303 or
+  `HX-Redirect` to `?error=month_closed`; an unknown category: `?error=plan_category_gone` (404).
+- Banner: "This month has no plan yet." with "Copy plan from <month>" when the viewer can write,
+  the month is open, has no line and the previous month has lines a copy would add. Month names
+  after "from" use `i18n.dates.format_month_after_from` (CLDR's format-context name: "z
+  września 2026"). After a copy: "Copied N planned values from …" (or "… (workspace setting)"
+  for the automatic copy), and how many were not copied.
+- The month page GET calls `services.budget.auto_copy_on_open` before rendering (HEAD answers
+  405: FastAPI's GET routes do not take HEAD). `?plan_copied=`/`plan_skipped=` are read only as
+  1-6 ASCII digits (anything else is ignored), and the copy result is shown to writers only.
+- A new value for a category that left the plan meanwhile (archived or turned into a transfer
+  in another tab, no line) reloads the page with the message (`?error=plan_category_archived` /
+  `plan_category_transfer`; HTMX: 409 with `HX-Redirect`), since its row is gone. The
+  too-many-decimals message names the stored currency the value was judged in.
+- The screen-reader line `#plan-status` sits outside `#month-summary` (a transaction write's
+  out-of-band summary never clears it); a copy announces its result there. A cell's save that
+  completes after a transaction write replaced the block swaps into the new block's row of the
+  same id (`app.js` listens on the row itself: HTMX fires `htmx:beforeSwap` on the detached
+  row). Empty read-only cells show "—" with "Not planned" as screen-reader text.
+- Every transaction write renders the whole block out of band. `app.js` (delegated listeners):
+  Enter in a planned cell moves to the next cell (the change saves the one left; on the last
+  cell Enter saves in place), Esc restores the saved value (`data-saved-value`) and clears the
+  message; a planned value being typed when a transaction write swaps the block keeps its text,
+  focus and selection and is saved once when the field is left; the server's `data-autofocus`
+  of the transaction table does not pull the focus out of a planned cell.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -292,9 +334,10 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
 - Clicking a category filters the transaction tables to that category.
 - Golden example (must be a test): budget Food 550.00; transactions Food 50.00 + 500.00 → actual 550.00, difference 0.00; budget Travel 5 350.00 with 4 323.00 spent → difference 1 027.00; income Salary planned 3 000.00, actual 3 400.00 → difference +400.00.
 - Categories with actuals but no planned line are shown with planned 0.00 (never hidden).
-- **From F2.2:** render the summary in `months/_summary.html` from
-  `web.ledger.summary_context(ledger)`; every transaction write already sends `#month-summary`
-  out of band, so the totals refresh without a reload.
+- **From F2.2/F2.3:** render the summary in `months/_summary.html` from
+  `web.plan.summary_context` (F2.3 built the rows with planned cells, `months/_plan.html`);
+  every transaction write already sends `#month-summary` out of band, so the totals refresh
+  without a reload.
 
 **Agent prompt**
 ```

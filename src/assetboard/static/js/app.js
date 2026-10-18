@@ -190,6 +190,11 @@ function focusRequested() {
   const element = document.querySelector("[data-autofocus]");
   if (!(element instanceof HTMLElement)) return;
   element.removeAttribute("data-autofocus");
+  // Someone typing a planned value (F2.3) while a transaction save completes keeps typing there.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.matches("[data-plan-input]") && active !== element) {
+    return;
+  }
   element.focus();
   if (element instanceof HTMLInputElement) element.select();
 }
@@ -480,4 +485,111 @@ document.addEventListener("keydown", (event) => {
       clearEntryRow(row);
     }
   }
+});
+
+// Planned values in the month summary (F2.3). Each cell is a one-input form that saves on
+// change (and on Enter without this script). Enter moves to the next cell, which saves the one
+// left behind; on the last cell it saves in place. Esc restores the saved value. A transaction
+// write replaces the whole summary out of band: a planned value being typed and its focus are
+// carried into the new block, and it is saved when the field is left.
+const restoredPlanInputs = new WeakSet();
+let planStash = null;
+
+function planInputs() {
+  return Array.from(document.querySelectorAll("[data-plan-input]"));
+}
+
+document.addEventListener("keydown", (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || !input.matches("[data-plan-input]")) return;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    const inputs = planInputs();
+    const next = inputs[inputs.indexOf(input) + 1];
+    if (next instanceof HTMLInputElement) {
+      next.focus();
+      next.select();
+    } else {
+      input.form?.requestSubmit();
+    }
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    input.value = input.dataset.savedValue ?? "";
+    input.removeAttribute("aria-invalid");
+    input.setAttribute("aria-describedby", "plan-hint");
+    input.form?.querySelector("[data-field-error]")?.remove();
+    input.select();
+  }
+});
+
+// A carried-over value that the browser does report as changed is saved by that change
+// (hx-trigger), so the focusout below must not submit it a second time.
+document.addEventListener(
+  "change",
+  (event) => {
+    if (event.target instanceof HTMLInputElement) restoredPlanInputs.delete(event.target);
+  },
+  true,
+);
+
+document.addEventListener("focusout", (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || !restoredPlanInputs.has(input)) return;
+  restoredPlanInputs.delete(input);
+  // A value carried over a swap is not a "change" to the browser: save it explicitly.
+  if (input.value !== (input.dataset.savedValue ?? "")) input.form?.requestSubmit();
+});
+
+document.addEventListener("htmx:oobBeforeSwap", (event) => {
+  const block = event.detail?.target;
+  if (!(block instanceof HTMLElement) || block.id !== "month-summary") return;
+  const active = document.activeElement;
+  if (!(active instanceof HTMLInputElement) || !block.contains(active)) return;
+  if (!active.matches("[data-plan-input]")) return;
+  planStash = {
+    block,
+    id: active.id,
+    value: active.value,
+    selection: [active.selectionStart, active.selectionEnd, active.selectionDirection],
+  };
+});
+
+function restorePlanInput() {
+  if (!planStash) return;
+  const block = document.getElementById("month-summary");
+  if (!block || block === planStash.block) return; // not swapped yet
+  const { id, value, selection } = planStash;
+  planStash = null;
+  const input = document.getElementById(id);
+  if (!(input instanceof HTMLInputElement) || !block.contains(input)) return;
+  input.value = value;
+  input.focus();
+  try {
+    input.setSelectionRange(...selection);
+  } catch {
+    // Not every input type has a selection.
+  }
+  if (value !== (input.dataset.savedValue ?? "")) restoredPlanInputs.add(input);
+}
+document.addEventListener("htmx:oobAfterSwap", restorePlanInput);
+document.addEventListener("htmx:afterSwap", restorePlanInput);
+
+// A cell's save can finish after a transaction write replaced the whole summary out of band:
+// its target row is then detached, and HTMX fires htmx:beforeSwap on that detached row (the
+// event never reaches the document). So the listener sits on the row itself, added when the
+// request starts, and swaps into the row of the same id in the new block instead.
+document.addEventListener("htmx:beforeRequest", (event) => {
+  const form = event.detail?.elt;
+  const row = event.detail?.target;
+  if (!(form instanceof HTMLFormElement) || !form.matches("[data-plan-form]")) return;
+  if (!(row instanceof HTMLElement) || !row.matches("[data-plan-row]")) return;
+  row.addEventListener(
+    "htmx:beforeSwap",
+    (swap) => {
+      if (row.isConnected) return;
+      const live = document.getElementById(row.id);
+      if (live) swap.detail.target = live;
+    },
+    { once: true },
+  );
 });

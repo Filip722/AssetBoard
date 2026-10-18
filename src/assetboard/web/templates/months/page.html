@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
 {# The month page (F2.5): navigation, picker, closed state, close/reopen. The ``month_body``
-   block holds the summary (F2.4, #month-summary) and the transaction tables (F2.2,
-   months/_ledger.html); F2.3 adds planned values. No inline script or style. #}
+   block holds the summary (#month-summary: F2.3's planned values, F2.4's totals) and the
+   transaction tables (F2.2, months/_ledger.html). No inline script or style. #}
 {% block title %}{{ month_heading }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
 {% block content %}
@@ -76,6 +76,7 @@
   </form>
   {% endif %}
   <p id="ledger-status" class="sr-only" role="status" data-ledger-status></p>
+  <p id="plan-status" class="sr-only" role="status" data-plan-status></p>
   {% include "months/_summary.html" %}
   {% for s in ledger.sections %}{{ section(s) }}{% endfor %}
   {% endblock %}

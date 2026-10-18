@@ -1,0 +1,6 @@
+{# The summary after a copy (F2.3 part B), with its result on the screen-reader status line
+   (#plan-status sits outside the block, so a transaction write's out-of-band summary never
+   clears it). #}
+{% from "months/_plan.html" import copied_text, skipped_text with context %}
+{% include "months/_summary.html" %}
+<p id="plan-status" hx-swap-oob="innerHTML">{% if summary.copied %}{{ copied_text(summary.copied) }}{% if summary.copied.skipped %} {{ skipped_text(summary.copied) }}{% endif %}{% endif %}</p>

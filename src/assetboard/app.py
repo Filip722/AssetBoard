@@ -53,6 +53,7 @@ from assetboard.web.invite_routes import router as invite_router
 from assetboard.web.month_routes import MONTH_CLOSED_MESSAGE, MONTH_CLOSED_TITLE
 from assetboard.web.month_routes import router as month_router
 from assetboard.web.oidc_routes import router as oidc_router
+from assetboard.web.plan_routes import router as plan_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
@@ -178,6 +179,7 @@ def create_app(
     app.include_router(workspace_router)
     app.include_router(category_router)
     app.include_router(month_router)
+    app.include_router(plan_router)
     app.include_router(transaction_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)

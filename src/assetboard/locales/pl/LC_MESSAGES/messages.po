@@ -1042,6 +1042,9 @@ msgstr "Ten wpis już nie istnieje. Mógł zostać usunięty gdzie indziej."
 msgid "Too late to undo: the entry stays deleted."
 msgstr "Za późno na cofnięcie: wpis pozostaje usunięty."
 
+msgid "This category no longer exists. It may have been deleted elsewhere."
+msgstr "Ta kategoria już nie istnieje. Mogła zostać usunięta gdzie indziej."
+
 msgid "Month closed."
 msgstr "Miesiąc zamknięty."
 
@@ -1062,6 +1065,12 @@ msgstr "Zapisano wpis."
 
 msgid "Entry restored."
 msgstr "Przywrócono wpis."
+
+msgid "Planned value saved."
+msgstr "Zapisano wartość planowaną."
+
+msgid "Planned value removed."
+msgstr "Usunięto wartość planowaną."
 
 #, python-format
 msgid "Entry saved in %(month)s."
@@ -1129,6 +1138,28 @@ msgstr "Hasło jest nieprawidłowe. Spróbuj ponownie lub zacznij od nowa."
 
 msgid "This confirmation expired. Start over to sign in."
 msgstr "To potwierdzenie wygasło. Zacznij od nowa, aby się zalogować."
+
+msgid "Saved / invested"
+msgstr "Zaoszczędzone / zainwestowane"
+
+msgid "Withdrawn from savings"
+msgstr "Wypłacone z oszczędności"
+
+msgid "Transfers (not counted)"
+msgstr "Przelewy własne (nieliczone)"
+
+msgid "A planned value cannot be negative."
+msgstr "Wartość planowana nie może być ujemna."
+
+msgid "This category is archived: it takes no new planned values."
+msgstr ""
+"Ta kategoria jest zarchiwizowana: nie przyjmuje nowych wartości "
+"planowanych."
+
+msgid "Transfers are not counted in the plan: this category takes none."
+msgstr ""
+"Przelewy własne nie są liczone w planie: ta kategoria nie przyjmuje "
+"wartości planowanych."
 
 msgid ""
 "Sign-in through your proxy is not available for this request. Try again; "
@@ -1841,8 +1872,78 @@ msgstr ""
 "07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
 "czyści wiersz lub anuluje edycję."
 
+#, python-format
+msgid "Planned for %(name)s"
+msgstr "Plan dla: %(name)s"
+
+msgid "Not planned"
+msgstr "Nie zaplanowano"
+
+msgid "This month has no plan yet."
+msgstr "Ten miesiąc nie ma jeszcze planu."
+
+#, python-format
+msgid "Copy plan from %(month)s"
+msgstr "Kopiuj plan z %(month)s"
+
+msgid ""
+"Nothing was copied: every category that can take a planned value already "
+"has one."
+msgstr ""
+"Nic nie skopiowano: każda kategoria, która może mieć wartość planowaną, "
+"już ją ma."
+
+#, python-format
+msgid "%(num)d planned value was copied from %(month)s (workspace setting)."
+msgid_plural "%(num)d planned values were copied from %(month)s (workspace setting)."
+msgstr[0] ""
+"Skopiowano %(num)d wartość planowaną z %(month)s (ustawienie obszaru "
+"roboczego)."
+msgstr[1] ""
+"Skopiowano %(num)d wartości planowane z %(month)s (ustawienie obszaru "
+"roboczego)."
+msgstr[2] ""
+"Skopiowano %(num)d wartości planowanych z %(month)s (ustawienie obszaru "
+"roboczego)."
+
+#, python-format
+msgid "Copied %(num)d planned value from %(month)s."
+msgid_plural "Copied %(num)d planned values from %(month)s."
+msgstr[0] "Skopiowano %(num)d wartość planowaną z %(month)s."
+msgstr[1] "Skopiowano %(num)d wartości planowane z %(month)s."
+msgstr[2] "Skopiowano %(num)d wartości planowanych z %(month)s."
+
+#, python-format
+msgid "%(num)d planned value of an archived or transfer category was not copied."
+msgid_plural "%(num)d planned values of archived or transfer categories were not copied."
+msgstr[0] ""
+"Nie skopiowano %(num)d wartości planowanej kategorii zarchiwizowanej lub "
+"przelewu własnego."
+msgstr[1] ""
+"Nie skopiowano %(num)d wartości planowanych kategorii zarchiwizowanych "
+"lub przelewów własnych."
+msgstr[2] ""
+"Nie skopiowano %(num)d wartości planowanych kategorii zarchiwizowanych "
+"lub przelewów własnych."
+
 msgid "Undo"
 msgstr "Cofnij"
+
+msgid "Plan"
+msgstr "Plan"
+
+msgid "Planned"
+msgstr "Plan"
+
+msgid ""
+"Enter or leaving the field saves a planned value; 0 or an empty field "
+"removes it. Esc restores the saved value."
+msgstr ""
+"Enter lub opuszczenie pola zapisuje wartość planowaną; 0 lub puste pole "
+"ją usuwa. Esc przywraca zapisaną wartość."
+
+msgid "Add categories to plan this month."
+msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
 msgid "Closed"
 msgstr "Zamknięty"

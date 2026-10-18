@@ -82,12 +82,14 @@ class InvalidPlannedValue(PlanError):
     """The value or the category cannot take a planned value; ``code`` names why.
 
     Codes: ``invalid_amount``, ``amount_negative``, ``amount_too_large``,
-    ``too_many_decimals``, ``category_archived``, ``category_transfer``.
+    ``too_many_decimals``, ``category_archived``, ``category_transfer``. ``currency`` is the
+    stored base currency the amount was judged in (for ``too_many_decimals``), when known.
     """
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, currency: str | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.currency = currency
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,7 +177,7 @@ def _minor(value: Decimal, currency: str) -> int:
     try:
         return planned_minor(value, currency)
     except EntryError as exc:
-        raise InvalidPlannedValue(exc.code) from None
+        raise InvalidPlannedValue(exc.code, currency) from None
 
 
 def _amount_text(minor: int, currency: str) -> str:

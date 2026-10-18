@@ -30,3 +30,12 @@ def test_month_names_keep_cldr_case_and_capitalise_only_headings() -> None:
     assert format_month_heading(october, "pl") == "Październik 2026"
     assert format_month(october, "en") == format_month_heading(october, "en") == "October 2026"
     assert format_month(october, "xx-unknown") == "October 2026"  # unknown locale: English
+
+
+def test_a_month_after_from_uses_the_inflected_form() -> None:
+    from assetboard.domain.months import YearMonth
+    from assetboard.i18n.dates import format_month_after_from
+
+    september = YearMonth(2026, 9)
+    assert format_month_after_from(september, "pl") == "września 2026"  # "z września 2026"
+    assert format_month_after_from(september, "en") == "September 2026"

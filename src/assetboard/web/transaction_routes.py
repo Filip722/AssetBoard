@@ -57,9 +57,9 @@ from assetboard.web.ledger import (
     edit_values,
     field_messages,
     first_invalid,
-    summary_context,
 )
 from assetboard.web.month_routes import _month_path, _parse, month_context
+from assetboard.web.plan import build_summary, summary_context
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -142,7 +142,7 @@ def _section(
     context: dict[str, object] = {
         "ledger": ledger,
         "section_view": ledger.section(direction),
-        "summary": summary_context(ledger),
+        **summary_context(build_summary(factory, ctx, request, view)),
         "status": _t(request, STATUS[status]) if status else "",
         "toast_message": _t(request, STATUS["deleted"]) if toast_undo else None,
         "toast_undo": toast_undo,

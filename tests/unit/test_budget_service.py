@@ -232,7 +232,9 @@ def test_currency_checks_use_the_stored_currency_even_before_the_write(
         workspace.base_currency = "KWD"
     food = _category(team, "Food")
     assert _set(team, food, "1,234").planned == Money(1234, "KWD")
-    assert _invalid(lambda: _set(team, food, "1,2345")) == "too_many_decimals"
+    with pytest.raises(InvalidPlannedValue) as caught:
+        _set(team, food, "1,2345")
+    assert (caught.value.code, caught.value.currency) == ("too_many_decimals", "KWD")
     assert _invalid(lambda: _set(team, food, "-1")) == "amount_negative"  # syntax and sign: early
 
 

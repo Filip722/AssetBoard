@@ -212,13 +212,3 @@ def build_ledger(
             )
         )
     return LedgerView(month=view.month, can_write=can_write, sections=tuple(sections))
-
-
-def summary_context(ledger: LedgerView) -> dict[str, object]:
-    """The ``#month-summary`` block's context. Empty until F2.4 builds the month summary.
-
-    Every transaction write sends the block out of band (``months/_summary.html``), so F2.4's
-    totals refresh without a reload once this returns them.
-    """
-    del ledger
-    return {}

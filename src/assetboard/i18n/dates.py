@@ -37,6 +37,12 @@ def format_month_heading(month: YearMonth, locale: str) -> str:
     return text[:1].upper() + text[1:]
 
 
+def format_month_after_from(month: YearMonth, locale: str) -> str:
+    """The month and year after "from" in a sentence: CLDR's format-context month name, which
+    some languages inflect ("from September 2026", "z września 2026")."""
+    return format_date(month.first_day, format="MMMM y", locale=_locale(locale))
+
+
 def format_day(day: date, locale: str) -> str:
     """A date in the locale's medium format: "Oct 14, 2026", "14 paź 2026"."""
     return format_date(day, format="medium", locale=_locale(locale))

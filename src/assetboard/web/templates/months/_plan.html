@@ -1,0 +1,53 @@
+{# The plan in the month summary (F2.3 part B). ``summary`` is web.plan.SummaryView. Each
+   planned cell is a one-input form: Enter submits it without JavaScript (implicit submission);
+   with JavaScript a change saves it too, and app.js moves Enter to the next cell and makes Esc
+   restore the saved value (data-* hooks; no inline script or style). F2.4 adds the actual and
+   difference cells to these rows. #}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "categories/_macros.html" import swatch %}
+
+{% macro plan_row(r) -%}
+{% set row_id = "plan-" ~ r.category_id %}
+<tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}">
+  <th scope="row" class="py-1.5 pr-2 text-left font-normal">
+    <span class="flex items-center gap-2">{{ swatch(r.color) }}<span data-plan-category>{{ r.name }}</span>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
+  </th>
+  <td class="py-1.5 text-right align-top">
+    {% if summary.can_write %}
+    {% set action = scoped_url(request, 'plan_set', month=summary.month, category_id=r.category_id) %}
+    <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-trigger="change, submit" hx-target="#{{ row_id }}" hx-swap="outerHTML" hx-sync="this:replace" novalidate data-plan-form>
+      {{ csrf_input() }}
+      <label for="{{ row_id }}-amount" class="sr-only">{{ _("Planned for %(name)s", name=r.name) }}</label>
+      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="0" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
+             class="form-control ml-auto w-36 rounded-lg px-2.5 py-1.5 text-right tabular-nums">
+      {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
+    </form>
+    {% else %}
+    <span class="tabular-nums" data-planned>{% if r.display %}{{ r.display }}{% else %}<span class="text-muted" aria-hidden="true">—</span><span class="sr-only">{{ _("Not planned") }}</span>{% endif %}</span>
+    {% endif %}
+  </td>
+</tr>
+{%- endmacro %}
+
+{% macro banner(oob=false) -%}
+<div id="plan-banner"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  {% if summary.banner_source %}
+  {% set action = scoped_url(request, 'plan_copy', month=summary.month) %}
+  <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#month-summary" hx-swap="outerHTML" class="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-subtle px-4 py-3 text-sm" data-plan-banner>
+    {{ csrf_input() }}
+    <span>{{ _("This month has no plan yet.") }}</span>
+    <button type="submit" data-plan-copy class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Copy plan from %(month)s", month=summary.banner_source) }}</button>
+  </form>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+
+{# The result of a copy, shown in the block and announced on the status line. #}
+{% macro copied_text(c) -%}
+{% if c.count == 0 %}{{ _("Nothing was copied: every category that can take a planned value already has one.") }}{% elif c.automatic %}{{ ngettext("%(num)d planned value was copied from %(month)s (workspace setting).", "%(num)d planned values were copied from %(month)s (workspace setting).", c.count, month=c.source) }}{% else %}{{ ngettext("Copied %(num)d planned value from %(month)s.", "Copied %(num)d planned values from %(month)s.", c.count, month=c.source) }}{% endif %}
+{%- endmacro %}
+
+{% macro skipped_text(c) -%}
+{{ ngettext("%(num)d planned value of an archived or transfer category was not copied.", "%(num)d planned values of archived or transfer categories were not copied.", c.skipped) }}
+{%- endmacro %}

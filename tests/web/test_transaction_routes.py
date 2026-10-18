@@ -182,7 +182,10 @@ def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
     assert '<option value="" selected>' not in entry.group(0)  # no category chosen
     assert "selected>Food" not in entry.group(0)
     assert '<p id="ledger-status" hx-swap-oob="innerHTML">Entry added.</p>' in html
-    assert '<div id="month-summary" data-month-summary hx-swap-oob="outerHTML"></div>' in html
+    # The summary (F2.3: the plan) comes out of band, with its planned cells.
+    summary = re.search(r'<section id="month-summary"[^>]*>', html)
+    assert summary is not None and 'hx-swap-oob="outerHTML"' in summary.group(0)
+    assert 'id="plan-' in html
     assert "HX-Request" in response.headers["Vary"]
 
 

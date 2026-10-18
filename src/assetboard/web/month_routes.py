@@ -2,13 +2,17 @@
 
 The page is the shell that F2.2-F2.4 fill: F2.2 adds the transaction tables
 (``web.ledger``; the writes are in ``web.transaction_routes``), F2.3 planned values and F2.4
-the summary. Authorization happens in ``services.months``; plain form posts redirect (303)
+the summary. F2.3 fills the summary block with the planned values (``web.plan``; the writes are
+in ``web.plan_routes``) and runs the automatic plan copy when an editor opens a month page
+(``services.budget.auto_copy_on_open``: a GET that writes at most once per month, by design).
+Authorization happens in ``services.months``; plain form posts redirect (303)
 back to the month, so the page works without JavaScript. Every state-changing route is covered
 by the router-level ``require_csrf`` dependency.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import replace
 from typing import Annotated
@@ -23,6 +27,7 @@ from assetboard.db.repositories import NotFound
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month, format_month_heading
+from assetboard.services.budget import CopyResult, auto_copy_on_open
 from assetboard.services.context import Context
 from assetboard.services.months import (
     MonthError,
@@ -39,8 +44,8 @@ from assetboard.web.ledger import (
     SectionState,
     build_ledger,
     edit_values,
-    summary_context,
 )
+from assetboard.web.plan import PLAN_ERRORS, CellState, build_summary, summary_context
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -64,6 +69,9 @@ ERRORS = {
     "month_closed": MONTH_CLOSED_MESSAGE,
     "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
     "undo_expired": _("Too late to undo: the entry stays deleted."),
+    "plan_category_gone": _("This category no longer exists. It may have been deleted elsewhere."),
+    "plan_category_archived": PLAN_ERRORS["category_archived"],
+    "plan_category_transfer": PLAN_ERRORS["category_transfer"],
 }
 NOTICES = {
     "closed": _("Month closed."),
@@ -73,6 +81,8 @@ NOTICES = {
     "transaction_added": _("Entry added."),
     "transaction_saved": _("Entry saved."),
     "transaction_restored": _("Entry restored."),
+    "plan_saved": _("Planned value saved."),
+    "plan_removed": _("Planned value removed."),
 }
 SAVED_IN = _("Entry saved in %(month)s.")
 
@@ -125,10 +135,14 @@ def month_context(
     states: Mapping[str, SectionState] | None = None,
     deleted: UUID | None = None,
     saved_in: YearMonth | None = None,
+    plan_cell: CellState | None = None,
+    copied: CopyResult | None = None,
+    automatic: bool = False,
 ) -> dict[str, object]:
     """The month page's context (blocking: run in a thread). ``states`` carry the transaction
     tables' form values and messages; ``deleted`` offers Undo (pages without JavaScript) while
-    that row of this month can still be restored."""
+    that row of this month can still be restored; ``plan_cell`` is a refused planned value and
+    ``copied`` a plan copy to report."""
     factory = request.app.state.session_factory
     view = get_month(factory, ctx, target)
     locale = request.state.locale
@@ -158,7 +172,11 @@ def month_context(
         "notice_href": saved_in_href,
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
         "ledger": ledger,
-        "summary": summary_context(ledger),
+        **summary_context(
+            build_summary(
+                factory, ctx, request, view, cell=plan_cell, copied=copied, automatic=automatic
+            )
+        ),
         "deleted": pending.id if pending is not None else None,
     }
 
@@ -168,6 +186,27 @@ def _optional_uuid(value: str) -> UUID | None:
         return UUID(value) if value else None
     except ValueError:
         return None
+
+
+_COUNT = re.compile(r"[0-9]{1,6}")  # ASCII digits only: str.isdigit() also accepts "²"
+
+
+def _copied(month: YearMonth, copied: str, skipped: str) -> CopyResult | None:
+    """The copy reported after a plain form post (``?plan_copied=N&plan_skipped=M``); anything
+    malformed is ignored."""
+    source = month.prev()
+    skipped = skipped or "0"
+    if source is None or not _COUNT.fullmatch(copied) or not _COUNT.fullmatch(skipped):
+        return None
+    return CopyResult(source=source, copied=int(copied), skipped=int(skipped), kept=0)
+
+
+def _auto_copy(request: Request, ctx: Context, month: YearMonth) -> CopyResult | None:
+    """The automatic plan copy (F2.3) for a full page view (blocking). HEAD never gets here
+    (405); the check keeps a future HEAD route from writing."""
+    if request.method != "GET":
+        return None
+    return auto_copy_on_open(request.app.state.session_factory, ctx, month)
 
 
 def _optional_month(value: str) -> YearMonth | None:
@@ -189,11 +228,14 @@ async def month_page(
     saved_in: str = "",
     entry: str = "",
     day: str = "",
+    plan_copied: str = "",
+    plan_skipped: str = "",
 ) -> Response:
     """The month page. For browsers without JavaScript: ``?edit=<id>`` opens a row for
     editing, ``?deleted=<id>`` offers Undo, ``?entry=<direction>&day=<day>`` prefills that
     table's entry row with the day just used. ``?saved_in=YYYY-MM`` links an entry saved to
-    another month."""
+    another month. ``?plan_copied=N&plan_skipped=M`` reports a plan copy. Opening the page may copy
+    the previous month's plan (workspace setting, ``services.budget.auto_copy_on_open``)."""
     target = _parse(month)
     states: dict[str, SectionState] = {}
     editing = _optional_uuid(edit)
@@ -204,6 +246,10 @@ async def month_page(
         if entry in states:
             kept = replace(states[entry], entry_values=kept.entry_values)
         states[entry] = kept
+    copied, automatic = _copied(target, plan_copied, plan_skipped), False
+    if copied is None:
+        copied = await run_in_threadpool(_auto_copy, request, ctx, target)
+        automatic = copied is not None
     context = await run_in_threadpool(
         lambda: month_context(
             request,
@@ -214,6 +260,8 @@ async def month_page(
             states=states,
             deleted=_optional_uuid(deleted),
             saved_in=_optional_month(saved_in),
+            copied=copied,
+            automatic=automatic,
         )
     )
     return render_template(request, "months/page.html", context=context)
