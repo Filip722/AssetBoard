@@ -83,6 +83,11 @@ class MonthState(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     month is closed; reopening clears ``closed_at`` and ``closed_by_user_id`` and keeps the row.
     A month without a row is open. ``closed_by_user_id`` becomes NULL if the account is deleted,
     while the month stays closed.
+
+    ``plan_started_at`` (F2.3) is set by the month's first planned-value write (a saved value, a
+    copy or an automatic copy) and never cleared, so a row is also created then. The automatic
+    copy of the previous month's plan runs only while it is unset: a plan emptied on purpose is
+    not filled again on the next visit.
     """
 
     __tablename__ = "month_states"
@@ -95,6 +100,7 @@ class MonthState(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     closed_by_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    plan_started_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
 class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin, Base):
@@ -148,3 +154,37 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class BudgetLine(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """A planned value: the amount planned for one category in one month (F2.3).
+
+    ``month`` is the month's first day (the repository takes a ``YearMonth``). The amount is
+    positive minor units in the workspace's base currency; a zero plan has no row (lines are
+    removed, not soft-deleted). ``(workspace_id, category_id)`` references
+    ``categories(workspace_id, id)``, so a line never points at another workspace's category.
+    """
+
+    __tablename__ = "budget_lines"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id", "month", "category_id", name="uq_budget_lines_workspace_month_category"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "category_id"],
+            ["categories.workspace_id", "categories.id"],
+            name="fk_budget_lines_workspace_category",
+        ),
+        CheckConstraint(
+            f"planned_minor > 0 AND planned_minor <= {MAX_AMOUNT_MINOR}", name="planned_valid"
+        ),
+        CheckConstraint("length(currency) = 3", name="currency_length"),
+        CheckConstraint("month >= '1900-01-01' AND month <= '2199-12-01'", name="month_in_range"),
+        Index("ix_budget_lines_workspace_category", "workspace_id", "category_id"),
+    )
+
+    month: Mapped[date] = mapped_column(Date(), nullable=False)
+    category_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    # Money(planned_minor, currency); no ORM composite, as for transactions.
+    planned_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)

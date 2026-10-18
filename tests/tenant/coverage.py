@@ -55,6 +55,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
     },
     **{
+        ("BudgetLineRepository", method): "test_budget_line_queries_stay_in_their_workspace"
+        for method in ("create", "for_month", "line", "usage_by_category", "any_exists")
+    },
+    **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
         for method in (
             "create",

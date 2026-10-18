@@ -238,6 +238,18 @@ msgstr ""
 msgid "Deleted transaction restored"
 msgstr ""
 
+msgid "Planned value added"
+msgstr ""
+
+msgid "Planned value changed"
+msgstr ""
+
+msgid "Planned value removed"
+msgstr ""
+
+msgid "Plan copied from the previous month"
+msgstr ""
+
 msgid "Other event"
 msgstr ""
 
@@ -344,6 +356,15 @@ msgid "Previous amount"
 msgstr ""
 
 msgid "Currency"
+msgstr ""
+
+msgid "Copied from"
+msgstr ""
+
+msgid "Not copied"
+msgstr ""
+
+msgid "Automatic"
 msgstr ""
 
 msgid "owner"
@@ -539,6 +560,9 @@ msgid "Closing months"
 msgstr ""
 
 msgid "Transactions"
+msgstr ""
+
+msgid "Planned values"
 msgstr ""
 
 msgid "Sign-ins"
@@ -1851,11 +1875,20 @@ msgid "General"
 msgstr ""
 
 msgid ""
-"Locked: transactions exist (deleted ones included), and their amounts are"
-" stored in this currency."
+"Locked: transactions (deleted ones included) or planned values exist, and"
+" their amounts are stored in this currency."
 msgstr ""
 
 msgid "Formatting default"
+msgstr ""
+
+msgid "Copy the previous month's plan when a month is opened for the first time"
+msgstr ""
+
+msgid ""
+"Applies to the current and later months that have never had planned "
+"values, when an editor or owner opens them. Existing planned values are "
+"never overwritten."
 msgstr ""
 
 msgid ""
@@ -1953,5 +1986,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Entries and planned values for this month will appear here."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Locked: transactions exist (deleted ones "
+#~ "included), and their amounts are stored"
+#~ " in this currency."
 #~ msgstr ""
 

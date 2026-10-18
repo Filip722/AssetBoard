@@ -18,6 +18,7 @@ from assetboard.db.models.identity import AuditEvent
 from assetboard.db.repositories import CategoryRepository, NotFound
 from assetboard.domain.categories import SEED, Kind, Treatment
 from assetboard.services import categories as service
+from assetboard.services.budget import category_usage as budget_line_usage
 from assetboard.services.categories import (
     AlreadySeeded,
     CategoryArchived,
@@ -365,7 +366,8 @@ def test_usage_sources_are_summed_and_shown(team: WorkspaceDb) -> None:
     assert totals == {food.id: CategoryUsage(references=5, active_transactions=1)}
     listed = list_categories(team.factory, team.ctx("vic", "viewer"), usage_sources=sources)
     assert listed.expense[0].in_use and listed.expense[0].references == 5
-    assert [transaction_usage] == service.USAGE_SOURCES  # F2.2 transactions
+    # F2.2 transactions, F2.3 budget lines
+    assert [transaction_usage, budget_line_usage] == service.USAGE_SOURCES
 
 
 # Seed

@@ -13,6 +13,7 @@ from assetboard.db.repositories.base import (
     ScopedRepository,
     UnsupportedOperation,
 )
+from assetboard.db.repositories.budget_line import BudgetLineRepository, LineUsage
 from assetboard.db.repositories.category import CategoryRepository
 from assetboard.db.repositories.invitation import (
     InvitationLocation,
@@ -34,6 +35,7 @@ __all__ = [
     "AuditCursor",
     "AuditEventRepository",
     "AuditFilter",
+    "BudgetLineRepository",
     "CategoryCounts",
     "CategoryRepository",
     "InstanceAuditReader",
@@ -43,6 +45,7 @@ __all__ = [
     "InvitationLocation",
     "InvitationRepository",
     "InvitationTokenReader",
+    "LineUsage",
     "MembershipRepository",
     "MembershipView",
     "MonthStateRepository",

@@ -109,7 +109,8 @@ guard for every month; taking the lock again is harmless.
 
 Amounts are stored in the workspace's base currency and never converted, so the currency is
 locked once any amount exists. Each feature that stores amounts adds a check to
-`services.workspaces.BASE_CURRENCY_LOCKS` (transactions now; budget lines in F2.3). A write that
+`services.workspaces.BASE_CURRENCY_LOCKS` (transactions; budget lines since F2.3, which lock
+only while a line exists). A write that
 stores an amount reads the currency from the workspace row **inside** its transaction, after
 the month lock, never from `ctx.workspace` (the Context can be older than a settings change).
 The settings write takes the exclusive workspace lock first; on PostgreSQL a currency change and
@@ -122,6 +123,7 @@ a concurrent first transaction therefore cannot both pass.
 | Transaction create, edit, delete, undo | `FOR SHARE` (`lock_month_writes`) | edit/delete/undo: the transaction row `FOR UPDATE` (`get_for_update`) |
 | Category update, archive, restore, delete | `FOR UPDATE` | reads categories and usage |
 | Close or reopen a month; workspace settings | `FOR UPDATE` | month state / workspace fields |
+| Planned values: save, remove, copy, automatic copy (F2.3) | `FOR UPDATE` (serialises plan writes) | the month guard, then budget lines, month state |
 
 So a kind change or archive and a transaction write on the same category cannot interleave: the
 transaction write sees the category as changed, or the category write sees the transaction.

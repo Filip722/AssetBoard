@@ -101,6 +101,10 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     ),
     "transaction.deleted": ("date", "direction", "category", "amount", "currency"),
     "transaction.restored": ("date", "direction", "category", "amount", "currency"),
+    "budget_line.created": ("month", "category", "amount", "currency"),
+    "budget_line.updated": ("month", "category", "amount", "previous_amount", "currency"),
+    "budget_line.deleted": ("month", "category", "amount", "currency"),
+    "budget_line.copied": ("month", "source_month", "count", "skipped", "automatic"),
 }
 
 ACTION_LABELS: dict[str, str] = {
@@ -145,6 +149,10 @@ ACTION_LABELS: dict[str, str] = {
     "transaction.updated": _("Transaction changed"),
     "transaction.deleted": _("Transaction deleted"),
     "transaction.restored": _("Deleted transaction restored"),
+    "budget_line.created": _("Planned value added"),
+    "budget_line.updated": _("Planned value changed"),
+    "budget_line.deleted": _("Planned value removed"),
+    "budget_line.copied": _("Plan copied from the previous month"),
 }
 UNKNOWN_ACTION = _("Other event")
 # A failure while linking from the profile is not a refused sign-in.
@@ -186,6 +194,9 @@ KEY_LABELS: dict[str, str] = {
     "amount": _("Amount"),
     "previous_amount": _("Previous amount"),
     "currency": _("Currency"),
+    "source_month": _("Copied from"),
+    "skipped": _("Not copied"),
+    "automatic": _("Automatic"),
 }
 
 # Codes stored as values, with their texts, per kind of key: the same code can mean different
@@ -317,6 +328,12 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "transaction.deleted",
             "transaction.restored",
         ),
+        "planned_values": (
+            "budget_line.created",
+            "budget_line.updated",
+            "budget_line.deleted",
+            "budget_line.copied",
+        ),
     },
     "instance": {
         "sign_in": ("auth.login_success", "auth.logout", "auth.register"),
@@ -349,6 +366,7 @@ GROUP_LABELS: dict[str, str] = {
     "categories": _("Categories"),
     "months": _("Closing months"),
     "transactions": _("Transactions"),
+    "planned_values": _("Planned values"),
     "sign_in": _("Sign-ins"),
     "failures": _("Failures"),
     "links": _("Linked sign-in methods"),

@@ -11,11 +11,12 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
-from assetboard.db.models.ledger import Category, MonthState, Transaction
+from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 
 __all__ = [
     "AuditEvent",
     "AuthThrottle",
+    "BudgetLine",
     "Category",
     "ExternalIdentity",
     "Invitation",

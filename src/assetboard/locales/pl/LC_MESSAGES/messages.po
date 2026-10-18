@@ -241,6 +241,18 @@ msgstr "Usunięto transakcję"
 msgid "Deleted transaction restored"
 msgstr "Przywrócono usuniętą transakcję"
 
+msgid "Planned value added"
+msgstr "Dodano wartość planowaną"
+
+msgid "Planned value changed"
+msgstr "Zmieniono wartość planowaną"
+
+msgid "Planned value removed"
+msgstr "Usunięto wartość planowaną"
+
+msgid "Plan copied from the previous month"
+msgstr "Skopiowano plan z poprzedniego miesiąca"
+
 msgid "Other event"
 msgstr "Inne zdarzenie"
 
@@ -348,6 +360,15 @@ msgstr "Poprzednia kwota"
 
 msgid "Currency"
 msgstr "Waluta"
+
+msgid "Copied from"
+msgstr "Skopiowano z"
+
+msgid "Not copied"
+msgstr "Nie skopiowano"
+
+msgid "Automatic"
+msgstr "Automatycznie"
 
 msgid "owner"
 msgstr "właściciel"
@@ -543,6 +564,9 @@ msgstr "Zamykanie miesięcy"
 
 msgid "Transactions"
 msgstr "Transakcje"
+
+msgid "Planned values"
+msgstr "Wartości planowane"
 
 msgid "Sign-ins"
 msgstr "Logowania"
@@ -1971,14 +1995,26 @@ msgid "General"
 msgstr "Ogólne"
 
 msgid ""
-"Locked: transactions exist (deleted ones included), and their amounts are"
-" stored in this currency."
+"Locked: transactions (deleted ones included) or planned values exist, and"
+" their amounts are stored in this currency."
 msgstr ""
-"Zablokowana: istnieją transakcje (także usunięte), a ich kwoty są "
-"zapisane w tej walucie."
+"Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane,"
+" a ich kwoty są zapisane w tej walucie."
 
 msgid "Formatting default"
 msgstr "Domyślne formatowanie"
+
+msgid "Copy the previous month's plan when a month is opened for the first time"
+msgstr "Kopiuj plan z poprzedniego miesiąca przy pierwszym otwarciu miesiąca"
+
+msgid ""
+"Applies to the current and later months that have never had planned "
+"values, when an editor or owner opens them. Existing planned values are "
+"never overwritten."
+msgstr ""
+"Dotyczy bieżącego i późniejszych miesięcy, które nigdy nie miały wartości"
+" planowanych, gdy otworzy je edytor lub właściciel. Istniejące wartości "
+"planowane nigdy nie są nadpisywane."
 
 msgid ""
 "The formatting default is used for numbers and dates where no personal "

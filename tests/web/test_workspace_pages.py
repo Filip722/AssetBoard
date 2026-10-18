@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 from assetboard.db.models.identity import Membership, UserSession, Workspace
-from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 from assetboard.services.auth import session_id_hash
 from assetboard.services.workspaces import WorkspaceError
 from assetboard.web import workspace_routes
@@ -189,8 +189,8 @@ def _plant_transaction(owner: OwnerApp, *, deleted: bool) -> None:
 
 
 LOCKED_HELP = (
-    "Locked: transactions exist (deleted ones included), and their amounts are stored in this "
-    "currency."
+    "Locked: transactions (deleted ones included) or planned values exist, and their amounts "
+    "are stored in this currency."
 )
 
 
@@ -212,9 +212,47 @@ def test_the_settings_page_shows_why_the_base_currency_is_locked(
     assert LOCKED_HELP in page
     polish = owner.client.get("/workspace/settings", headers={"Accept-Language": "pl"}).text
     assert (
-        "Zablokowana: istnieją transakcje (także usunięte), a ich kwoty są zapisane w tej walucie."
-        in polish
+        "Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane, a ich kwoty "
+        "są zapisane w tej walucie." in polish
     )
+
+
+def test_a_planned_value_locks_the_base_currency_on_the_settings_page(owner: OwnerApp) -> None:
+    with owner.db() as session, session.begin():
+        category = Category(
+            workspace_id=owner.home_id, name="Food", name_key="food", kind="expense",
+            treatment="regular", color="#16a34a", sort_order=0,
+        )  # fmt: skip
+        session.add(category)
+        session.flush()
+        session.add(
+            BudgetLine(
+                workspace_id=owner.home_id, month=date(2026, 10, 1), category_id=category.id,
+                planned_minor=55000, currency="EUR",
+            )
+        )  # fmt: skip
+    page = owner.client.get("/workspace/settings").text
+    assert "data-currency-locked" in page and LOCKED_HELP in page
+
+
+def test_owners_turn_the_automatic_plan_copy_on_and_off(owner: OwnerApp) -> None:
+    page = owner.client.get("/workspace/settings").text
+    assert re.search(r'<input id="auto_copy_plan" name="auto_copy_plan" type="checkbox"', page)
+    assert "checked" not in page.split('id="auto_copy_plan"')[1].split(">")[0]  # off by default
+    form = {"name": "Home", "base_currency": "EUR", "timezone": "UTC", "locale": "en"}
+    response = owner.post(
+        "/workspace/settings", form | {"auto_copy_plan": "1"}, token_from="/workspace/settings"
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.auto_copy_plan)).one() is True
+    page = owner.client.get("/workspace/settings").text
+    assert " checked" in page.split('id="auto_copy_plan"')[1].split(">")[0]
+    polish = owner.client.get("/workspace/settings", headers={"Accept-Language": "pl"}).text
+    assert "Kopiuj plan z poprzedniego miesiąca przy pierwszym otwarciu miesiąca" in polish
+    owner.post("/workspace/settings", form, token_from="/workspace/settings")  # unchecked box
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.auto_copy_plan)).one() is False
 
 
 def test_a_locked_base_currency_change_is_refused_on_the_field(owner: OwnerApp) -> None:

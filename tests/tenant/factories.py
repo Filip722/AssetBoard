@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
-from assetboard.db.models.ledger import Category, MonthState, Transaction
+from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.services.invitations import new_token
 
 
@@ -109,6 +109,20 @@ def make_transaction(session: Session, workspace_id: UUID) -> Transaction:
     )
 
 
+def make_budget_line(session: Session, workspace_id: UUID) -> BudgetLine:
+    """A planned value with its own category in the same workspace (composite foreign key)."""
+    category = make_category(session, workspace_id)
+    session.add(category)
+    session.flush()
+    return BudgetLine(
+        workspace_id=workspace_id,
+        month=date(2026, 10, 1),
+        category_id=category.id,
+        planned_minor=55000,
+        currency="EUR",
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     Membership: TenantCase(make_membership, update_values={"role": "editor"}),
     AuditEvent: TenantCase(make_audit_event, unsupported=frozenset({"update", "delete"})),
@@ -127,4 +141,6 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
         update_values={"description": "Market", "description_key": "market"},
         unsupported=frozenset({"delete"}),
     ),
+    # A zero plan removes the line (generic delete); values change through update.
+    BudgetLine: TenantCase(make_budget_line, update_values={"planned_minor": 999}),
 }

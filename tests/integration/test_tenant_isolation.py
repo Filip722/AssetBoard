@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import ForeignKey, ForeignKeyConstraint, MetaData, String, Uuid
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
 from assetboard.clock import FixedClock
@@ -34,12 +35,14 @@ from assetboard.db.repositories import (
     UPDATABLE_FIELDS,
     AuditEventRepository,
     AuditFilter,
+    BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
     ForeignWorkspace,
     InstanceAuditReader,
     InvitationRepository,
     InvitationTokenReader,
+    LineUsage,
     MembershipRepository,
     MonthStateRepository,
     NotFound,
@@ -359,7 +362,9 @@ def test_current_workspace_repository_touches_only_its_workspace(
     )
     assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
 
-    assert {"name", "base_currency", "country_code", "timezone", "locale"} == UPDATABLE_FIELDS
+    assert {
+        "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan"
+    } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
             a_repo.update(**{forbidden: ctx_b.workspace.id})
@@ -530,6 +535,38 @@ def test_transaction_queries_stay_in_their_workspace(
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
     assert [r.id for r in in_a.for_month(october)] == [a_row.id]
+
+
+def test_budget_line_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = BudgetLineRepository(db_session, ctx_a), BudgetLineRepository(db_session, ctx_b)
+    october = YearMonth(2026, 10)
+    assert (in_a.any_exists(), in_b.any_exists()) == (False, False)
+
+    def category(ctx: Any) -> Any:
+        return CategoryRepository(db_session, ctx).create(
+            name="Food", name_key="food", kind="expense", treatment="regular",
+            color="#16a34a", sort_order=0,
+        )  # fmt: skip
+
+    food_a, food_b = category(ctx_a), category(ctx_b)
+    a_line = in_a.create(month=october, category_id=food_a.id, planned_minor=55000, currency="EUR")
+    assert a_line.workspace_id == ctx_a.workspace.id
+    assert (in_a.any_exists(), in_b.any_exists()) == (True, False)
+    assert [line.id for line in in_a.for_month(october)] == [a_line.id]
+    assert in_b.for_month(october) == []
+    assert in_a.line(october, food_a.id) is a_line
+    assert in_b.line(october, food_a.id) is None  # another workspace's line is not found
+    assert in_a.usage_by_category() == {food_a.id: LineUsage(1, frozenset({october}))}
+    assert in_b.usage_by_category() == {}
+    # The composite foreign key refuses a line on another workspace's category.
+    with pytest.raises(IntegrityError), db_session.begin_nested():
+        in_b.create(month=october, category_id=food_a.id, planned_minor=1, currency="EUR")
+    b_line = in_b.create(month=october, category_id=food_b.id, planned_minor=100, currency="EUR")
+    assert [line.id for line in in_b.for_month(october)] == [b_line.id]
+    assert [line.id for line in in_a.for_month(october)] == [a_line.id]
 
 
 # Method coverage (#11)

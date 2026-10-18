@@ -12,7 +12,8 @@ each feature adds its source here:
   (they still point at the category, and undo must keep working); ``active_transactions``
   counts the non-deleted ones (any date) and is shown as "affected" when the treatment changes;
   ``active_months`` are the months with non-deleted rows.
-* F2.3 budget lines: ``references`` and ``active_months``. M3 scheduled items: ``references``.
+* F2.3 budget lines: ``references`` counts the lines (any month; removed lines no longer
+  exist), ``active_months`` the months they plan. M3 scheduled items: ``references``.
 
 A category with ``references > 0`` cannot change its kind, and deleting it archives it instead.
 A treatment change is allowed; the edit form lists the **closed** months among
@@ -57,6 +58,7 @@ from assetboard.domain.categories import (
 )
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
+from assetboard.services.budget import category_usage as budget_line_usage
 from assetboard.services.category_usage import CategoryUsage, UsageSource
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.transactions import category_usage as transaction_usage
@@ -64,7 +66,7 @@ from assetboard.services.transactions import category_usage as transaction_usage
 __all__ = ["USAGE_SOURCES", "CategoryUsage", "UsageSource"]
 
 # Every feature whose rows reference categories (see the module docstring).
-USAGE_SOURCES: list[UsageSource] = [transaction_usage]
+USAGE_SOURCES: list[UsageSource] = [transaction_usage, budget_line_usage]
 
 
 class CategoryError(Exception):

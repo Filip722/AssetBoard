@@ -40,6 +40,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "audit_events",
         "auth_throttles",
+        "budget_lines",
         "categories",
         "external_identities",
         "invitations",

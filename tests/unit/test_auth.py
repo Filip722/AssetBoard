@@ -1257,8 +1257,15 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
     assert "Password" not in every_value
 
 
-# Workspace-owned tables with a non-null workspace_id (F1.2, F2.1, F2.5, F2.2).
-WORKSPACE_TABLES = {"memberships", "invitations", "categories", "month_states", "transactions"}
+# Workspace-owned tables with a non-null workspace_id (F1.2, F2.1, F2.5, F2.2, F2.3).
+WORKSPACE_TABLES = {
+    "memberships",
+    "invitations",
+    "categories",
+    "month_states",
+    "transactions",
+    "budget_lines",
+}
 
 
 def test_workspace_table_scope_allowlist_for_f12() -> None:

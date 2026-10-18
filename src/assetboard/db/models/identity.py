@@ -86,6 +86,10 @@ class Workspace(IdMixin, TimestampMixin, Base):
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
     country_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    # F2.3: copy the previous month's plan when a month is first opened (off by default).
+    auto_copy_plan: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
 
 
 class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

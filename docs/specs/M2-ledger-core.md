@@ -9,16 +9,17 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 **Data model (sketch)**
 - `Category(id, workspace_id, name, name_key, kind[expense|income], treatment[regular|savings|transfer], color, sort_order, archived_at)`; unique `(workspace_id, kind, name_key)` among non-archived (partial unique index `WHERE archived_at IS NULL`, on SQLite and PostgreSQL). `name_key` is computed in Python (`domain.categories.name_key`: NFKC, Unicode casefold, whitespace collapsed) because SQLite's `lower()` folds ASCII only. `UNIQUE(workspace_id, id)` is the target of composite foreign keys from Transaction and BudgetLine. (Changed in F2.1; was `lower(name)`.)
 - `Transaction(id, workspace_id, direction[expense|income], date, amount_minor, currency, category_id, description, description_key, source, created_by_user_id?, created_at, updated_at, deleted_at)`; index `(workspace_id, date)`, `(workspace_id, category_id, date)`, `(workspace_id, direction, description_key)`. (Changed in F2.2: `created_by` is `created_by_user_id`, set to NULL when the account is deleted; `description_key` is the casefolded description for autocomplete; the reserved `scheduled_occurrence_id`, `import_batch_id`, `account_id` columns are added with their composite foreign keys by M3, M4 and the accounts feature, whose tables do not exist yet.)
-- `BudgetLine(id, workspace_id, month, category_id, planned_minor, currency)`; unique `(workspace_id, month, category_id)`.
-- `MonthState(id, workspace_id, month, closed_at?, closed_by_user_id?)`; `month` is the first day (DATE); unique `(workspace_id, month)`. (Changed in F2.5: `id` key for the scoped repository; `closed_by_user_id` is set to NULL when the account is deleted.)
+- `BudgetLine(id, workspace_id, month, category_id, planned_minor, currency, created_at, updated_at)`; unique `(workspace_id, month, category_id)`; composite FK to `categories(workspace_id, id)`. (Changed in F2.3: timestamps; zero removes the row, no `deleted_at`.)
+- `MonthState(id, workspace_id, month, closed_at?, closed_by_user_id?, plan_started_at?)`; `month` is the first day (DATE); unique `(workspace_id, month)`. (Changed in F2.5: `id` key for the scoped repository; `closed_by_user_id` is set to NULL when the account is deleted. F2.3 adds `plan_started_at`, the automatic-copy marker.)
 
 **Carried over from F1.2 (2026-10-12):** owners can change a workspace's base currency on the
 settings page, which is harmless while no amounts exist. Once transactions or budget lines
 exist, M2 must either block the change or convert stored amounts; decide in F2.2's plan.
 **Decided in F2.2 (owner, 2026-10-14):** block it. The base currency cannot change once any
 transaction or budget line exists, soft-deleted rows included; the settings page shows it locked
-with the reason (`services.workspaces.BASE_CURRENCY_LOCKS`; F2.2 adds transactions, **F2.3 must
-add budget lines**).
+with the reason (`services.workspaces.BASE_CURRENCY_LOCKS`; F2.2 adds transactions, F2.3 budget
+lines). **Changed in F2.3:** budget lines are removed, not soft-deleted, so only lines that exist
+now lock it (owner decision).
 
 ---
 
@@ -200,6 +201,68 @@ undo within and after the window, viewer cannot write.
   after `require_role_now`. The auto-copy on first opening must skip closed months (and is a
   write during a page view: plan it explicitly).
 
+**As built (F2.3 part A: data, service, seams and the workspace setting; the month-page UI is
+part B)**
+- `BudgetLine` as sketched, plus `created_at`/`updated_at`; composite foreign key
+  `(workspace_id, category_id) -> categories(workspace_id, id)`; `UNIQUE(workspace_id, month,
+  category_id)`; checks `planned_minor` 1..999 999 999 999 999, `month` 1900-01-01..2199-12-01;
+  index `(workspace_id, category_id)`. `month` is the first day (the repository takes a
+  `YearMonth`). No `deleted_at`: **zero or empty removes the row** (hard delete; no undo for
+  planned values).
+- Currency: the workspace's base currency, read from the workspace row inside the write.
+  Amounts parse in the caller's locale (`i18n.numbers.parse_amount`) and convert with
+  `domain.budget.planned_minor`, which refuses instead of rounding: `invalid_amount`,
+  `amount_negative`, `amount_too_large`, `too_many_decimals`; `0` (also `0,00`, `-0`) and an
+  empty field mean "remove". Syntax and sign are checked before the write; the currency-specific
+  checks (decimals, size) run inside it with the currency read from the workspace row, never the
+  Context's (review, 2026-10-18).
+- Service `services.budget`: `get_plan` (every member), `set_planned` (outcome `created`,
+  `updated`, `removed` or `unchanged`; saving the stored value or removing a missing line
+  changes and records nothing), `copy_previous_plan`, `auto_copy_on_open`; seams
+  `category_usage` and `workspace_has_budget_lines`.
+- Writes: `require_role` on the Context, then in one `run_immediate` transaction
+  `require_role_now`, the **exclusive** workspace lock (orders plan writes against each other on
+  PostgreSQL, so concurrent upserts or copies cannot both insert one (month, category); it also
+  covers `lock_month_writes`), `ensure_month_open` for the target month, and only then reads.
+- A **new** line needs an active category that is not a transfer (`category_archived`,
+  `category_transfer`); an existing line can be changed or removed whatever its category became.
+  An unknown or foreign category is `NotFound`.
+- `get_plan` groups rows like F2.4's summary: `expense` (expense/regular), `saved`
+  (expense/savings), `income`, `withdrawn` (income/savings), and `transfer` ("Transfers (not
+  counted)") only when such lines exist; rows are the active non-transfer categories in category
+  order plus archived or transfer categories that have a line in the month.
+  `copyable_from_previous` counts the lines a copy would add now (for the banner).
+- **Copy:** strictly from the immediately previous month; never overwrites (categories that
+  already have a line keep it: `kept`); lines of categories now archived or transfers are
+  skipped and counted (`skipped`). A closed **source** month can be copied from.
+- **Automatic copy:** workspace setting `workspaces.auto_copy_plan` (default off; owners, on the
+  settings page). `auto_copy_on_open` copies when the actor is an editor or owner, the month is
+  the **current one or later** (past months get the banner only), open, has no line and **never
+  had a planned value**: `month_states.plan_started_at` is set by the month's first plan write
+  (save, copy or automatic copy) and never cleared, so a plan emptied on purpose is not
+  refilled. A read decides first, so a page view writes only when a copy is due; the write
+  checks again after the exclusive lock and the month guard, and swallows `PermissionDenied`,
+  `MonthClosed` and SQLite's "database is locked" (a page view never fails because of it). Nothing is written when the previous month has nothing to copy, so a later visit can
+  still copy. It is a GET that writes by design: idempotent (at most once per month, by the
+  marker), race-safe (serialised write, re-checked), and without CSRF risk beyond what the
+  owner's setting already does on a visit. Part B calls it from the month page GET (not HEAD).
+- **Base-currency lock (deviation from "soft-deleted rows included"):** lines are removed, not
+  soft-deleted, so `workspace_has_budget_lines` is true while a line exists now. A removed plan
+  holds no amount; audit rows carry `currency`. With no transaction and no line left, the
+  currency can change again.
+- Usage source: `references` counts lines (any month), `active_months` their months. A planned
+  value therefore blocks a kind change and turns a delete into archive, and a treatment change
+  lists closed months that have planned values.
+- Audit: `budget_line.created` (`month`, `category`, `amount`, `currency`), `.updated` (adds
+  `previous_amount`), `.deleted` (the removed amount), `budget_line.copied` (entity: the month's
+  `MonthState` row; `month`, `source_month`, `count`, `skipped`, `automatic`), group "Planned
+  values". Every cell save that changes something is audited.
+- **Product decisions (owner, 2026-10-18):** automatic copy only for the current and later
+  months (banner for past months); copy skips archived and transfer categories and reports the
+  count; no new planned values on transfer categories (existing ones shown under "Transfers
+  (not counted)" so they can be removed); removing every line with no transaction unlocks the
+  base currency; every cell save is audited; copy strictly from the immediately previous month.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -257,7 +320,8 @@ Property tests: totals equal the sum of rows; transfers never appear; difference
   keeps CLDR's case for running text ("listopad 2026"); `format_month_heading` capitalises the
   first letter for the page heading and title only.
 - `domain.months.YearMonth`: parse/format, prev/next, first/last day, bounds.
-- `MonthState` rows are created on the first close. Reopening clears `closed_at` and
+- `MonthState` rows are created on the first close (and, since F2.3, on a month's first
+  planned-value write, which sets `plan_started_at`). Reopening clears `closed_at` and
   `closed_by_user_id` and keeps the row; rows are never deleted. Closing a closed month or
   reopening an open one changes nothing and records nothing; the page then says "already
   closed" / "already open".

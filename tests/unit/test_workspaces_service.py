@@ -13,10 +13,11 @@ from sqlalchemy.orm import ORMExecuteState, Session
 from sqlalchemy.sql import ClauseElement
 
 from assetboard.db.models.identity import AuditEvent
-from assetboard.db.models.ledger import Transaction
+from assetboard.db.models.ledger import Category, Transaction
 from assetboard.db.repositories import NotFound
 from assetboard.domain.months import YearMonth
 from assetboard.services import workspaces
+from assetboard.services.budget import set_planned, workspace_has_budget_lines
 from assetboard.services.categories import create_category
 from assetboard.services.context import Context, PermissionDenied, Role
 from assetboard.services.transactions import (
@@ -39,13 +40,18 @@ from assetboard.services.workspaces import (
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
-SETTINGS = {
+SETTINGS: dict[str, Any] = {
     "name": "Family",
     "base_currency": "PLN",
     "country_code": "PL",
     "timezone": "Europe/Warsaw",
     "locale": "pl",
+    "auto_copy_plan": False,
 }
+
+
+def _settings(**changes: Any) -> dict[str, Any]:
+    return SETTINGS | changes
 
 
 @pytest.fixture
@@ -158,6 +164,21 @@ def test_update_settings_changes_the_workspace_and_audits_field_names(team: Work
     assert len(_events(team)) == 1
 
 
+def test_auto_copy_plan_is_off_by_default_and_owners_turn_it_on(team: WorkspaceDb) -> None:
+    owner = team.ctx("olga", "owner")
+    assert workspace_settings(team.factory, owner).auto_copy_plan is False
+    saved = update_settings(team.factory, owner, **_settings(auto_copy_plan=True))
+    assert saved.auto_copy_plan is True
+    assert workspace_settings(team.factory, owner).auto_copy_plan is True
+    assert _events(team)[-1] == (
+        "workspace.settings_updated",
+        {"fields": "auto_copy_plan,base_currency,country_code,locale,name,timezone"},
+    )
+    update_settings(team.factory, owner, **SETTINGS)
+    assert workspace_settings(team.factory, owner).auto_copy_plan is False
+    assert _events(team)[-1] == ("workspace.settings_updated", {"fields": "auto_copy_plan"})
+
+
 @pytest.mark.parametrize(
     ("changes", "field", "code"),
     [
@@ -173,7 +194,7 @@ def test_update_settings_validates_input(
     team: WorkspaceDb, changes: dict[str, str], field: str, code: str
 ) -> None:
     with pytest.raises(InvalidWorkspaceSettings) as invalid:
-        update_settings(team.factory, team.ctx("olga", "owner"), **(SETTINGS | changes))
+        update_settings(team.factory, team.ctx("olga", "owner"), **_settings(**changes))
     assert (invalid.value.field, invalid.value.code) == (field, code)
     assert _events(team) == []
 
@@ -220,15 +241,47 @@ def test_the_base_currency_is_locked_once_a_transaction_exists(
     assert (locked.value.field, locked.value.code) == ("base_currency", "base_currency_locked")
     assert _currency(team) == "EUR" and _events(team) == events_before
     # Every other setting still changes.
-    saved = update_settings(team.factory, owner, **(SETTINGS | {"base_currency": "EUR"}))
+    saved = update_settings(team.factory, owner, **_settings(base_currency="EUR"))
     assert (saved.name, saved.base_currency, saved.base_currency_locked) == ("Family", "EUR", True)
+
+
+def _plan(db: WorkspaceDb, amount: str = "550") -> None:
+    editor = db.ctx("ed", "editor")
+    food = create_category(
+        db.factory, editor, name="Food", kind="expense", treatment="regular", color="#16a34a"
+    )
+    set_planned(
+        db.factory, editor, month=YearMonth(2026, 3), category_id=food.id, amount=amount,
+        locale="en",
+    )  # fmt: skip
+
+
+def test_a_planned_value_locks_the_base_currency_while_it_exists(team: WorkspaceDb) -> None:
+    """F2.3 (owner decision P4): lines are removed, not soft-deleted, so only existing lines
+    lock the currency; removing the last one (with no transaction) unlocks it again."""
+    _plan(team)
+    owner = team.ctx("olga", "owner")
+    assert workspace_settings(team.factory, owner).base_currency_locked is True
+    with pytest.raises(workspaces.BaseCurrencyLocked):
+        update_settings(team.factory, owner, **SETTINGS)
+    with team.factory() as session:
+        food = session.scalars(select(Category.id)).one()
+    set_planned(
+        team.factory, team.ctx("ed", "editor"), month=YearMonth(2026, 3), category_id=food,
+        amount="0", locale="en",
+    )  # fmt: skip
+    assert workspace_settings(team.factory, owner).base_currency_locked is False
+    assert update_settings(team.factory, owner, **SETTINGS).base_currency == "PLN"
 
 
 def test_every_registered_lock_is_consulted(
     team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    assert [workspace_has_transactions] == workspaces.BASE_CURRENCY_LOCKS
-    # What F2.3 budget lines will add: any check that reports stored amounts locks it.
+    assert [
+        workspace_has_transactions,
+        workspace_has_budget_lines,
+    ] == workspaces.BASE_CURRENCY_LOCKS
+    # Any check that reports stored amounts locks it.
     monkeypatch.setattr(workspaces, "BASE_CURRENCY_LOCKS", [lambda _session, _ctx: True])
     with pytest.raises(workspaces.BaseCurrencyLocked):
         update_settings(team.factory, team.ctx("olga", "owner"), **SETTINGS)
