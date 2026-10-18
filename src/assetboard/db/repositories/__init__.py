@@ -21,6 +21,11 @@ from assetboard.db.repositories.invitation import (
 )
 from assetboard.db.repositories.membership import MembershipRepository, WorkspaceMember
 from assetboard.db.repositories.month_state import MonthStateRepository
+from assetboard.db.repositories.transaction import (
+    CategoryCounts,
+    DescriptionMatch,
+    TransactionRepository,
+)
 from assetboard.db.repositories.user_memberships import MembershipView, UserMembershipReader
 from assetboard.db.repositories.workspace import UPDATABLE_FIELDS, CurrentWorkspaceRepository
 
@@ -29,9 +34,11 @@ __all__ = [
     "AuditCursor",
     "AuditEventRepository",
     "AuditFilter",
+    "CategoryCounts",
     "CategoryRepository",
     "InstanceAuditReader",
     "CurrentWorkspaceRepository",
+    "DescriptionMatch",
     "ForeignWorkspace",
     "InvitationLocation",
     "InvitationRepository",
@@ -42,6 +49,7 @@ __all__ = [
     "NotFound",
     "RepositoryError",
     "ScopedRepository",
+    "TransactionRepository",
     "UnsupportedOperation",
     "UserMembershipReader",
     "WorkspaceMember",

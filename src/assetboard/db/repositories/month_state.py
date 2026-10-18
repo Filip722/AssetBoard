@@ -24,3 +24,8 @@ class MonthStateRepository(ScopedRepository[MonthState]):
     def create(self, month: YearMonth) -> MonthState:
         """An open row for ``month`` (the caller then closes it)."""
         return self.add(MonthState(month=month.first_day))
+
+    def closed_months(self) -> frozenset[YearMonth]:
+        """Every month of the workspace that is closed now."""
+        statement = self._scoped_select().where(MonthState.closed_at.is_not(None))
+        return frozenset(YearMonth.from_date(row.month) for row in self._session.scalars(statement))

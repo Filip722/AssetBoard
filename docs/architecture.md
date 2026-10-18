@@ -94,6 +94,31 @@ reads stored rows to learn which months it touches (editing a transaction reads 
 bulk changes read the selected rows) calls `lock_month_writes` **before** those reads, then the
 guard for every month; taking the lock again is harmless.
 
+### Base currency and stored amounts (F2.2)
+
+Amounts are stored in the workspace's base currency and never converted, so the currency is
+locked once any amount exists. Each feature that stores amounts adds a check to
+`services.workspaces.BASE_CURRENCY_LOCKS` (transactions now; budget lines in F2.3). A write that
+stores an amount reads the currency from the workspace row **inside** its transaction, after
+the month lock, never from `ctx.workspace` (the Context can be older than a settings change).
+The settings write takes the exclusive workspace lock first; on PostgreSQL a currency change and
+a concurrent first transaction therefore cannot both pass.
+
+**Lock order (PostgreSQL).** Always the workspace row first, then other rows:
+
+| Write | Workspace row | Then |
+|---|---|---|
+| Transaction create, edit, delete, undo | `FOR SHARE` (`lock_month_writes`) | edit/delete/undo: the transaction row `FOR UPDATE` (`get_for_update`) |
+| Category update, archive, restore, delete | `FOR UPDATE` | reads categories and usage |
+| Close or reopen a month; workspace settings | `FOR UPDATE` | month state / workspace fields |
+
+So a kind change or archive and a transaction write on the same category cannot interleave: the
+transaction write sees the category as changed, or the category write sees the transaction.
+
+Seams between services are static lists, not import-time registration: features add their
+callables to `services.categories.USAGE_SOURCES` (what references a category) and
+`BASE_CURRENCY_LOCKS`, so the result never depends on which modules happen to be imported.
+
 ## How to add a new workspace-owned model
 
 `Invitation` (F1.2) is a worked example: `WorkspaceScopedMixin`, migration `0004_f12`,

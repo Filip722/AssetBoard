@@ -42,8 +42,14 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categorie
     </div>
     <div class="space-y-1">
       <label for="treatment-{{ row_id }}" class="sr-only">{{ _("Treatment") }}</label>
-      <select id="treatment-{{ row_id }}" name="treatment" {% if c.active_transactions %}aria-describedby="treatment-{{ row_id }}-help"{% endif %} class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">{{ options(treatment_labels, edit_values.treatment) }}</select>
+      {% set closed = c.closed_months_affected %}
+      {% set described = (["treatment-" ~ row_id ~ "-help"] if c.active_transactions else []) + (["treatment-" ~ row_id ~ "-closed"] if closed else []) %}
+      <select id="treatment-{{ row_id }}" name="treatment" {% if described %}aria-describedby="{{ described|join(' ') }}"{% endif %} class="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">{{ options(treatment_labels, edit_values.treatment) }}</select>
       {% if c.active_transactions %}<p id="treatment-{{ row_id }}-help" class="text-xs text-muted dark:text-slate-400" data-affected>{{ ngettext("A treatment change applies to %(num)d transaction.", "A treatment change applies to %(num)d transactions.", c.active_transactions) }}</p>{% endif %}
+      {% if closed %}
+      {% set shown = closed[:12]|map("string")|join(", ") ~ (", …" if closed|length > 12 else "") %}
+      <p id="treatment-{{ row_id }}-closed" class="text-xs text-amber-800 dark:text-amber-200" data-closed-months>{{ ngettext("This changes the totals of %(num)d closed month: %(months)s.", "This changes the totals of %(num)d closed months: %(months)s.", closed|length, months=shown) }}</p>
+      {% endif %}
       {% if edit_errors.get("treatment") %}<p class="text-sm text-rose-700 dark:text-rose-300">{{ edit_errors.get("treatment") }}</p>{% endif %}
     </div>
     <div class="flex flex-wrap items-center gap-2">

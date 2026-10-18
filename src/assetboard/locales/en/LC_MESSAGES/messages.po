@@ -226,6 +226,18 @@ msgstr ""
 msgid "Month reopened"
 msgstr ""
 
+msgid "Transaction added"
+msgstr ""
+
+msgid "Transaction changed"
+msgstr ""
+
+msgid "Transaction deleted"
+msgstr ""
+
+msgid "Deleted transaction restored"
+msgstr ""
+
 msgid "Other event"
 msgstr ""
 
@@ -308,6 +320,30 @@ msgid "Number"
 msgstr ""
 
 msgid "Month"
+msgstr ""
+
+msgid "Closed months affected"
+msgstr ""
+
+msgid "Date"
+msgstr ""
+
+msgid "Previous date"
+msgstr ""
+
+msgid "Direction"
+msgstr ""
+
+msgid "Category"
+msgstr ""
+
+msgid "Amount"
+msgstr ""
+
+msgid "Previous amount"
+msgstr ""
+
+msgid "Currency"
 msgstr ""
 
 msgid "owner"
@@ -460,6 +496,18 @@ msgstr ""
 msgid "colour"
 msgstr ""
 
+msgid "date"
+msgstr ""
+
+msgid "amount"
+msgstr ""
+
+msgid "description"
+msgstr ""
+
+msgid "category"
+msgstr ""
+
 msgid "expense"
 msgstr ""
 
@@ -488,6 +536,9 @@ msgid "Categories"
 msgstr ""
 
 msgid "Closing months"
+msgstr ""
+
+msgid "Transactions"
 msgstr ""
 
 msgid "Sign-ins"
@@ -943,6 +994,9 @@ msgid ""
 msgstr ""
 
 msgid "Choose a supported currency."
+msgstr ""
+
+msgid "The base currency cannot change: amounts are already stored in it."
 msgstr ""
 
 msgid "Choose a country from the list."
@@ -1457,6 +1511,12 @@ msgid_plural "A treatment change applies to %(num)d transactions."
 msgstr[0] ""
 msgstr[1] ""
 
+#, python-format
+msgid "This changes the totals of %(num)d closed month: %(months)s."
+msgid_plural "This changes the totals of %(num)d closed months: %(months)s."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "in use"
 msgstr ""
 
@@ -1663,6 +1723,11 @@ msgid "No pending invitations."
 msgstr ""
 
 msgid "General"
+msgstr ""
+
+msgid ""
+"Locked: transactions exist (deleted ones included), and their amounts are"
+" stored in this currency."
 msgstr ""
 
 msgid "Formatting default"

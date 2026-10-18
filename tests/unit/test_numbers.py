@@ -113,3 +113,53 @@ def test_resolve_locale_skips_unsupported_preferences() -> None:
 def test_locale_aware_amount_helpers_reject_unknown_locale() -> None:
     with pytest.raises(ValueError, match="Unsupported locale"):
         parse_amount("10", "not-a-locale")
+
+
+@pytest.mark.parametrize(
+    ("text", "locale", "expected"),
+    [
+        ("1 234,56", "pl", Decimal("1234.56")),
+        ("1 234,56", "pl", Decimal("1234.56")),
+        ("12,5", "pl", Decimal("12.5")),
+        ("12,5", "en", Decimal("12.5")),
+        ("0,001", "pl", Decimal("0.001")),  # pl: the comma is the decimal separator
+        ("0,5", "en", Decimal("0.5")),
+        ("0.001", "en", Decimal("0.001")),
+        ("1,234.56", "en", Decimal("1234.56")),
+        ("1,234.56", "pl", Decimal("1234.56")),
+        ("1.234,56", "pl", Decimal("1234.56")),
+        ("1,234,567", "en", Decimal("1234567")),
+        ("1 234 567", "en", Decimal("1234567")),
+        ("123,456", "en", Decimal("123456")),
+    ],
+)
+def test_parse_amount_groups_and_decimals_table(text: str, locale: str, expected: Decimal) -> None:
+    assert parse_amount(text, locale) == expected
+
+
+@pytest.mark.parametrize("locale", ["en", "pl"])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1,23,456",  # groups after the first must have 3 digits
+        "1.23.456",
+        "1 23 456",
+        "1 2345",
+        "1234 567",  # the first group has at most 3 digits
+        "0 001",  # a leading zero group is not a thousands group
+        "01 234",
+        "0,001.5",
+        "0.001,5",
+        "1,2345.6",
+    ],
+)
+def test_parse_amount_rejects_malformed_grouping(text: str, locale: str) -> None:
+    with pytest.raises(ValueError, match="valid amount|prawidłową kwotę"):
+        parse_amount(text, locale)
+
+
+@pytest.mark.parametrize("text", ["0,001", "01,234", "0,000"])
+def test_parse_amount_rejects_a_leading_zero_group_in_en(text: str) -> None:
+    """In ``en`` the comma groups thousands: "0,001" is neither 1 nor 0.001."""
+    with pytest.raises(ValueError, match="valid amount"):
+        parse_amount(text, "en")

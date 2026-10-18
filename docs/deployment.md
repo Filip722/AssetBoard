@@ -202,6 +202,12 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: transactions, data layer (F2.2 part A)
+
+- The migration adds the `transactions` table and changes no existing data. No new setting. The
+  month page does not show transactions yet (part B). Once a workspace has a transaction, its
+  base currency can no longer change; see [docs/workspace-settings.md](workspace-settings.md).
+
 ### Unreleased: month pages (F2.5)
 
 - **Month pages** at "Month" in the main navigation (`/m`, `/m/YYYY-MM`); see

@@ -31,28 +31,28 @@ def _invalid_amount_message(locale: str) -> str:
     return gettext("Enter a valid amount.", language if language in {"en", "pl"} else "en")
 
 
-def _grouped_integer(value: str, separator: str) -> bool:
-    groups = value.split(separator)
+def _valid_groups(groups: list[str]) -> bool:
+    """Thousands groups: a first group of 1-3 digits without a leading zero, then groups of
+    exactly 3 digits (``1,234,567``). ``0,001`` and ``01,234`` are not grouped numbers."""
     return (
         len(groups) > 1
         and 1 <= len(groups[0]) <= 3
         and groups[0].isascii()
         and groups[0].isdigit()
+        and not groups[0].startswith("0")
         and all(len(group) == 3 and group.isascii() and group.isdigit() for group in groups[1:])
     )
+
+
+def _grouped_integer(value: str, separator: str) -> bool:
+    return _valid_groups(value.split(separator))
 
 
 def _remove_space_groups(value: str) -> str:
     if not any(character in _SPACE_GROUPS for character in value):
         return value
     groups = re.split(r"[ \u00a0\u202f]", value)
-    if not (
-        len(groups) > 1
-        and 1 <= len(groups[0]) <= 3
-        and groups[0].isascii()
-        and groups[0].isdigit()
-        and all(len(group) == 3 and group.isascii() and group.isdigit() for group in groups[1:])
-    ):
+    if not _valid_groups(groups):
         raise ValueError
     return "".join(groups)
 

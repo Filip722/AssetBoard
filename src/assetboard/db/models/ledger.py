@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -18,9 +21,20 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
+from assetboard.db.base import (
+    Base,
+    IdMixin,
+    SoftDeleteMixin,
+    TimestampMixin,
+    WorkspaceScopedMixin,
+)
 from assetboard.db.types import UtcDateTime
 from assetboard.domain.categories import MAX_CATEGORY_NAME_LENGTH, MAX_NAME_KEY_LENGTH
+from assetboard.domain.transactions import (
+    MAX_AMOUNT_MINOR,
+    MAX_DESCRIPTION_KEY_LENGTH,
+    MAX_DESCRIPTION_LENGTH,
+)
 
 
 class Category(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -79,5 +93,58 @@ class MonthState(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     month: Mapped[date] = mapped_column(Date(), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     closed_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin, Base):
+    """An expense or income entry (F2.2).
+
+    Amounts are positive minor units in the workspace's base currency; ``direction`` says which
+    way the money went and always equals the category's kind. ``(workspace_id, category_id)``
+    references ``categories(workspace_id, id)``, so a transaction can never point at another
+    workspace's category. Rows are soft-deleted (``deleted_at``) and never removed.
+    ``description_key`` is the description's case-insensitive key for autocomplete
+    (``domain.transactions.description_key``). The reserved columns of the spec
+    (``scheduled_occurrence_id``, ``import_batch_id``, ``account_id``) arrive with the features
+    that own their tables (M3, M4).
+    """
+
+    __tablename__ = "transactions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "category_id"],
+            ["categories.workspace_id", "categories.id"],
+            name="fk_transactions_workspace_category",
+        ),
+        CheckConstraint("direction IN ('expense', 'income')", name="direction_valid"),
+        CheckConstraint(
+            f"amount_minor > 0 AND amount_minor <= {MAX_AMOUNT_MINOR}", name="amount_valid"
+        ),
+        CheckConstraint("length(currency) = 3", name="currency_length"),
+        CheckConstraint(
+            "source IN ('manual', 'recurring', 'recurring_auto', 'import')", name="source_valid"
+        ),
+        CheckConstraint("date >= '1900-01-01' AND date <= '2199-12-31'", name="date_in_range"),
+        Index("ix_transactions_workspace_date", "workspace_id", "date"),
+        Index("ix_transactions_workspace_category_date", "workspace_id", "category_id", "date"),
+        Index(
+            "ix_transactions_workspace_direction_description",
+            "workspace_id",
+            "direction",
+            "description_key",
+        ),
+    )
+
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    date: Mapped[dt.date] = mapped_column(Date(), nullable=False)
+    # Money(amount_minor, currency); no ORM composite, whose history breaks partial updates.
+    amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    category_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    description: Mapped[str] = mapped_column(String(MAX_DESCRIPTION_LENGTH), nullable=False)
+    description_key: Mapped[str] = mapped_column(String(MAX_DESCRIPTION_KEY_LENGTH), nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

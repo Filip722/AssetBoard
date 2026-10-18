@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select
 
-from assetboard.db.models.ledger import Category
+from assetboard.db.models.ledger import Category, MonthState, Transaction
+from assetboard.domain.months import YearMonth
 from assetboard.services import categories as category_service
 from assetboard.services.categories import CategoryUsage
 from tests.conftest import OwnerApp
@@ -294,3 +296,86 @@ def test_an_unknown_move_direction_is_400(owner: OwnerApp) -> None:
     response = owner.post(f"/categories/{b}/move", {"direction": "left"}, token_from="/categories")
     assert response.status_code == 400
     assert _names(owner.client.get("/categories").text, "expense") == ["A", "B"]
+
+
+# Treatment changes and closed months (F2.2, owner decision: allow, but warn)
+
+
+def _spend(owner: OwnerApp, category_id: UUID, *days: date, deleted: bool = False) -> None:
+    with owner.db() as session, session.begin():
+        for day in days:
+            session.add(
+                Transaction(
+                    workspace_id=owner.home_id, direction="expense", date=day,
+                    amount_minor=1250, currency="EUR", category_id=category_id,
+                    description="", description_key="", source="manual",
+                    deleted_at=datetime(2026, 10, 1, tzinfo=UTC) if deleted else None,
+                )
+            )  # fmt: skip
+
+
+def _close(owner: OwnerApp, *months: date) -> None:
+    with owner.db() as session, session.begin():
+        for month in months:
+            session.add(
+                MonthState(
+                    workspace_id=owner.home_id, month=month,
+                    closed_at=datetime(2026, 10, 1, tzinfo=UTC),
+                )
+            )  # fmt: skip
+
+
+def test_the_edit_row_names_the_closed_months_a_treatment_change_affects(
+    owner: OwnerApp,
+) -> None:
+    food = _create(owner, "Food")
+    _spend(owner, food, date(2026, 8, 3), date(2026, 9, 4), date(2026, 10, 5))
+    _spend(owner, food, date(2026, 7, 1), deleted=True)  # deleted rows change no totals
+    _close(owner, date(2026, 7, 1), date(2026, 8, 1), date(2026, 9, 1))
+    headers = {"HX-Request": "true"}
+    edit = owner.client.get(f"/categories/{food}/edit", headers=headers).text
+    assert "This changes the totals of 2 closed months: 2026-08, 2026-09." in edit
+    assert f'aria-describedby="treatment-{food}-help treatment-{food}-closed"' in edit
+    owner.client.headers["Accept-Language"] = "pl"
+    edit = owner.client.get(f"/categories/{food}/edit", headers=headers).text
+    assert "Ta zmiana zmieni sumy 2 zamkniętych miesięcy: 2026-08, 2026-09." in edit
+    # The change itself is allowed.
+    form = {"name": "Food", "kind": "expense", "treatment": "savings", "color": "#16a34a"}
+    assert _htmx(owner, f"/categories/{food}", form).status_code == 200
+
+
+def test_one_closed_month_and_long_lists(owner: OwnerApp) -> None:
+    food, rent = _create(owner, "Food"), _create(owner, "Rent")
+    _spend(owner, food, date(2026, 9, 4))
+    _close(owner, date(2026, 9, 1))
+    edit = owner.client.get(f"/categories/{food}/edit", headers={"HX-Request": "true"}).text
+    assert "This changes the totals of 1 closed month: 2026-09." in edit
+    months = [date(2025, m, 1) for m in range(1, 13)] + [date(2026, 1, 1)]
+    _spend(owner, rent, *months)
+    _close(owner, *months)
+    edit = owner.client.get(f"/categories/{rent}/edit", headers={"HX-Request": "true"}).text
+    assert "This changes the totals of 13 closed months: 2025-01, " in edit
+    assert "2025-12, …." in edit and "2026-01" not in edit
+
+
+def test_the_closed_months_warning_alone_describes_the_treatment_field(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``aria-describedby`` follows the warnings actually shown, each on its own."""
+    food = _create(owner, "Food")
+    _close(owner, date(2026, 9, 1))
+    usage = CategoryUsage(references=1, active_months=frozenset({YearMonth(2026, 9)}))
+    monkeypatch.setattr(category_service, "USAGE_SOURCES", [lambda _s, _c: {food: usage}])
+    edit = owner.client.get(f"/categories/{food}/edit", headers={"HX-Request": "true"}).text
+    assert f'aria-describedby="treatment-{food}-closed"' in edit
+    assert "data-affected" not in edit and "data-closed-months" in edit
+
+
+def test_no_warning_without_transactions_in_closed_months(owner: OwnerApp) -> None:
+    food = _create(owner, "Food")
+    _spend(owner, food, date(2026, 10, 5))
+    _close(owner, date(2026, 9, 1))
+    edit = owner.client.get(f"/categories/{food}/edit", headers={"HX-Request": "true"}).text
+    assert "data-closed-months" not in edit
+    assert "A treatment change applies to 1 transaction." in edit
+    assert f'aria-describedby="treatment-{food}-help"' in edit

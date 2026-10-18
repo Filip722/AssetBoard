@@ -8,13 +8,17 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Data model (sketch)**
 - `Category(id, workspace_id, name, name_key, kind[expense|income], treatment[regular|savings|transfer], color, sort_order, archived_at)`; unique `(workspace_id, kind, name_key)` among non-archived (partial unique index `WHERE archived_at IS NULL`, on SQLite and PostgreSQL). `name_key` is computed in Python (`domain.categories.name_key`: NFKC, Unicode casefold, whitespace collapsed) because SQLite's `lower()` folds ASCII only. `UNIQUE(workspace_id, id)` is the target of composite foreign keys from Transaction and BudgetLine. (Changed in F2.1; was `lower(name)`.)
-- `Transaction(id, workspace_id, direction[expense|income], date, amount_minor, currency, category_id, description, source, scheduled_occurrence_id?, import_batch_id?, account_id?, created_by, created_at, updated_at, deleted_at)`; index `(workspace_id, date)`, `(workspace_id, category_id, date)`.
+- `Transaction(id, workspace_id, direction[expense|income], date, amount_minor, currency, category_id, description, description_key, source, created_by_user_id?, created_at, updated_at, deleted_at)`; index `(workspace_id, date)`, `(workspace_id, category_id, date)`, `(workspace_id, direction, description_key)`. (Changed in F2.2: `created_by` is `created_by_user_id`, set to NULL when the account is deleted; `description_key` is the casefolded description for autocomplete; the reserved `scheduled_occurrence_id`, `import_batch_id`, `account_id` columns are added with their composite foreign keys by M3, M4 and the accounts feature, whose tables do not exist yet.)
 - `BudgetLine(id, workspace_id, month, category_id, planned_minor, currency)`; unique `(workspace_id, month, category_id)`.
 - `MonthState(id, workspace_id, month, closed_at?, closed_by_user_id?)`; `month` is the first day (DATE); unique `(workspace_id, month)`. (Changed in F2.5: `id` key for the scoped repository; `closed_by_user_id` is set to NULL when the account is deleted.)
 
 **Carried over from F1.2 (2026-10-12):** owners can change a workspace's base currency on the
 settings page, which is harmless while no amounts exist. Once transactions or budget lines
 exist, M2 must either block the change or convert stored amounts; decide in F2.2's plan.
+**Decided in F2.2 (owner, 2026-10-14):** block it. The base currency cannot change once any
+transaction or budget line exists, soft-deleted rows included; the settings page shows it locked
+with the reason (`services.workspaces.BASE_CURRENCY_LOCKS`; F2.2 adds transactions, **F2.3 must
+add budget lines**).
 
 ---
 
@@ -29,7 +33,8 @@ exist, M2 must either block the change or convert stored amounts; decide in F2.2
 - Editors/owners only; viewers read-only.
 
 **As built (F2.1)**
-- "In use" comes from `services.categories.USAGE_SOURCES` (empty in F2.1). **F2.2 must register** a source for transactions: `references` counts every transaction row of the category, soft-deleted ones included; `active_transactions` counts non-deleted ones (any date; shown as "affected" on a treatment change). **F2.3** (budget lines) and **M3** (scheduled items) register `references` only.
+- "In use" comes from `services.categories.USAGE_SOURCES`, a static list (F2.2 changed it from import-time registration; `CategoryUsage` lives in `services.category_usage`). F2.2 adds transactions: `references` counts every transaction row of the category, soft-deleted ones included; `active_transactions` counts non-deleted ones (any date; shown as "affected" on a treatment change); `active_months` are the months with non-deleted rows. **F2.3** (budget lines) adds `references` and `active_months` (planned values change closed months' totals too); **M3** (scheduled items) `references` only.
+- **Treatment change and closed months (owner, F2.2):** allowed, but the edit row warns with the closed months among `active_months` ("This changes the totals of 2 closed months: 2026-08, 2026-09.", at most 12 listed); `category.updated` records `closed_months_affected` (a count).
 - Deleting a category in use archives it ("Archived because it is in use"); the Delete button is shown only for unused categories, Archive/Restore always. Restoring fails while an active category of the same kind has the name; a restored category goes to the end of its list.
 - "First run" means the workspace has no categories at all (archived included); nothing is seeded automatically. Seed names are stored in the language of the user who clicks, and are ordinary names afterwards.
 - Reordering (up/down buttons, active categories only) is not audited; create/update/archive/restore/delete/seed are (`category.*` actions, "Categories" group in the workspace audit log).
@@ -72,6 +77,46 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
 
 **Notes:** Use HTMX row swaps; return the updated summary block via OOB swap so totals refresh without a full reload.
 
+**As built (F2.2 part A: data and service layer; the month-page UI is part B)**
+- Single currency: every transaction is in the workspace's base currency, read from the
+  workspace row inside the write (after the month lock), not from the Context. The base currency
+  is then locked (see "Carried over from F1.2").
+- `domain.transactions`: `parse_entry_date(text, month)` accepts a day number `1`-`31` (ASCII
+  digits, within the viewed month), `YYYY-M(M)-D(D)` and `D(D).M(M).YYYY`; `/` forms are refused
+  (ambiguous order). Codes: `invalid_date`, `day_not_in_month`, `date_out_of_range` (outside
+  1900-01..2199-12). `amount_minor(Decimal, currency)` refuses instead of rounding:
+  `amount_not_positive`, `amount_too_large` (> 999 999 999 999 999 minor units),
+  `too_many_decimals`. Amounts are parsed with `i18n.numbers.parse_amount` in the caller's
+  locale (`invalid_amount`). Descriptions are optional, at most 200 characters, whitespace
+  collapsed, without control or invisible characters (`invalid_description`,
+  `description_too_long`).
+- **Product decisions (owner, 2026-10-14):** a full date outside the viewed month is allowed and
+  saved to its own month (both months guarded); undo is allowed to any editor or owner, exactly
+  10 seconds after `deleted_at` by the injected clock (then `UndoExpired`); audit data contains
+  the amount but never the description (audit rows are append-only, so free text there could
+  never be erased); month tables are ordered by date ascending, then entry order.
+- Service (`services.transactions`): `create_transaction`, `update_transaction` (date, amount,
+  description, category; not the direction), `delete_transaction` (soft delete; returns
+  `undo_until`), `undo_delete`, `get_transaction`, `list_month` (expense and income, non-deleted),
+  `suggest_descriptions`. `InvalidTransaction.errors` maps every invalid field (`direction`,
+  `day`, `amount`, `description`, `category`) to its code at once. Category codes:
+  `category_required`, `invalid_category` (unknown or another workspace's),
+  `category_kind_mismatch` (direction must equal the category's kind), `category_archived` (an
+  archived category takes no new transactions; a row keeps the archived category it has).
+- Deleting a deleted row and undoing a live row change nothing and record nothing; a deleted row
+  is `NotFound` for edit. If the month was closed after the deletion, undo raises `MonthClosed`
+  and the row stays deleted (the window is checked first).
+- Autocomplete: prefix match on `description_key` (NFKC + Unicode casefold, so "ż" finds
+  "Żabka"; `%` and `_` are literal), per direction, non-deleted rows only, at most 8
+  suggestions. Keys are ranked in SQL over every matching row (most used, then most recently
+  dated, then the key); the spellings and categories are then read for those keys only. The shown spelling is the most used
+  one; the suggested category is the most used **active** category (ties: most recently dated,
+  then category order), or none.
+- Audit: `transaction.created`, `.updated`, `.deleted`, `.restored` with `date`, `direction`,
+  `category` (name), `amount` (plain decimal), `currency`; updates add `fields` and
+  `previous_date` / `previous_amount` when those change. Group "Transactions" in the workspace
+  audit log.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -94,6 +139,9 @@ undo within and after the window, viewer cannot write.
 - When a month has no budget lines at all and the previous month has some, show a banner "Copy plan from <previous month>" (one click copies all lines). Copying never overwrites existing lines.
 - Setting for the workspace: auto-copy previous plan when a month is first opened (default off).
 - Closed months: planned values read-only.
+- **From F2.2:** add a budget-lines check to `services.workspaces.BASE_CURRENCY_LOCKS` (any
+  stored line locks the currency) and a source to
+  `services.categories.USAGE_SOURCES` with `references` and `active_months`.
 - **Closed-month guard (from F2.5).** Upsert, delete-on-zero and copy-from-previous call
   `services.months.ensure_month_open` for the **target** month inside their write transaction,
   after `require_role_now`. The auto-copy on first opening must skip closed months (and is a

@@ -80,6 +80,7 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
         "previous_treatment",
         "treatment",
         "affected_transactions",
+        "closed_months_affected",
     ),
     "category.archived": ("name", "in_use"),
     "category.restored": ("name",),
@@ -87,6 +88,19 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "category.seeded": ("count",),
     "month.closed": ("month",),
     "month.reopened": ("month",),
+    # Never the description: audit rows are append-only, free text there could not be erased.
+    "transaction.created": ("date", "direction", "category", "amount", "currency"),
+    "transaction.updated": (
+        "fields",
+        "date",
+        "previous_date",
+        "category",
+        "amount",
+        "previous_amount",
+        "currency",
+    ),
+    "transaction.deleted": ("date", "direction", "category", "amount", "currency"),
+    "transaction.restored": ("date", "direction", "category", "amount", "currency"),
 }
 
 ACTION_LABELS: dict[str, str] = {
@@ -127,6 +141,10 @@ ACTION_LABELS: dict[str, str] = {
     "category.seeded": _("Suggested categories added"),
     "month.closed": _("Month closed"),
     "month.reopened": _("Month reopened"),
+    "transaction.created": _("Transaction added"),
+    "transaction.updated": _("Transaction changed"),
+    "transaction.deleted": _("Transaction deleted"),
+    "transaction.restored": _("Deleted transaction restored"),
 }
 UNKNOWN_ACTION = _("Other event")
 # A failure while linking from the profile is not a refused sign-in.
@@ -160,6 +178,14 @@ KEY_LABELS: dict[str, str] = {
     "in_use": _("In use"),
     "count": _("Number"),
     "month": _("Month"),
+    "closed_months_affected": _("Closed months affected"),
+    "date": _("Date"),
+    "previous_date": _("Previous date"),
+    "direction": _("Direction"),
+    "category": _("Category"),
+    "amount": _("Amount"),
+    "previous_amount": _("Previous amount"),
+    "currency": _("Currency"),
 }
 
 # Codes stored as values, with their texts, per kind of key: the same code can mean different
@@ -226,6 +252,10 @@ FIELD_LABELS: dict[str, str] = {
     "kind": _("kind"),
     "treatment": _("treatment"),
     "color": _("colour"),
+    "date": _("date"),
+    "amount": _("amount"),
+    "description": _("description"),
+    "category": _("category"),
 }
 KIND_LABELS: dict[str, str] = {
     "expense": _("expense"),
@@ -249,6 +279,7 @@ VALUE_TABLES: dict[str, dict[str, str]] = {
     "purpose": PURPOSE_LABELS,
     "fields": FIELD_LABELS,
     "kind": KIND_LABELS,
+    "direction": KIND_LABELS,
     "treatment": TREATMENT_LABELS,
     "previous_treatment": TREATMENT_LABELS,
 }
@@ -280,6 +311,12 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "category.seeded",
         ),
         "months": ("month.closed", "month.reopened"),
+        "transactions": (
+            "transaction.created",
+            "transaction.updated",
+            "transaction.deleted",
+            "transaction.restored",
+        ),
     },
     "instance": {
         "sign_in": ("auth.login_success", "auth.logout", "auth.register"),
@@ -311,6 +348,7 @@ GROUP_LABELS: dict[str, str] = {
     "settings": _("Workspace settings"),
     "categories": _("Categories"),
     "months": _("Closing months"),
+    "transactions": _("Transactions"),
     "sign_in": _("Sign-ins"),
     "failures": _("Failures"),
     "links": _("Linked sign-in methods"),

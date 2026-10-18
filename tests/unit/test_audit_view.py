@@ -140,3 +140,27 @@ def test_every_month_action_has_a_label_keys_and_a_group() -> None:
     texts.append(GROUP_LABELS["months"])
     for text in texts:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
+
+
+# Transaction events (F2.2)
+
+TRANSACTION_ACTIONS = {
+    "transaction.created",
+    "transaction.updated",
+    "transaction.deleted",
+    "transaction.restored",
+}
+
+
+def test_every_transaction_action_has_a_label_keys_and_a_group() -> None:
+    assert {a for a in ACTION_LABELS if a.startswith("transaction.")} == TRANSACTION_ACTIONS
+    assert set(GROUPS["workspace"]["transactions"]) == TRANSACTION_ACTIONS
+    keys = {key for action in TRANSACTION_ACTIONS for key in DATA_KEYS[action]}
+    assert "description" not in keys  # free text never reaches the append-only log
+    assert keys <= set(KEY_LABELS)
+    assert set(VALUE_TABLES["direction"]) == {"expense", "income"}
+    texts = [ACTION_LABELS[a] for a in TRANSACTION_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts += [GROUP_LABELS["transactions"], KEY_LABELS["closed_months_affected"]]
+    texts += [VALUE_TABLES["fields"][f] for f in ("date", "amount", "description", "category")]
+    for text in texts:
+        assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"

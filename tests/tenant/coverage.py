@@ -37,6 +37,24 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         for method in ("for_month", "create")
     },
     **{
+        ("MonthStateRepository", "closed_months"): (
+            "test_month_state_queries_stay_in_their_workspace"
+        ),
+    },
+    **{
+        ("TransactionRepository", method): "test_transaction_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "get_for_update",
+            "for_month",
+            "counts_by_category",
+            "active_months_by_category",
+            "any_exists",
+            "description_keys",
+            "description_details",
+        )
+    },
+    **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
         for method in (
             "create",

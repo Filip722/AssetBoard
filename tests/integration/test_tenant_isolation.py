@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Iterator
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -44,6 +44,7 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     NotFound,
     ScopedRepository,
+    TransactionRepository,
     UserMembershipReader,
 )
 from assetboard.db.repositories.base import models_marked_workspace_owned, repositories_for
@@ -482,6 +483,53 @@ def test_month_state_queries_stay_in_their_workspace(
     assert b_october.workspace_id == ctx_b.workspace.id
     assert in_b.for_month(october) is b_october
     assert in_a.for_month(october) is a_october
+    in_a.update(a_october.id, closed_at=datetime(2026, 10, 31, 12, tzinfo=UTC))
+    assert in_a.closed_months() == {october}
+    assert in_b.closed_months() == frozenset()  # B's October is open; A's close is not seen
+
+
+def test_transaction_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = TransactionRepository(db_session, ctx_a), TransactionRepository(db_session, ctx_b)
+    october = YearMonth(2026, 10)
+    assert (in_a.any_exists(), in_b.any_exists()) == (False, False)
+
+    def category(ctx: Any, name: str) -> Any:
+        return CategoryRepository(db_session, ctx).create(
+            name=name, name_key=name.casefold(), kind="expense", treatment="regular",
+            color="#16a34a", sort_order=0,
+        )  # fmt: skip
+
+    def make(repository: TransactionRepository, category_id: UUID, description: str) -> Any:
+        return repository.create(
+            direction="expense", day=date(2026, 10, 7), amount_minor=1250, currency="EUR",
+            category_id=category_id, description=description,
+            description_key=description.casefold(), source="manual", created_by_user_id=None,
+        )  # fmt: skip
+
+    food_a, food_b = category(ctx_a, "Food"), category(ctx_b, "Food")
+    a_row = make(in_a, food_a.id, "Lidl")
+    assert a_row.workspace_id == ctx_a.workspace.id
+    assert (in_a.any_exists(), in_b.any_exists()) == (True, False)
+    assert [r.id for r in in_a.for_month(october)] == [a_row.id]
+    assert in_b.for_month(october) == []
+    assert in_a.get_for_update(a_row.id) is a_row
+    assert in_b.get_for_update(a_row.id) is None  # another workspace's row is not found
+    assert set(in_a.counts_by_category()) == {food_a.id}
+    assert in_b.counts_by_category() == {}
+    assert in_a.active_months_by_category() == {food_a.id: frozenset({october})}
+    assert in_b.active_months_by_category() == {}
+    assert in_a.description_keys(direction="expense", key_prefix="li", limit=10) == ["lidl"]
+    assert in_b.description_keys(direction="expense", key_prefix="li", limit=10) == []
+    assert [m.description for m in in_a.description_details(
+        direction="expense", keys=["lidl"])] == ["Lidl"]  # fmt: skip
+    assert in_b.description_details(direction="expense", keys=["lidl"]) == []
+    b_row = make(in_b, food_b.id, "Lidl")
+    assert b_row.workspace_id == ctx_b.workspace.id
+    assert [r.id for r in in_b.for_month(october)] == [b_row.id]
+    assert [r.id for r in in_a.for_month(october)] == [a_row.id]
 
 
 # Method coverage (#11)

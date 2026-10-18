@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
-from assetboard.db.models.ledger import Category, MonthState
+from assetboard.db.models.ledger import Category, MonthState, Transaction
 from assetboard.services.invitations import new_token
 
 
@@ -90,6 +90,25 @@ def make_month_state(session: Session, workspace_id: UUID) -> MonthState:
     return MonthState(workspace_id=workspace_id, month=date(2000 + index // 12, 1 + index % 12, 1))
 
 
+def make_transaction(session: Session, workspace_id: UUID) -> Transaction:
+    """A transaction with its own category in the same workspace (composite foreign key)."""
+    category = make_category(session, workspace_id)
+    session.add(category)
+    session.flush()
+    return Transaction(
+        workspace_id=workspace_id,
+        direction="expense",
+        date=date(2026, 10, 7),
+        amount_minor=1250,
+        currency="EUR",
+        category_id=category.id,
+        description="Groceries",
+        description_key="groceries",
+        source="manual",
+        created_by_user_id=None,
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     Membership: TenantCase(make_membership, update_values={"role": "editor"}),
     AuditEvent: TenantCase(make_audit_event, unsupported=frozenset({"update", "delete"})),
@@ -100,6 +119,12 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     MonthState: TenantCase(
         make_month_state,
         update_values={"closed_at": datetime(2026, 1, 31, 12, tzinfo=UTC)},
+        unsupported=frozenset({"delete"}),
+    ),
+    # Soft delete only (``deleted_at`` through ``update``); rows are never removed.
+    Transaction: TenantCase(
+        make_transaction,
+        update_values={"description": "Market", "description_key": "market"},
         unsupported=frozenset({"delete"}),
     ),
 }

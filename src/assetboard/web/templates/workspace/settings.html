@@ -11,7 +11,17 @@
   <form method="post" action="{{ scoped_url(request, 'workspace_settings') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>
     {{ csrf_input() }}
     <div class="sm:col-span-2">{{ field("name", _("Workspace name"), value=values.name, error=errors.get("name"), required=true, maxlength=max_name_length) }}</div>
+    {% if values.base_currency_locked %}
+    <div class="space-y-1.5" data-currency-locked>
+      <label for="base_currency" class="block text-sm font-medium text-ink dark:text-slate-200">{{ _("Base currency") }}</label>
+      <input type="hidden" name="base_currency" value="{{ values.base_currency }}">
+      <select id="base_currency" disabled aria-describedby="base_currency-help{% if errors.get('base_currency') %} base_currency-error{% endif %}" class="w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink dark:border-slate-700 dark:bg-slate-900 dark:text-white"><option selected>{{ values.base_currency }}</option></select>
+      <p id="base_currency-help" class="text-xs text-muted dark:text-slate-400">{{ _("Locked: transactions exist (deleted ones included), and their amounts are stored in this currency.") }}</p>
+      {% if errors.get("base_currency") %}<p id="base_currency-error" class="text-sm text-rose-700 dark:text-rose-300">{{ errors.get("base_currency") }}</p>{% endif %}
+    </div>
+    {% else %}
     {{ select("base_currency", _("Base currency"), currency_options, selected=values.base_currency, error=errors.get("base_currency")) }}
+    {% endif %}
     {{ select("country_code", _("Country"), country_options, selected=values.country_code or "", error=errors.get("country_code"), blank=_("Not set")) }}
     {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone, error=errors.get("timezone")) }}
     {{ select("locale", _("Formatting default"), locales, selected=values.locale, error=errors.get("locale")) }}

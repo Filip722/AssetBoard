@@ -5,11 +5,18 @@ actor may have been demoted or removed meanwhile). So every write runs in one
 ``BEGIN IMMEDIATE`` transaction that re-reads the actor's membership, requires ``owner`` there,
 and checks the last-owner rule in the same transaction. Concurrent writes queue at BEGIN and
 each sees the previous one's result.
+
+**Base currency.** Stored amounts are in the base currency and are never converted, so the
+currency is locked once any amount exists (soft-deleted rows included). Each feature that stores
+amounts adds a check to ``BASE_CURRENCY_LOCKS``: F2.2 transactions now, F2.3 budget lines next.
+The settings write takes the exclusive workspace lock first, so on PostgreSQL a currency change
+and a concurrent first transaction (which takes the shared lock) cannot both pass.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from uuid import UUID
 
@@ -26,12 +33,16 @@ from assetboard.db.repositories import (
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.services.context import Context, PermissionDenied, Role, require_role
 from assetboard.services.invitations import new_token
+from assetboard.services.transactions import workspace_has_transactions
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
 MAX_WORKSPACE_NAME_LENGTH = 120
 INVITATION_EXPIRY_DAYS = (1, 7, 30)
 DEFAULT_INVITATION_EXPIRY_DAYS = 7
 MAX_PENDING_INVITATIONS = 50
+
+# Checks that lock the base currency: each returns True while amounts exist in the workspace.
+BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [workspace_has_transactions]
 
 
 class WorkspaceError(Exception):
@@ -97,6 +108,8 @@ class WorkspaceSettings:
     country_code: str | None
     timezone: str
     locale: str
+    # True once amounts are stored in the base currency (it can no longer change).
+    base_currency_locked: bool = False
 
 
 def _checkpoint(_name: str) -> None:
@@ -111,6 +124,17 @@ def _require_owner_now(session: Session, ctx: Context) -> None:
         raise PermissionDenied(Role.OWNER, actual)
 
 
+def _base_currency_locked(session: Session, ctx: Context) -> bool:
+    return any(check(session, ctx) for check in BASE_CURRENCY_LOCKS)
+
+
+class BaseCurrencyLocked(InvalidWorkspaceSettings):
+    """Amounts exist in the current base currency, so it cannot change."""
+
+    def __init__(self) -> None:
+        super().__init__("base_currency", "base_currency_locked")
+
+
 def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> WorkspaceSettings:
     require_role(ctx, Role.OWNER)
     with factory() as session:
@@ -121,6 +145,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             country_code=workspace.country_code,
             timezone=workspace.timezone,
             locale=workspace.locale,
+            base_currency_locked=_base_currency_locked(session, ctx),
         )
 
 
@@ -160,6 +185,7 @@ def update_settings(
         _require_owner_now(session, ctx)
         _checkpoint("update_settings")
         repository = CurrentWorkspaceRepository(session, ctx)
+        repository.lock(exclusive=True)  # before any read: orders against amount writes
         workspace = repository.get()
         changes = {
             field: value
@@ -172,6 +198,8 @@ def update_settings(
             )
             if getattr(workspace, field) != value
         }
+        if "base_currency" in changes and _base_currency_locked(session, ctx):
+            raise BaseCurrencyLocked
         if changes:
             repository.update(**changes)
             AuditEventRepository(session, ctx).record(
@@ -182,7 +210,7 @@ def update_settings(
                 ts=ctx.clock.now(),
                 data={"fields": ",".join(sorted(changes))},
             )
-        return wanted
+        return replace(wanted, base_currency_locked=_base_currency_locked(session, ctx))
 
     return run_immediate(factory, write)
 

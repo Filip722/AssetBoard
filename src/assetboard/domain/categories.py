@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
+
+from assetboard.domain.text import collapse_whitespace, has_rejected_characters, text_key
 
 MAX_CATEGORY_NAME_LENGTH = 80
 # NFKC and casefold() can lengthen a string ("ß" -> "ss"; U+FDFA -> 18 characters). A name
 # whose key would exceed the column is refused (``clean_name``). 255 characters are at most
 # 1020 bytes in UTF-8, well below PostgreSQL's B-tree index row limit (about 2700 bytes).
 MAX_NAME_KEY_LENGTH = 255
-_REJECTED_NAME_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp", "Co", "Cn"})
-# Format characters that emoji sequences need: ZERO WIDTH JOINER (U+200D) joins "👨‍👩‍👧".
-# (VARIATION SELECTOR-16, U+FE0F, is a mark, not a format character, so it is allowed anyway.)
-_ALLOWED_FORMAT_CHARACTERS = frozenset({"\u200d", "\ufe0f"})
 _COLOR = re.compile(r"#[0-9a-f]{6}")
 
 
@@ -51,14 +48,9 @@ def clean_name(value: str) -> str:
     Emoji joiners (U+200D, U+FE0F) are allowed; other format characters (such as U+202E) are
     not. A name whose ``name_key`` would not fit its column is refused too.
     """
-    stripped = value.strip()
-    if any(
-        unicodedata.category(character) in _REJECTED_NAME_CATEGORIES
-        and character not in _ALLOWED_FORMAT_CHARACTERS
-        for character in stripped
-    ):
+    if has_rejected_characters(value.strip()):
         raise InvalidCategoryName
-    cleaned = " ".join(stripped.split())
+    cleaned = collapse_whitespace(value)
     if not cleaned or len(cleaned) > MAX_CATEGORY_NAME_LENGTH:
         raise InvalidCategoryName
     if len(name_key(cleaned)) > MAX_NAME_KEY_LENGTH:
@@ -71,8 +63,7 @@ def name_key(name: str) -> str:
 
     SQLite's ``lower()`` folds ASCII only, so uniqueness uses this stored key instead.
     """
-    folded = unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", name).casefold())
-    return " ".join(folded.split())
+    return text_key(name)
 
 
 def clean_color(value: str) -> str:

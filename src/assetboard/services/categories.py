@@ -5,15 +5,24 @@ Everyone in the workspace may read categories; writes need ``editor``. Each writ
 Context built before a demotion cannot write.
 
 **Usage seam.** Whether a category is "in use" comes from ``USAGE_SOURCES``: callables that
-return, per category id, how many rows reference it. F2.1 has none (no transactions yet).
-Later features register one each, at import time of their service module:
+return, per category id, a ``CategoryUsage`` (``services.category_usage``). The list is static;
+each feature adds its source here:
 
 * F2.2 transactions: ``references`` counts every transaction row, soft-deleted ones included
   (they still point at the category, and undo must keep working); ``active_transactions``
-  counts the non-deleted ones (any date) and is shown as "affected" when the treatment changes.
-* F2.3 budget lines, M3 scheduled items: ``references`` only.
+  counts the non-deleted ones (any date) and is shown as "affected" when the treatment changes;
+  ``active_months`` are the months with non-deleted rows.
+* F2.3 budget lines: ``references`` and ``active_months``. M3 scheduled items: ``references``.
 
 A category with ``references > 0`` cannot change its kind, and deleting it archives it instead.
+A treatment change is allowed; the edit form lists the **closed** months among
+``active_months``, whose totals the change alters (owner decision, F2.2).
+
+**Concurrency.** Writes that read usage or change a category's kind or archived state (update,
+archive, restore, delete) take the exclusive workspace lock (``CurrentWorkspaceRepository.lock``)
+right after the role check, before reading anything else. Transaction writes take the shared one
+before reading the category, so on PostgreSQL a transaction can never land on a category that
+just changed kind or was archived, and a kind change always sees every transaction.
 """
 
 from __future__ import annotations
@@ -28,7 +37,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.ledger import Category
-from assetboard.db.repositories import AuditEventRepository, CategoryRepository
+from assetboard.db.repositories import (
+    AuditEventRepository,
+    CategoryRepository,
+    CurrentWorkspaceRepository,
+    MonthStateRepository,
+)
 from assetboard.domain.categories import (
     SEED,
     Direction,
@@ -41,20 +55,16 @@ from assetboard.domain.categories import (
     move,
     name_key,
 )
+from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
+from assetboard.services.category_usage import CategoryUsage, UsageSource
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.transactions import category_usage as transaction_usage
 
+__all__ = ["USAGE_SOURCES", "CategoryUsage", "UsageSource"]
 
-@dataclass(frozen=True, slots=True)
-class CategoryUsage:
-    references: int = 0  # every row that points at the category (blocks delete and kind change)
-    active_transactions: int = 0  # non-deleted transactions (shown when the treatment changes)
-
-
-UsageSource = Callable[[Session, Context], Mapping[UUID, CategoryUsage]]
-
-# Registered by later features (see the module docstring). Empty in F2.1.
-USAGE_SOURCES: list[UsageSource] = []
+# Every feature whose rows reference categories (see the module docstring).
+USAGE_SOURCES: list[UsageSource] = [transaction_usage]
 
 
 class CategoryError(Exception):
@@ -106,6 +116,8 @@ class CategoryView:
     archived: bool
     references: int
     active_transactions: int
+    # Closed months whose totals a treatment change alters (oldest first).
+    closed_months_affected: tuple[YearMonth, ...] = ()
 
     @property
     def in_use(self) -> bool:
@@ -134,15 +146,15 @@ def usage_by_category(
     totals: dict[UUID, CategoryUsage] = {}
     for source in USAGE_SOURCES if sources is None else sources:
         for category_id, usage in source(session, ctx).items():
-            seen = totals.get(category_id, CategoryUsage())
-            totals[category_id] = CategoryUsage(
-                references=seen.references + usage.references,
-                active_transactions=seen.active_transactions + usage.active_transactions,
-            )
+            totals[category_id] = totals.get(category_id, CategoryUsage()) + usage
     return totals
 
 
-def _view(category: Category, usage: Mapping[UUID, CategoryUsage]) -> CategoryView:
+def _view(
+    category: Category,
+    usage: Mapping[UUID, CategoryUsage],
+    closed: frozenset[YearMonth] = frozenset(),
+) -> CategoryView:
     used = usage.get(category.id, CategoryUsage())
     return CategoryView(
         id=category.id,
@@ -154,7 +166,17 @@ def _view(category: Category, usage: Mapping[UUID, CategoryUsage]) -> CategoryVi
         archived=category.archived_at is not None,
         references=used.references,
         active_transactions=used.active_transactions,
+        closed_months_affected=tuple(sorted(used.active_months & closed)),
     )
+
+
+def _lock_categories(session: Session, ctx: Context) -> None:
+    """The exclusive workspace lock, before any read (see "Concurrency" above)."""
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+
+
+def _closed_months(session: Session, ctx: Context) -> frozenset[YearMonth]:
+    return MonthStateRepository(session, ctx).closed_months()
 
 
 def _kind(value: str) -> Kind:
@@ -241,7 +263,8 @@ def list_categories(
     require_role(ctx, Role.VIEWER)
     with factory() as session:
         usage = usage_by_category(session, ctx, usage_sources)
-        views = [_view(c, usage) for c in CategoryRepository(session, ctx).ordered()]
+        closed = _closed_months(session, ctx)
+        views = [_view(c, usage, closed) for c in CategoryRepository(session, ctx).ordered()]
     return CategoryList(
         expense=tuple(v for v in views if not v.archived and v.kind == Kind.EXPENSE),
         income=tuple(v for v in views if not v.archived and v.kind == Kind.INCOME),
@@ -260,7 +283,8 @@ def get_category(
     require_role(ctx, Role.VIEWER)
     with factory() as session:
         category = CategoryRepository(session, ctx).get_or_raise(category_id)
-        return _view(category, usage_by_category(session, ctx, usage_sources))
+        usage = usage_by_category(session, ctx, usage_sources)
+        return _view(category, usage, _closed_months(session, ctx))
 
 
 # Writes (editors and owners)
@@ -323,11 +347,13 @@ def update_category(
 
     def write(session: Session) -> CategoryView:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         repository = CategoryRepository(session, ctx)
         category = repository.get_or_raise(category_id)
         if category.archived_at is not None:
             raise CategoryArchived
         usage = usage_by_category(session, ctx, usage_sources)
+        closed = _closed_months(session, ctx)
         used = usage.get(category.id, CategoryUsage())
         kind_changes = category.kind != wanted_kind.value
         if kind_changes and used.references > 0:
@@ -345,7 +371,7 @@ def update_category(
             if getattr(category, field) != value
         }
         if not changes:
-            return _view(category, usage)
+            return _view(category, usage, closed)
         previous_treatment = category.treatment
         if "name" in changes:
             changes["name_key"] = key
@@ -362,9 +388,10 @@ def update_category(
                 "previous_treatment": previous_treatment,
                 "treatment": wanted_treatment.value,
                 "affected_transactions": used.active_transactions,
+                "closed_months_affected": len(used.active_months & closed),
             }
         _audit(session, ctx, "category.updated", category.id, data)
-        return _view(category, usage)
+        return _view(category, usage, closed)
 
     return _write(factory, write)
 
@@ -404,6 +431,7 @@ def archive_category(
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         category = CategoryRepository(session, ctx).get_or_raise(category_id)
         if category.archived_at is None:
             used = usage_by_category(session, ctx, usage_sources).get(category.id)
@@ -426,6 +454,7 @@ def restore_category(factory: sessionmaker[Session], ctx: Context, category_id: 
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         repository = CategoryRepository(session, ctx)
         category = repository.get_or_raise(category_id)
         if category.archived_at is None:
@@ -453,6 +482,7 @@ def delete_category(
 
     def write(session: Session) -> DeleteOutcome:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         repository = CategoryRepository(session, ctx)
         category = repository.get_or_raise(category_id)
         used = usage_by_category(session, ctx, usage_sources).get(category.id, CategoryUsage())

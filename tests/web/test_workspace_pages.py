@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -10,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 from assetboard.db.models.identity import Membership, UserSession, Workspace
+from assetboard.db.models.ledger import Category, Transaction
 from assetboard.services.auth import session_id_hash
 from assetboard.services.workspaces import WorkspaceError
 from assetboard.web import workspace_routes
@@ -165,6 +167,73 @@ def test_settings_validation_errors_are_shown_on_the_field(owner: OwnerApp) -> N
     assert response.status_code == 400
     assert 'aria-describedby="name-error"' in response.text
     assert "Enter a workspace name of 1 to 120 characters." in response.text
+
+
+def _plant_transaction(owner: OwnerApp, *, deleted: bool) -> None:
+    """A stored amount in the workspace's currency (soft-deleted or not)."""
+    with owner.db() as session, session.begin():
+        category = Category(
+            workspace_id=owner.home_id, name="Food", name_key="food", kind="expense",
+            treatment="regular", color="#16a34a", sort_order=0,
+        )  # fmt: skip
+        session.add(category)
+        session.flush()
+        session.add(
+            Transaction(
+                workspace_id=owner.home_id, direction="expense", date=date(2026, 10, 7),
+                amount_minor=1250, currency="EUR", category_id=category.id, description="",
+                description_key="", source="manual",
+                deleted_at=datetime(2026, 10, 7, tzinfo=UTC) if deleted else None,
+            )
+        )  # fmt: skip
+
+
+LOCKED_HELP = (
+    "Locked: transactions exist (deleted ones included), and their amounts are stored in this "
+    "currency."
+)
+
+
+def test_the_base_currency_select_is_free_without_amounts(owner: OwnerApp) -> None:
+    page = owner.client.get("/workspace/settings").text
+    assert "data-currency-locked" not in page
+    assert '<select id="base_currency" name="base_currency"' in page
+
+
+@pytest.mark.parametrize("deleted", [False, True])
+def test_the_settings_page_shows_why_the_base_currency_is_locked(
+    owner: OwnerApp, deleted: bool
+) -> None:
+    _plant_transaction(owner, deleted=deleted)
+    page = owner.client.get("/workspace/settings").text
+    assert "data-currency-locked" in page
+    assert re.search(r'<select id="base_currency" disabled[^>]*base_currency-help', page)
+    assert '<input type="hidden" name="base_currency" value="EUR">' in page
+    assert LOCKED_HELP in page
+    polish = owner.client.get("/workspace/settings", headers={"Accept-Language": "pl"}).text
+    assert (
+        "Zablokowana: istnieją transakcje (także usunięte), a ich kwoty są zapisane w tej walucie."
+        in polish
+    )
+
+
+def test_a_locked_base_currency_change_is_refused_on_the_field(owner: OwnerApp) -> None:
+    _plant_transaction(owner, deleted=False)
+    form = {"name": "Family", "base_currency": "PLN", "timezone": "UTC", "locale": "en"}
+    response = owner.post("/workspace/settings", form, token_from="/workspace/settings")
+    assert response.status_code == 400
+    assert "The base currency cannot change: amounts are already stored in it." in response.text
+    assert "base_currency-help base_currency-error" in response.text
+    assert 'name="base_currency" value="EUR"' in response.text  # the stored one, not PLN
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.base_currency)).one() == "EUR"
+    response = owner.post(
+        "/workspace/settings", form | {"base_currency": "EUR"}, token_from="/workspace/settings"
+    )
+    assert response.status_code == 303  # every other setting still changes
+    owner.client.headers["Accept-Language"] = "pl"
+    polish = owner.post("/workspace/settings", form, token_from="/workspace/settings")
+    assert "Waluty bazowej nie można zmienić: są już w niej zapisane kwoty." in polish.text
 
 
 @pytest.mark.parametrize("role", ["editor", "viewer"])

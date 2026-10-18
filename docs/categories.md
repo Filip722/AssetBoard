@@ -51,7 +51,10 @@ Once a category is in use:
 
 - its **kind cannot change** (an expense category cannot become an income category);
 - its **treatment can change**: the edit form shows how many transactions the change applies
-  to. The change applies to all of them, in every month.
+  to. The change applies to all of them, in every month, **closed months included**: when some
+  of them lie in closed months, the form warns and names those months, for example "This
+  changes the totals of 2 closed months: 2026-08, 2026-09." (at most 12 are listed). Closing a
+  month protects its entries, not the categories they use.
 
 Changes to categories (but not reordering) are recorded in the workspace audit log under
 "Categories".

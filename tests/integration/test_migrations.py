@@ -46,6 +46,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "memberships",
         "month_states",
         "setup_state",
+        "transactions",
         "user_sessions",
         "users",
         "workspaces",
@@ -528,6 +529,88 @@ def test_0010_round_trip_creates_month_states_unique_per_workspace_month(
 
         command.downgrade(alembic_config(settings), "0009_f21")
         assert "month_states" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0011_round_trip_creates_transactions_with_checks_and_a_composite_category_key(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f22.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    home, other = "0" * 31 + "1", "0" * 31 + "2"
+    food, foreign_food = "0" * 31 + "c", "0" * 31 + "d"
+    stamp = "'2026-01-01 00:00:00'"
+    rows = iter(f"{n:032x}" for n in range(100, 200))
+
+    def insert(connection: Connection, **values: object) -> None:
+        row: dict[str, object] = {
+            "workspace_id": home, "category_id": food, "direction": "expense",
+            "date": "2026-10-07", "amount_minor": 1250, "currency": "EUR", "source": "manual",
+        } | values  # fmt: skip
+        connection.exec_driver_sql(
+            "INSERT INTO transactions (id, workspace_id, category_id, direction, date, "
+            "amount_minor, currency, description, description_key, source, created_at, "
+            f"updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, '', '', ?, {stamp}, {stamp})",
+            (
+                next(rows), row["workspace_id"], row["category_id"], row["direction"],
+                row["date"], row["amount_minor"], row["currency"], row["source"],
+            ),
+        )  # fmt: skip
+
+    try:
+        with engine.connect() as connection:
+            indexes = {
+                name
+                for (name,) in connection.exec_driver_sql(
+                    "SELECT name FROM sqlite_master WHERE type = 'index' "
+                    "AND tbl_name = 'transactions'"
+                )
+            }
+        assert {
+            "ix_transactions_workspace_id",
+            "ix_transactions_workspace_date",
+            "ix_transactions_workspace_category_date",
+            "ix_transactions_workspace_direction_description",
+        } <= indexes
+        with engine.begin() as connection:
+            for workspace_id, category_id in ((home, food), (other, foreign_food)):
+                connection.exec_driver_sql(
+                    "INSERT INTO workspaces (id, name, base_currency, locale, timezone, "
+                    "created_at, updated_at) "
+                    f"VALUES (?, 'W', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                    (workspace_id,),
+                )
+                connection.exec_driver_sql(
+                    "INSERT INTO categories (id, workspace_id, name, name_key, kind, treatment, "
+                    f"color, sort_order, created_at, updated_at) VALUES (?, ?, 'Food', 'food', "
+                    f"'expense', 'regular', '#16a34a', 0, {stamp}, {stamp})",
+                    (category_id, workspace_id),
+                )
+            insert(connection)
+            insert(connection, source="import", amount_minor=999_999_999_999_999)
+        for bad in (
+            {"category_id": foreign_food},  # another workspace's category
+            {"amount_minor": 0},
+            {"amount_minor": -1},
+            {"amount_minor": 10**15},
+            {"direction": "transfer"},
+            {"currency": "EURO"},
+            {"source": "api"},
+            {"date": "1899-12-31"},
+            {"date": "2200-01-01"},
+        ):
+            with pytest.raises(IntegrityError), engine.begin() as connection:
+                insert(connection, **bad)
+
+        command.downgrade(alembic_config(settings), "0010_f25")
+        assert "transactions" not in inspect(engine).get_table_names()
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

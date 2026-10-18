@@ -7,6 +7,7 @@ pages. Successful writes redirect (303) back to the page they came from.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Annotated
 from uuid import UUID
 
@@ -62,6 +63,7 @@ def _(message: str) -> str:
 SETTINGS_ERRORS = {
     "invalid_workspace_name": _("Enter a workspace name of 1 to 120 characters."),
     "invalid_base_currency": _("Choose a supported currency."),
+    "base_currency_locked": _("The base currency cannot change: amounts are already stored in it."),
     "invalid_country_code": _("Choose a country from the list."),
     "invalid_timezone": _("Choose a time zone from the list."),
     "invalid_locale": _("Choose a supported language."),
@@ -186,6 +188,14 @@ async def settings_submit(
             )
         )
     except InvalidWorkspaceSettings as exc:
+        current = await run_in_threadpool(
+            workspace_settings, request.app.state.session_factory, ctx
+        )
+        if current.base_currency_locked:
+            # The locked field shows the stored currency, whatever was submitted.
+            submitted = replace(
+                submitted, base_currency=current.base_currency, base_currency_locked=True
+            )
         return _settings_page(
             request,
             submitted,

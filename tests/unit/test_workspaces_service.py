@@ -7,12 +7,23 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import ORMExecuteState, Session
+from sqlalchemy.sql import ClauseElement
 
 from assetboard.db.models.identity import AuditEvent
+from assetboard.db.models.ledger import Transaction
 from assetboard.db.repositories import NotFound
+from assetboard.domain.months import YearMonth
 from assetboard.services import workspaces
+from assetboard.services.categories import create_category
 from assetboard.services.context import Context, PermissionDenied, Role
+from assetboard.services.transactions import (
+    create_transaction,
+    delete_transaction,
+    workspace_has_transactions,
+)
 from assetboard.services.workspaces import (
     InvalidWorkspaceSettings,
     LastOwnerError,
@@ -165,6 +176,82 @@ def test_update_settings_validates_input(
         update_settings(team.factory, team.ctx("olga", "owner"), **(SETTINGS | changes))
     assert (invalid.value.field, invalid.value.code) == (field, code)
     assert _events(team) == []
+
+
+# The base currency is locked once amounts exist (F2.2, owner decision)
+
+
+def _spend(db: WorkspaceDb) -> None:
+    editor = db.ctx("ed", "editor")
+    food = create_category(
+        db.factory, editor, name="Food", kind="expense", treatment="regular", color="#16a34a"
+    )
+    create_transaction(
+        db.factory, editor, month=YearMonth(2026, 3), direction="expense", day="7",
+        amount="12.50", description="", category_id=food.id, locale="en",
+    )  # fmt: skip
+
+
+def _currency(db: WorkspaceDb) -> str:
+    return workspace_settings(db.factory, db.ctx("olga", "owner")).base_currency
+
+
+def test_the_base_currency_is_free_while_no_amounts_exist(team: WorkspaceDb) -> None:
+    owner = team.ctx("olga", "owner")
+    assert workspace_settings(team.factory, owner).base_currency_locked is False
+    saved = update_settings(team.factory, owner, **SETTINGS)
+    assert (saved.base_currency, saved.base_currency_locked) == ("PLN", False)
+
+
+@pytest.mark.parametrize("deleted", [False, True])
+def test_the_base_currency_is_locked_once_a_transaction_exists(
+    team: WorkspaceDb, deleted: bool
+) -> None:
+    _spend(team)
+    if deleted:  # a soft-deleted transaction still holds an amount in the currency
+        with team.factory() as session:
+            row_id = session.scalars(select(Transaction.id)).one()
+        delete_transaction(team.factory, team.ctx("ed", "editor"), row_id)
+    owner = team.ctx("olga", "owner")
+    assert workspace_settings(team.factory, owner).base_currency_locked is True
+    events_before = _events(team)
+    with pytest.raises(workspaces.BaseCurrencyLocked) as locked:
+        update_settings(team.factory, owner, **SETTINGS)
+    assert (locked.value.field, locked.value.code) == ("base_currency", "base_currency_locked")
+    assert _currency(team) == "EUR" and _events(team) == events_before
+    # Every other setting still changes.
+    saved = update_settings(team.factory, owner, **(SETTINGS | {"base_currency": "EUR"}))
+    assert (saved.name, saved.base_currency, saved.base_currency_locked) == ("Family", "EUR", True)
+
+
+def test_every_registered_lock_is_consulted(
+    team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert [workspace_has_transactions] == workspaces.BASE_CURRENCY_LOCKS
+    # What F2.3 budget lines will add: any check that reports stored amounts locks it.
+    monkeypatch.setattr(workspaces, "BASE_CURRENCY_LOCKS", [lambda _session, _ctx: True])
+    with pytest.raises(workspaces.BaseCurrencyLocked):
+        update_settings(team.factory, team.ctx("olga", "owner"), **SETTINGS)
+
+
+def test_the_settings_write_locks_the_workspace_before_reading_it(team: WorkspaceDb) -> None:
+    """PostgreSQL: the exclusive lock orders a currency change against a first transaction."""
+    seen: list[str] = []
+
+    def record(state: ORMExecuteState) -> None:
+        statement = state.statement
+        assert isinstance(statement, ClauseElement)
+        seen.append(str(statement.compile(dialect=postgresql.dialect())))
+
+    event.listen(Session, "do_orm_execute", record)
+    try:
+        update_settings(team.factory, team.ctx("olga", "owner"), **SETTINGS)
+    finally:
+        event.remove(Session, "do_orm_execute", record)
+    workspace_reads = [i for i, s in enumerate(seen) if "FROM workspaces" in s]
+    transaction_reads = [i for i, s in enumerate(seen) if "FROM transactions" in s]
+    assert seen[workspace_reads[0]].rstrip().endswith("FOR UPDATE")
+    assert transaction_reads and workspace_reads[0] < min(transaction_reads)
 
 
 # Roles and the last-owner rule
