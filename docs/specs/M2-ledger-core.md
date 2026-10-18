@@ -170,6 +170,12 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   selection, and puts them into the new row after the swap instead of the server's
   `data-autofocus`. On a 4xx the server's echo of the submitted values and messages wins; if
   sending fails, the submitted values come back.
+- **Swaps settle at once (fix, 2026-10-18):** `base.html` sets HTMX's `defaultSettleDelay` to 0.
+  With the default 20 ms, new content was visible but not yet wired up (`hx-*`) and its
+  `data-autofocus` not yet applied: Esc right after opening an edit row clicked an inert Cancel
+  link, and a field clicked in that window lost the focus to the day field, so typing meant for
+  the amount went into the day (the intermittent F2.2 browser failure). No style depends on the
+  settling classes.
 
 **Agent prompt**
 ```

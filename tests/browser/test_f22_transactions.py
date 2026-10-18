@@ -230,6 +230,30 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             expect(bread.locator("[data-amount]")).to_have_text("€13.00")
             expect(bread.locator("[data-edit]")).to_be_focused()
 
+            # Swapped-in content is wired up (hx-* attributes) and focused in the same task as
+            # the swap: HTMX's default 20 ms settle delay left a window in which the new edit
+            # row was visible but inert and its requested focus still pending, so a key press
+            # or click in it was lost (Esc did nothing) or moved (typing for Amount into Day).
+            page.evaluate(
+                """() => {
+                  window.__settledInSwapTask = [];
+                  document.addEventListener("htmx:afterSwap", () => {
+                    window.__swapTask = true;
+                    setTimeout(() => { window.__swapTask = false; });
+                  });
+                  document.addEventListener("htmx:afterSettle", () => {
+                    window.__settledInSwapTask.push(window.__swapTask === true);
+                  });
+                }"""
+            )
+            bread.locator("[data-edit]").click()
+            expect(edit_day).to_be_focused()
+            page.keyboard.press("Escape")
+            expect(edit_row).to_have_count(0)
+            expect(bread.locator("[data-edit]")).to_be_focused()
+            settled = page.evaluate("window.__settledInSwapTask")
+            assert settled and all(settled), settled
+
             # Delete: the strict undo toast counts down; Undo restores the row.
             bread.locator("[data-delete]").click()
             expect(page.locator("#ledger-expense [data-description]")).to_have_text(
