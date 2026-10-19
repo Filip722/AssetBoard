@@ -44,6 +44,7 @@ from assetboard.web.ledger import (
     SectionState,
     build_ledger,
     edit_values,
+    parse_filter,
 )
 from assetboard.web.plan import PLAN_ERRORS, CellState, build_summary, summary_context
 from assetboard.web.rendering import render_template
@@ -81,6 +82,7 @@ NOTICES = {
     "transaction_added": _("Entry added."),
     "transaction_saved": _("Entry saved."),
     "transaction_restored": _("Entry restored."),
+    "outside_filter": _("Entry saved. Its category is not shown while this filter is on."),
     "plan_saved": _("Planned value saved."),
     "plan_removed": _("Planned value removed."),
 }
@@ -138,6 +140,7 @@ def month_context(
     plan_cell: CellState | None = None,
     copied: CopyResult | None = None,
     automatic: bool = False,
+    filter_id: UUID | None = None,
 ) -> dict[str, object]:
     """The month page's context (blocking: run in a thread). ``states`` carry the transaction
     tables' form values and messages; ``deleted`` offers Undo (pages without JavaScript) while
@@ -150,7 +153,7 @@ def month_context(
     if view.closed_at is not None:
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
         closed_on = format_day(local, locale)
-    ledger = build_ledger(factory, ctx, request, view, states)
+    ledger = build_ledger(factory, ctx, request, view, states, filter_id)
     pending = None
     if deleted is not None and ledger.can_write:
         pending = pending_undo(factory, ctx, deleted)
@@ -174,7 +177,14 @@ def month_context(
         "ledger": ledger,
         **summary_context(
             build_summary(
-                factory, ctx, request, view, cell=plan_cell, copied=copied, automatic=automatic
+                factory,
+                ctx,
+                request,
+                view,
+                cell=plan_cell,
+                copied=copied,
+                automatic=automatic,
+                filter_id=ledger.filter.category_id if ledger.filter else None,
             )
         ),
         "deleted": pending.id if pending is not None else None,
@@ -230,12 +240,15 @@ async def month_page(
     day: str = "",
     plan_copied: str = "",
     plan_skipped: str = "",
+    category: str = "",
 ) -> Response:
     """The month page. For browsers without JavaScript: ``?edit=<id>`` opens a row for
     editing, ``?deleted=<id>`` offers Undo, ``?entry=<direction>&day=<day>`` prefills that
     table's entry row with the day just used. ``?saved_in=YYYY-MM`` links an entry saved to
-    another month. ``?plan_copied=N&plan_skipped=M`` reports a plan copy. Opening the page may copy
-    the previous month's plan (workspace setting, ``services.budget.auto_copy_on_open``)."""
+    another month. ``?plan_copied=N&plan_skipped=M`` reports a plan copy. ``?category=<id>``
+    shows that category's entries only (F2.4; an unknown id shows everything). Opening the
+    page may copy the previous month's plan (workspace setting,
+    ``services.budget.auto_copy_on_open``)."""
     target = _parse(month)
     states: dict[str, SectionState] = {}
     editing = _optional_uuid(edit)
@@ -262,6 +275,7 @@ async def month_page(
             saved_in=_optional_month(saved_in),
             copied=copied,
             automatic=automatic,
+            filter_id=parse_filter(category),
         )
     )
     return render_template(request, "months/page.html", context=context)

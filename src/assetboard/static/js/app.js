@@ -424,7 +424,11 @@ document.addEventListener("click", (event) => {
 // Esc in the entry row clears it (fields and messages); the row keeps the focus.
 function clearEntryRow(row) {
   row.querySelectorAll("[data-ledger-field]").forEach((field) => {
-    if (field instanceof HTMLSelectElement) field.selectedIndex = 0;
+    if (field instanceof HTMLSelectElement) {
+      // With a category filter (F2.4) the entry row keeps that category.
+      field.value = field.dataset.default ?? "";
+      if (field.selectedIndex < 0) field.selectedIndex = 0;
+    }
     else if (field instanceof HTMLInputElement) field.value = "";
     field.removeAttribute("aria-invalid");
     const hint = field.getAttribute("data-describedby");
@@ -592,4 +596,37 @@ document.addEventListener("htmx:beforeRequest", (event) => {
     },
     { once: true },
   );
+});
+
+// The category filter (F2.4). Every request about the transaction tables carries the filter
+// the page shows when it is sent (forms also have it as a hidden field, for use without this
+// script), so answers stay filtered: row, edit, cancel, create, update, delete and undo.
+document.addEventListener("htmx:configRequest", (event) => {
+  const path = event.detail?.path ?? "";
+  if (!/\/m\/[^/]+\/transactions(\/|$)/.test(path)) return; // not the suggestions
+  const chosen = document.getElementById("ledger")?.getAttribute("data-ledger-filter") ?? "";
+  if (chosen) event.detail.parameters.filter = chosen;
+});
+
+// The summary marks the category the tables show. A filter link swaps only the tables
+// (#ledger), so the mark moves here, after any swap; after a filter link or "Show all" the
+// change is announced on the ledger's status line and the focus goes to the table heading.
+document.addEventListener("htmx:afterSettle", (event) => {
+  const ledger = document.getElementById("ledger");
+  const chosen = ledger?.getAttribute("data-ledger-filter") ?? "";
+  document.querySelectorAll("[data-filter-link]").forEach((link) => {
+    if (chosen && link.getAttribute("data-filter-link") === chosen) {
+      link.setAttribute("aria-current", "true");
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  });
+  const trigger = event.detail?.requestConfig?.elt;
+  if (!(trigger instanceof Element) || !trigger.matches("[data-filter-link], [data-ledger-show-all]")) {
+    return;
+  }
+  const status = document.getElementById("ledger-status");
+  if (status) status.textContent = ledger?.getAttribute("data-ledger-announce") ?? "";
+  const heading = ledger?.querySelector("h2");
+  if (heading instanceof HTMLElement) heading.focus();
 });

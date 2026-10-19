@@ -16,7 +16,7 @@
 {% set row_id = "plan-" ~ r.category_id %}
 <tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}">
   <th scope="row" class="py-1.5 pr-2 text-left font-normal">
-    <span class="flex items-center gap-2">{{ swatch(r.color) }}<span data-plan-category>{{ r.name }}</span>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
+    {% set filter_href = scoped_url(request, 'month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}#ledger" hx-get="{{ filter_href }}" hx-select="#ledger" hx-target="#ledger" hx-swap="outerHTML" hx-push-url="true"{% if summary.filter_id == r.category_id %} aria-current="true"{% endif %} title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="rounded underline-offset-2 hover:underline aria-[current=true]:font-semibold aria-[current=true]:text-primary-ink aria-[current=true]:underline" data-plan-category data-filter-link="{{ r.category_id }}">{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
   </th>
   <td class="py-1.5 pr-2 text-right align-top">
     {% if r.editable %}

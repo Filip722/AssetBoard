@@ -1090,6 +1090,9 @@ msgstr "Zapisano wpis."
 msgid "Entry restored."
 msgstr "Przywrócono wpis."
 
+msgid "Entry saved. Its category is not shown while this filter is on."
+msgstr "Zapisano wpis. Jego kategoria jest ukryta przez filtr."
+
 msgid "Planned value saved."
 msgstr "Zapisano wartość planowaną."
 
@@ -1882,6 +1885,16 @@ msgstr ""
 "tożsamości albo otwierając dowolną stronę przez serwer proxy). Potem masz"
 " na to 10 minut."
 
+#, python-format
+msgid "Showing %(name)s only (%(num)d entry)."
+msgid_plural "Showing %(name)s only (%(num)d entries)."
+msgstr[0] "Pokazano tylko: %(name)s (%(num)d wpis)."
+msgstr[1] "Pokazano tylko: %(name)s (%(num)d wpisy)."
+msgstr[2] "Pokazano tylko: %(name)s (%(num)d wpisów)."
+
+msgid "Show all"
+msgstr "Pokaż wszystko"
+
 msgid "Day"
 msgstr "Dzień"
 
@@ -1905,6 +1918,9 @@ msgstr "Edytuj wpis z %(date)s, %(amount)s"
 msgid "Delete the entry of %(date)s, %(amount)s"
 msgstr "Usuń wpis z %(date)s, %(amount)s"
 
+msgid "No entries in this category this month."
+msgstr "Brak wpisów tej kategorii w tym miesiącu."
+
 msgid ""
 "Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). "
 "Tab moves to the next field, Enter saves, Esc clears the row or cancels "
@@ -1914,11 +1930,18 @@ msgstr ""
 "07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
 "czyści wiersz lub anuluje edycję."
 
+msgid "Showing all entries."
+msgstr "Pokazano wszystkie wpisy."
+
 msgid "(favourable)"
 msgstr "(korzystnie)"
 
 msgid "(unfavourable)"
 msgstr "(niekorzystnie)"
+
+#, python-format
+msgid "Show only the entries of %(name)s"
+msgstr "Pokaż tylko wpisy: %(name)s"
 
 #, python-format
 msgid "Planned for %(name)s"

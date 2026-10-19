@@ -386,6 +386,36 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   (`services.budget.get_plan` for the transfer group and the copy banner, then
   `services.summary.month_summary`); fold them into one read when the summary grows.
 
+**As built (F2.4 part B: filtering the transaction tables by category)**
+- Every category name in the summary links to `/m/YYYY-MM?category=<id>#ledger`. Without
+  JavaScript that is a plain page; with HTMX the full page is requested and only `#ledger` (the
+  transaction tables) is swapped (`hx-select`), and the address is pushed, so Back and
+  bookmarks work. The summary is not re-rendered: `app.js` moves its `aria-current` mark to the
+  filtered category after the swap (the server sets it on full pages).
+- While filtered, only that category's rows are listed, with a bar "Showing <name> only (N
+  entries) · Show all" in the table; the entry row preselects the category (and keeps it when
+  cleared: `data-default`) when it takes new entries. Entry, edit and delete forms carry a
+  hidden `filter` field (the undo toast a `?filter=` query), so answers and redirects stay
+  filtered; an entry saved under another category is saved and the table says "Entry saved.
+  Its category is not shown while this filter is on." (`?notice=outside_filter` without
+  JavaScript). An unknown, malformed or other workspace's id is no filter (everything shows).
+  Viewers and closed months can filter (read-only).
+- **Review fixes (2026-10-19):** the filter is validated once per write (a category of this
+  workspace) and only the validated id is used in answers and redirects (so a forged value is
+  never echoed into a Location); a filter of the other kind than the written table is no
+  filter. With JavaScript, `app.js` adds the filter the page shows to every request about the
+  tables (`htmx:configRequest`: row, edit, cancel, create, update, delete, undo), and the
+  row/edit routes render filtered (a row outside the filter is shown unfiltered, not an
+  error). Without JavaScript, the Cancel link and the page's Undo form keep it too. After a
+  filter link or "Show all" the change is announced on `#ledger-status` and the focus goes to
+  the table's heading. `base.html` sets `historyCacheSize: 0` and `refreshOnHistoryMiss`:
+  `hx-push-url` would otherwise keep pages (amounts, CSRF tokens) in localStorage, and Back
+  would show stale totals; Back now reloads the page.
+- **Assumptions open to the owner's veto (2026-10-19):** **Q3** while filtered the other
+  kind's table is hidden (not shown empty); **Q4** transfer (and archived) categories can be
+  filtered too: their names in the summary (including the plan-only "Transfers (not counted)"
+  group) link to the filter like any other.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

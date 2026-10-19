@@ -1047,6 +1047,9 @@ msgstr ""
 msgid "Entry restored."
 msgstr ""
 
+msgid "Entry saved. Its category is not shown while this filter is on."
+msgstr ""
+
 msgid "Planned value saved."
 msgstr ""
 
@@ -1771,6 +1774,15 @@ msgid ""
 "minutes."
 msgstr ""
 
+#, python-format
+msgid "Showing %(name)s only (%(num)d entry)."
+msgid_plural "Showing %(name)s only (%(num)d entries)."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Show all"
+msgstr ""
+
 msgid "Day"
 msgstr ""
 
@@ -1794,16 +1806,26 @@ msgstr ""
 msgid "Delete the entry of %(date)s, %(amount)s"
 msgstr ""
 
+msgid "No entries in this category this month."
+msgstr ""
+
 msgid ""
 "Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). "
 "Tab moves to the next field, Enter saves, Esc clears the row or cancels "
 "an edit."
 msgstr ""
 
+msgid "Showing all entries."
+msgstr ""
+
 msgid "(favourable)"
 msgstr ""
 
 msgid "(unfavourable)"
+msgstr ""
+
+#, python-format
+msgid "Show only the entries of %(name)s"
 msgstr ""
 
 #, python-format

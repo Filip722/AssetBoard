@@ -143,14 +143,30 @@ class SectionView:
 
 
 @dataclass(frozen=True, slots=True)
+class LedgerFilter:
+    """The transaction tables show one category only (F2.4: chosen in the month summary)."""
+
+    category_id: UUID
+    name: str
+    kind: str  # only this table is shown (owner may veto: Q3)
+    count: int  # the category's entries in the month
+
+
+@dataclass(frozen=True, slots=True)
 class LedgerView:
     month: YearMonth
     can_write: bool  # editor or owner, and the month is open
     sections: tuple[SectionView, ...]
     max_description: int = MAX_DESCRIPTION_LENGTH
+    filter: LedgerFilter | None = None
 
     def section(self, direction: str) -> SectionView:
         return next(s for s in self.sections if s.direction == direction)
+
+    @property
+    def filter_id(self) -> str:
+        """The filter as a form/query value ("" without one)."""
+        return str(self.filter.category_id) if self.filter is not None else ""
 
 
 def edit_values(row: TransactionView, month: YearMonth, locale: str) -> dict[str, str]:
@@ -170,22 +186,53 @@ def build_ledger(
     request: Request,
     view: MonthView,
     states: Mapping[str, SectionState] | None = None,
+    filter_id: UUID | None = None,
 ) -> LedgerView:
-    """Both tables of ``view.month`` with the requests' states (blocking: run in a thread)."""
+    """Both tables of ``view.month`` with the requests' states (blocking: run in a thread).
+
+    With ``filter_id`` (a category of this workspace, archived and transfer ones included) only
+    that category's table and rows are shown, and its entry row preselects the category when
+    it takes new entries. An unknown id is ignored.
+    """
     locale = request.state.locale
     transactions = list_month(factory, ctx, view.month)
     categories = list_categories(factory, ctx, usage_sources=())
     can_write = has_role(ctx, Role.EDITOR) and not view.closed
+    chosen = next(
+        (
+            c
+            for c in (*categories.expense, *categories.income, *categories.archived)
+            if c.id == filter_id
+        ),
+        None,
+    )
+    ledger_filter = None
+    if chosen is not None:
+        count = sum(
+            1 for t in (*transactions.expense, *transactions.income) if t.category_id == chosen.id
+        )
+        ledger_filter = LedgerFilter(chosen.id, chosen.name, chosen.kind, count)
     sections: list[SectionView] = []
     for direction in DIRECTIONS:
+        if ledger_filter is not None and ledger_filter.kind != direction:
+            continue
         state = (states or {}).get(direction, SectionState())
         stored = transactions.expense if direction == "expense" else transactions.income
+        if ledger_filter is not None:
+            stored = tuple(t for t in stored if t.category_id == ledger_filter.category_id)
         rows = tuple(
             RowView(t, format_day(t.date, locale), format_money(t.amount, locale)) for t in stored
         )
         active = categories.expense if direction == "expense" else categories.income
         options = tuple((str(c.id), c.name) for c in active)
         edit_options = options
+        if (
+            ledger_filter is not None
+            and "category_id" not in state.entry_values
+            and any(c.id == ledger_filter.category_id for c in active)
+        ):
+            preselect = {"category_id": str(ledger_filter.category_id)}
+            state = replace(state, entry_values={**state.entry_values, **preselect})
         ids = {r.t.id for r in rows}
         if not can_write:  # read-only: no entry row, no edit row, nothing to focus
             state = SectionState(
@@ -211,4 +258,14 @@ def build_ledger(
                 state=state,
             )
         )
-    return LedgerView(month=view.month, can_write=can_write, sections=tuple(sections))
+    return LedgerView(
+        month=view.month, can_write=can_write, sections=tuple(sections), filter=ledger_filter
+    )
+
+
+def parse_filter(value: str) -> UUID | None:
+    """A ``?category=`` / ``filter`` value; anything malformed means no filter."""
+    try:
+        return UUID(value) if value else None
+    except ValueError:
+        return None

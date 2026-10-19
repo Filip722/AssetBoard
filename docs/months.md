@@ -39,6 +39,12 @@ The **Summary** block at the top of the month page shows how the month is going:
 
 The summary updates as soon as you add, change or delete an entry or a planned value.
 
+Click a category's name in the summary to see only its entries: the other table is hidden, a
+bar says which category is shown, and new entries start with that category. **Show all** (or
+your browser's Back button) shows everything again. The address includes the category, so
+the filtered month can be bookmarked. Choosing a filter (or Show all) reloads the tables, so
+anything typed but not yet saved in an entry row is dropped.
+
 ## Planning a month
 
 Type the amount you plan for a category in its **Planned** field in the summary:

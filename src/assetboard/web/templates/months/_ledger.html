@@ -13,6 +13,22 @@
 {% set delete_class = "rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft" %}
 {% set listbox_class = "absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto rounded-lg border border-line bg-surface py-1 text-sm text-ink shadow-card" %}
 
+{# The category filter (F2.4) travels with every write, so the answer stays filtered. #}
+{# The filter bar sits in the (only) table shown, so a write's section swap keeps its count. #}
+{% macro filter_bar() -%}
+  {% if ledger.filter %}
+  {% set all_href = scoped_url(request, 'month', month=ledger.month|string) %}
+  <p class="flex flex-wrap items-center gap-3 mt-2 rounded-xl border border-line bg-subtle px-4 py-3 text-sm" data-ledger-filter-bar>
+    <span>{{ ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) }}</span>
+    <a href="{{ all_href }}#ledger" hx-get="{{ all_href }}" hx-select="#ledger" hx-target="#ledger" hx-swap="outerHTML" hx-push-url="true" class="font-medium text-primary-ink underline" data-ledger-show-all>{{ _("Show all") }}</a>
+  </p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro filter_input() -%}
+{% if ledger.filter %}<input type="hidden" name="filter" value="{{ ledger.filter_id }}">{% endif %}
+{%- endmacro %}
+
 {% macro autofocus(state, name) -%}
 {% if state.focus == name %} data-autofocus{% endif %}
 {%- endmacro %}
@@ -52,7 +68,7 @@
 </td>
 <td class="py-2 pr-2 align-top">
   <label for="{{ prefix }}-category" class="sr-only">{{ _("Category") }}</label>
-  <select id="{{ prefix }}-category" name="category_id" form="{{ form_id }}"{{ described(prefix, "category", errors) }}{{ autofocus(s.state, kind ~ ":category") }} data-ledger-field class="form-select w-full rounded-lg py-1.5 pl-2.5">
+  <select id="{{ prefix }}-category" name="category_id" form="{{ form_id }}"{{ described(prefix, "category", errors) }}{{ autofocus(s.state, kind ~ ":category") }}{% if kind == "entry" and ledger.filter %} data-default="{{ ledger.filter_id }}"{% endif %} data-ledger-field class="form-select w-full rounded-lg py-1.5 pl-2.5">
     <option value="">{{ _("Choose a category") }}</option>
     {% for value, name in options %}<option value="{{ value }}"{% if value == values.get('category_id') %} selected{% endif %}>{{ name }}</option>{% endfor %}
   </select>
@@ -70,6 +86,7 @@
     <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate data-entry-form>
       {{ csrf_input() }}
       <input type="hidden" name="direction" value="{{ s.direction }}">
+      {{ filter_input() }}
       <button type="submit" data-entry-add class="{{ primary_class }}">{{ _("Add") }}</button>
     </form>
   </td>
@@ -90,9 +107,10 @@
   <td class="whitespace-nowrap py-2 align-top text-right">
     <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate class="inline">
       {{ csrf_input() }}
+      {{ filter_input() }}
       <button type="submit" data-edit-save class="{{ primary_class }}">{{ _("Save") }}</button>
     </form>
-    <a href="{{ scoped_url(request, 'month', month=ledger.month|string) }}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_row', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML" data-edit-cancel class="{{ small_class }}">{{ _("Cancel") }}</a>
+    <a href="{{ scoped_url(request, 'month', month=ledger.month|string) }}{% if ledger.filter %}?category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_row', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML" data-edit-cancel class="{{ small_class }}">{{ _("Cancel") }}</a>
   </td>
 </tr>
 {%- endmacro %}
@@ -109,10 +127,11 @@
   <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ muted_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
   {% if ledger.can_write %}
   <td class="whitespace-nowrap py-1 text-right">
-    <a href="{{ scoped_url(request, 'month', month=ledger.month|string) }}?edit={{ row_id }}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_edit', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML"{{ autofocus(s.state, "row:" ~ row_id) }} data-edit aria-label="{{ _('Edit the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ small_class }}">{{ _("Edit") }}</a>
+    <a href="{{ scoped_url(request, 'month', month=ledger.month|string) }}?edit={{ row_id }}{% if ledger.filter %}&amp;category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_edit', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML"{{ autofocus(s.state, "row:" ~ row_id) }} data-edit aria-label="{{ _('Edit the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ small_class }}">{{ _("Edit") }}</a>
     {% set delete_action = scoped_url(request, 'transaction_delete', month=ledger.month|string, transaction_id=row_id) %}
     <form method="post" action="{{ delete_action }}" hx-post="{{ delete_action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" class="inline">
       {{ csrf_input() }}
+      {{ filter_input() }}
       <button type="submit" data-delete aria-label="{{ _('Delete the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ delete_class }}">{{ _("Delete") }}</button>
     </form>
   </td>
@@ -125,7 +144,8 @@
 <section id="ledger-{{ s.direction }}" class="panel p-4 sm:p-6" aria-labelledby="ledger-{{ s.direction }}-heading" data-ledger="{{ s.direction }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
   {# Without an entry row (no category of this kind) the focus falls back to the heading. #}
   {% set heading_focus = ledger.can_write and not s.categories and (s.state.focus or "").startswith("entry:") %}
-  <h2 id="ledger-{{ s.direction }}-heading" class="text-base font-semibold"{% if heading_focus %} tabindex="-1" data-autofocus{% endif %}>{{ s.heading }}</h2>
+  <h2 id="ledger-{{ s.direction }}-heading" class="text-base font-semibold" tabindex="-1"{% if heading_focus %} data-autofocus{% endif %}>{{ s.heading }}</h2>
+  {{ filter_bar() }}
   {% if s.state.notice %}
   <p class="mt-2 text-sm" data-ledger-notice>{% if s.state.notice_href %}<a href="{{ s.state.notice_href }}" class="font-medium text-primary-ink underline">{{ s.state.notice }}</a>{% else %}{{ s.state.notice }}{% endif %}</p>
   {% endif %}
@@ -144,7 +164,7 @@
       </thead>
       <tbody class="divide-y divide-line">
         {% for r in s.rows %}{{ row(s, r) }}{% endfor %}
-        {% if not s.rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{{ s.empty }}</td></tr>{% endif %}
+        {% if not s.rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
         {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
       </tbody>
     </table>
@@ -153,4 +173,19 @@
   <p id="ledger-{{ s.direction }}-hint" class="mt-2 text-xs {{ muted_class }}">{{ _("Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). Tab moves to the next field, Enter saves, Esc clears the row or cancels an edit.") }}</p>
   {% endif %}
 </section>
+{%- endmacro %}
+
+
+{# The transaction tables (#ledger): with a category filter (F2.4) only that category's table
+   and rows, with a bar in it saying so and a way back. The month page's links in the summary swap
+   this element (hx-select), and push the filtered address. #}
+{% macro tables() -%}
+{% if ledger.filter %}
+{% set announce = ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) %}
+{% else %}
+{% set announce = _("Showing all entries.") %}
+{% endif %}
+<div id="ledger" class="space-y-6" data-ledger-filter="{{ ledger.filter_id }}" data-ledger-announce="{{ announce }}">
+  {% for s in ledger.sections %}{{ section(s) }}{% endfor %}
+</div>
 {%- endmacro %}

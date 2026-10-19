@@ -143,6 +143,7 @@ class SummaryView:
     bars: tuple[BarView, ...] = ()
     sort: str = "actual"
     zero_input: str = "0"  # the placeholder of an empty planned cell ("0.00", "0,00")
+    filter_id: str = ""  # the category the transaction tables are filtered to (aria-current)
 
     def row(self, category_id: UUID) -> PlanRowView | None:
         wanted = str(category_id)
@@ -195,6 +196,7 @@ def build_summary(
     automatic: bool = False,
     focus_first: bool = False,
     sort: SortOrder | None = None,
+    filter_id: UUID | None = None,
 ) -> SummaryView:
     """The ``#month-summary`` block of ``view.month`` (blocking: run in a thread).
 
@@ -298,6 +300,7 @@ def build_summary(
         bars=bars,
         sort=sort,
         zero_input=format_amount_input(Money(0, summary.currency), locale),
+        filter_id=str(filter_id) if filter_id is not None else "",
     )
 
 

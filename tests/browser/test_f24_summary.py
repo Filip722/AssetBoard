@@ -1,12 +1,14 @@
 """The month summary in Chromium (F2.4): actual, difference and KPIs refresh without a reload
-after a planned value or an entry is saved, the sort toggle reorders the rows and is kept, and
-there are no CSP violations. The test's categories are created directly ("Golden ..."); the
-suggested set that setup gives every new workspace stays in the summary with nothing in it."""
+after a planned value or an entry is saved, the sort toggle reorders the rows and is kept,
+clicking a category filters the transaction tables (part B), and there are no CSP violations.
+The test's categories are created directly ("Golden ..."); the suggested set that setup gives
+every new workspace stays in the summary with nothing in it."""
 
 from __future__ import annotations
 
 import asyncio
 import os
+import re
 import socket
 import threading
 import time
@@ -173,6 +175,50 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             )
             assert page.evaluate("document.activeElement.id") == "summary-sort-actual"
             assert _order(page) == ["Golden Travel", "Golden Food"]
+
+            # Clicking a category shows only its entries (and only its table); its entry row
+            # preselects it; the address is pushed, so Back shows everything again.
+            page.locator("#month-summary [data-filter-link]", has_text="Golden Food").click()
+            expect(page.locator("[data-ledger-filter-bar]")).to_contain_text(
+                "Showing Golden Food only (1 entry)."
+            )
+            expect(page.locator("#ledger-status")).to_have_text(
+                "Showing Golden Food only (1 entry)."
+            )
+            expect(page.locator("#ledger-expense-heading")).to_be_focused()
+            assert re.search(r"/m/2025-03\?category=[0-9a-f-]+$", page.url)
+            expect(page.locator("#ledger-income")).to_have_count(0)
+            expect(page.locator("#ledger-expense [data-description]")).to_have_count(1)
+            expect(
+                page.locator("#month-summary [data-filter-link]", has_text="Golden Food")
+            ).to_have_attribute("aria-current", "true")
+            expect(page.locator("#entry-expense-category option:checked")).to_have_text(
+                "Golden Food"
+            )
+            page.locator("#entry-expense-day").fill("5")
+            page.locator("#entry-expense-amount").fill("7")
+            page.locator("#entry-expense-amount").press("Enter")
+            expect(page.locator("[data-ledger-filter-bar]")).to_contain_text("(2 entries)")
+            expect(page.locator("#ledger-expense tr[data-transaction]")).to_have_count(2)
+            expect(page.locator("#entry-expense-category option:checked")).to_have_text(
+                "Golden Food"
+            )
+            page.go_back()
+            expect(page.locator("#ledger-income")).to_be_visible()
+            expect(page.locator("[data-ledger-filter-bar]")).to_have_count(0)
+            # Back loads the page afresh (no history cache): the entry added while filtered
+            # is listed, the totals are current, and nothing was kept in localStorage.
+            expect(food_row.locator("[data-actual]")).to_have_text("€57.00")
+            expect(kpis.nth(1)).to_have_text("€457.00")
+            assert page.evaluate("localStorage.getItem('htmx-history-cache')") is None
+            page.locator("#month-summary [data-filter-link]", has_text="Golden Salary").click()
+            expect(page.locator("#ledger-expense")).to_have_count(0)
+            expect(page.locator("#ledger-income-heading")).to_be_focused()
+            page.locator("[data-ledger-show-all]").click()
+            expect(page.locator("#ledger-expense")).to_be_visible()
+            expect(page.locator("#ledger-expense-heading")).to_be_focused()
+            expect(page.locator("#ledger-status")).to_have_text("Showing all entries.")
+            expect(page.locator("#month-summary [aria-current='true']")).to_have_count(0)
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [e for e in console_errors if "Content Security Policy" in e]
