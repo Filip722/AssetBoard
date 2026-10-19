@@ -123,20 +123,26 @@ heat-map grid UI.
 
 ---
 
-## F8.6 Importer extension: FIRE sheet
+## F8.6 Archive extension: FIRE scenarios
+
+Replaces the former workbook "importer extension" (M4 no longer has a spreadsheet importer; owner
+decision, 2026-10-18). A scenario from a spreadsheet is entered with the F8.1 form.
 
 **Acceptance**
-- Reads the inputs block (inflation, return above inflation, income growth, expected FIRE age) and starting values (income, expenses) from cached cells; **detects the birth year inside formulas** (e.g., a constant subtracted from the year column) by reading formula text; reads the explicit yearly net-savings values that precede the formula-driven rows and offers them as `FireContribution`s.
-- Creates one scenario "Imported from workbook" via a prefilled F8.1 form for confirmation (nothing is created without the user pressing confirm).
-- Parity check: after creation, run `project()` and compare FIRE age and net worth by year with the workbook's cached values; report differences.
-- Extend `scripts/make_sample_workbook.py` with a synthetic FIRE sheet containing these quirks.
+- New archive files (a minor format version per ADR-0016) with lineage `id` columns as in M4:
+  `fire_scenarios.csv`, `fire_contributions.csv`, `fire_events.csv`; links to other modules'
+  data by lineage id.
+- Restore only (no standalone import); a scenario whose linked data is missing is restored with
+  manual values and listed.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them, and `project()`
+  gives the same result for a restored scenario.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F8.6 from docs/specs/M8-fire-planner.md as an extension of the M4 importer: parse the FIRE inputs and starting values, detect birth year from
-formula text (two-pass read: formulas and cached values), propose contributions, prefilled scenario form, parity check against cached values.
-Tests on the extended synthetic workbook.
+Implement F8.6 from docs/specs/M8-fire-planner.md as an extension of the M4 archive (docs/specs/M4-ledger-export-import.md,
+ADR-0016): the new files with lineage ids, export, restore, emptiness checks, extended round-trip test with identical
+projections after restore.
 ```
 
 ---

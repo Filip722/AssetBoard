@@ -93,14 +93,27 @@ Only a fake resolver exists now; real ones are added in M6 and M7. Tests for lin
 
 ---
 
-## F5.5 Importer extension: assets and liabilities
+## F5.5 Archive extension: net worth
 
-**Acceptance:** importer reads the assets/liabilities sheet (observed layout: assets in columns B–D = description, value, category; liabilities in F–H). The parser reads the sheet twice: once for cached values (`data_only=True`) and once to read the formula *text* (never evaluated) so it can detect references. Rows whose value cell is a **formula referencing another sheet** (e.g., investments or loan balance) are not imported as manual items; they are listed as "linked in the workbook — configure link later". Manual rows become items with an initial valuation dated today (user may choose the date). Category mapping reuses the F4.3 UI. Dry-run, rollback and idempotency follow F4.1.
+Replaces the former workbook "importer extension" (M4 no longer has a spreadsheet importer; owner
+decision, 2026-10-18).
+
+**Acceptance**
+- New archive files (a minor format version per ADR-0016) with lineage `id` columns and
+  references by id plus name as in M4: `networth_categories.csv`, `networth_items.csv`
+  (including `valuation_mode`, `link_type` and the link target's lineage id), `item_valuations.csv`,
+  `networth_snapshots.csv` (breakdown as one row per category, or a JSON column; decide in the plan).
+- Restore recreates them in dependency order; a linked item whose target is not in the archive
+  (its module's files missing) is restored as manual and listed.
+- Standalone import in merge mode: `item_valuations.csv` (by item name; same date and value =
+  duplicate, different value = conflict, listed), so a valuation history kept elsewhere can be
+  brought in. Other files are restore only.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F5.5 from docs/specs/M5-net-worth.md as an extension of the M4 importer framework: parse the assets/liabilities sheet layout described,
-skip cross-sheet formula rows (report them as 'linked'), create items + initial valuations, reuse the category mapping UI.
-Extend scripts/make_sample_workbook.py with a synthetic assets/liabilities sheet (including cross-sheet formula cells). Tests on it.
+Implement F5.5 from docs/specs/M5-net-worth.md as an extension of the M4 archive (docs/specs/M4-ledger-export-import.md,
+ADR-0016): the new files with lineage ids, export, restore order incl. links, standalone item_valuations.csv import,
+emptiness checks and the extended round-trip test.
 ```

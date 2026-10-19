@@ -168,18 +168,28 @@ decrement-on-post behaviour, linked liability and overview table. Tests for coun
 
 ---
 
-## F7.8 Importer extension: loan parameters
+## F7.8 Archive extension: loans
+
+Replaces the former workbook "importer extension" (M4 no longer has a spreadsheet importer; owner
+decision, 2026-10-18). Loans are entered with the F7.1 wizard; the archive backs them up.
 
 **Acceptance**
-- Reads the loan sheet's parameter block (observed: principal, term in months, suggested overpayment/target amount, margin, current rate or reference rate cell, per-month cost parameters, first schedule row's balance) and proposes a loan via the F7.1 wizard prefilled; the user confirms.
-- Schedule rows are **not** imported (recomputed by the engine).
-- Validation report: after creating the loan, compare engine payoff date, total interest and remaining principal at the workbook's schedule date against the workbook's cached values; differences beyond a tolerance (default 1 month / 1%) are flagged with likely causes (rate, day-count, cost components).
-- Noted source quirks are reported, not silently fixed (e.g., a missing month in the date column).
+- New archive files (a minor format version per ADR-0016) with lineage `id` columns and
+  references by id plus name as in M4: `loans.csv`, `loan_rate_changes.csv`,
+  `reference_rates.csv`, `reference_rate_values.csv`, `loan_cost_components.csv`,
+  `loan_overpayments.csv`, `loan_payments.csv`, `loan_balance_checkpoints.csv`,
+  `loan_scenarios.csv`, `installment_plans.csv`. Schedules are not archived (recomputed by the
+  engine).
+- Restore recreates them in dependency order; standalone import in merge mode only for
+  `reference_rate_values.csv` (by reference rate name; same date = duplicate or conflict). Other
+  files are restore only.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them, and a restored
+  loan produces the same `build_schedule()` result as the original.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F7.8 from docs/specs/M7-loans-and-mortgage.md as an extension of the M4 importer: parse the loan parameter block and schedule cached values,
-prefill the F7.1 wizard, run the validation comparison against build_schedule(), report date gaps in the source schedule.
-Extend scripts/make_sample_workbook.py with a synthetic loan sheet (including one skipped month). Tests on it.
+Implement F7.8 from docs/specs/M7-loans-and-mortgage.md as an extension of the M4 archive (docs/specs/M4-ledger-export-import.md,
+ADR-0016): the new files with lineage ids, export, restore order, standalone reference_rate_values.csv import,
+emptiness checks, extended round-trip test incl. identical schedules after restore.
 ```

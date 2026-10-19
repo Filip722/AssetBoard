@@ -173,22 +173,31 @@ the create-linked-items helper, double-counting warning. Tests: resolver values 
 
 ---
 
-## F6.9 Importer extension: investments
+## F6.9 Archive extension: investments
+
+Replaces the former workbook "importer extension" (M4 no longer has a spreadsheet importer; owner
+decision, 2026-10-18).
 
 **Acceptance**
-- Reads the purchases table (observed columns: date, description, quantity, unit cost, commission, total cost, category), the instruments table (name, category, quantity formulas), and manual price cells.
-- Dates in `dd.mm.yy` (and `dd.mm.yyyy`) are parsed; **missing dates** produce "undated lots" flagged for the user to fix.
-- Duplicate descriptions that differ only by suffixes like "part stocks"/"part bonds" for the same fund (observed: an 80/20 fund tracked as two rows with ×0.8/×0.2) are proposed as **one instrument with an 80/20 allocation**; the user confirms or overrides. Unit cost and commission are scaled back appropriately; the proposal is shown in the dry-run.
-- Categories → asset classes via the mapping UI; instruments are created with type guesses (crypto/metal/currency/bond/real estate) the user can change.
-- Prices that were formulas (live feeds) are not imported; the cached value, if present, becomes a single manual price point dated today (opt-in).
-- Reconciliation: imported total cost per class compared with the workbook's cached per-class totals.
+- New archive files (a minor format version per ADR-0016) with lineage `id` columns and
+  references by id plus name as in M4: `asset_classes.csv`, `instruments.csv`,
+  `instrument_allocations.csv`, `investment_transactions.csv`, `price_points.csv` (manual and
+  transaction prices; provider prices optional, decide in the plan), `bond_terms.csv`,
+  `price_source_configs.csv` without secrets (provider keys follow F9.3).
+- Quantities and prices are plain decimals written from `Decimal` without loss (never through
+  `float`); FX rates likewise.
+- Standalone import in merge mode: `investment_transactions.csv` (the "bring my purchase
+  history" path: instrument by name, with the mapping step for unknown instruments like F4.3's
+  categories, create with a type the user picks; an empty `date` makes an "undated lot" flagged
+  for the user to fix). Other files are restore only.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F6.9 from docs/specs/M6-investments.md as an extension of the M4 importer: parse purchase history and instruments, dd.mm.yy dates,
-undated-lot flagging, detection of split-fund rows -> single instrument with allocation proposal, class mapping, optional cached price import,
-cost reconciliation. Extend scripts/make_sample_workbook.py with a synthetic investments sheet containing these quirks. Tests on it.
+Implement F6.9 from docs/specs/M6-investments.md as an extension of the M4 archive (docs/specs/M4-ledger-export-import.md,
+ADR-0016): the new files with lineage ids and lossless decimals, export, restore order, standalone
+investment_transactions.csv import with instrument mapping and undated lots, emptiness checks, extended round-trip test.
 ```
 
 ---

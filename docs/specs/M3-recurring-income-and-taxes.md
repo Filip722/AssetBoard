@@ -202,3 +202,34 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F3.7 (stretch) from docs/specs/M3-recurring-income-and-taxes.md: WorkDay model + migration, calendar UI (HTMX),
 derivation of the month WorkLog from day entries, fill-working-days shortcut. Make sure F3.4 recalculation is triggered on every change.
 ```
+
+---
+
+## F3.8 Archive extension: recurring items, income sources, taxes and work logs
+
+**Story:** My workspace archive (M4) also backs up and restores my recurring items, income
+sources, tax rules and work logs.
+
+**Acceptance**
+- New archive files (a minor format version per ADR-0016), with lineage `id` columns and
+  references by id plus name as in M4: `scheduled_items.csv`, `scheduled_occurrences.csv`,
+  `income_sources.csv`, `tax_rules.csv`, `tax_rule_versions.csv`, `income_source_tax_rules.csv`,
+  `work_logs.csv` (and `work_days.csv` if F3.7 exists). `transactions.csv` gains optional
+  `source` and `scheduled_occurrence_id` columns so posted occurrences stay linked after a
+  restore.
+- Restore recreates them after categories and before transactions (occurrences after
+  transactions when they reference them); merge mode imports `work_logs.csv` alone (by income
+  source name, never overwriting an existing month: conflict, listed); the other files are
+  restore only.
+- Notification channels are **not** archived (their Apprise URLs are secrets; F9.3 decides
+  about secrets); they are listed in `ARCHIVE_EXCLUDED_MODELS` with that reason, notification
+  logs too.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F3.8 from docs/specs/M3-recurring-income-and-taxes.md as an extension of the M4 archive
+(docs/specs/M4-ledger-export-import.md, ADR-0016): the new files with lineage ids, export, restore order, standalone
+work_logs.csv import in merge mode, exclusions with reasons, emptiness checks, and the extended round-trip test.
+```

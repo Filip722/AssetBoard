@@ -78,7 +78,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M1 | User, ExternalIdentity, UserSession, Workspace, Membership, Invitation, AuditEvent |
 | M2 | Category, Transaction, BudgetLine, MonthState |
 | M3 | ScheduledItem, ScheduledOccurrence, IncomeSource, WorkLog, (WorkDay), TaxRule, TaxRuleVersion, IncomeSourceTaxRule, NotificationChannel, NotificationLog |
-| M4 | ImportBatch (+ `import_batch_id` on Transaction) |
+| M4 | ImportBatch, ImportCategoryMapping (+ `import_batch_id`, `import_key` on Transaction and Category; `import_batch_id` on BudgetLine) |
 | M5 | NetWorthCategory, NetWorthItem, ItemValuation, NetWorthSnapshot |
 | M6 | AssetClass, Instrument, InstrumentAllocation, InvestmentTransaction, PricePoint, FxRate, PriceSourceConfig, BondTerms |
 | M7 | Loan, LoanRateChange, ReferenceRate, ReferenceRateValue, LoanCostComponent, LoanOverpayment, LoanPayment, LoanBalanceCheckpoint, LoanScenario, InstallmentPlan |
@@ -86,7 +86,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M9 | ApiToken, BackupRun, DashboardPreference |
 
 Key fields for the shared entities:
-- **Transaction**: id, workspace_id, direction (income|expense), date, amount (Money), category_id, description, source (manual|recurring|recurring_auto|import), scheduled_occurrence_id?, import_batch_id?, account_id? (reserved), created_by, timestamps, deleted_at.
+- **Transaction**: id, workspace_id, direction (income|expense), date, amount (Money), category_id, description, source (manual|recurring|recurring_auto|import), scheduled_occurrence_id?, import_batch_id?, import_key?, account_id? (reserved), created_by, timestamps, deleted_at.
 - **BudgetLine**: workspace_id, month (first day), category_id, planned (Money); unique (workspace, month, category).
 - **Category**: workspace_id, name, kind, treatment, color, sort_order, archived_at.
 
@@ -98,14 +98,14 @@ Key fields for the shared entities:
 | M1 | Identity: local auth, workspaces, OIDC SSO | M0 | v0.1 |
 | M2 | Ledger core: categories, transactions, month view, planned vs actual | M1 | v0.2 |
 | M3 | Recurring items, variable income, taxes, reminders | M2 | v0.3 |
-| M4 | Excel importer (dogfooding point: you can leave the spreadsheet for monthly tracking) | M2 (M3 for work logs) | v0.4 |
+| M4 | Ledger export and import: a documented archive for full workspace backup and restore, and CSV import of your own history (dogfooding point: you can leave the spreadsheet for monthly tracking) | M2 | v0.4 |
 | M5 | Net worth: assets, debts, snapshots | M1 | v0.5 |
 | M6 | Investments | M5 | v0.6 |
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
 | M8 | FIRE planner | M2, M6, M7 | v0.8 |
 | M9 | Dashboard, reports, export/backup, API, hardening | all | v1.0 |
 
-Each of M5–M8 ends with a feature "importer extension" that adds that sheet to the Excel importer.
+M3 and M5–M8 each end with an "archive extension" feature that adds the module's data to the workspace archive of M4 (export, restore, and standalone CSV import where it makes sense), following [ADR-0016](../adr/0016-workspace-archive-format.md).
 
 ## 6. Non-goals (v1)
 Bank sync/aggregation; receipt OCR; tax filing; advice of any kind; native mobile apps (a responsive PWA is enough); built-in country tax tables (tax rules are user-defined; labelled example templates may come later).

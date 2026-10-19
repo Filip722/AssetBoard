@@ -406,6 +406,12 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 **Acceptance**
 - `/transactions` list across all months: filters (date range, direction, categories, text in description, amount range), sorting, pagination (50/page).
 - Export the filtered result as CSV (UTF-8 with BOM option for Excel, delimiter and decimal-separator options); amounts as plain decimals.
+- **Columns aligned with M4 (owner, 2026-10-18):** the export writes the columns of M4's
+  `transactions.csv` in the same order, without `deleted_at` (`date,direction,amount,currency,
+  category,description,category_id,id`; dates `YYYY-MM-DD`, enum tokens in English), so an
+  export re-imports through M4 (with the default options it is a valid `transactions.csv`; with
+  the semicolon and decimal-comma options it imports with the matching upload options). See
+  [M4-ledger-export-import.md](M4-ledger-export-import.md#transactionscsv) and ADR-0016.
 - Editors can bulk-recategorize the filtered/selected rows (with confirmation and audit event).
 - **Closed-month guard (from F2.5).** Bulk recategorize takes
   `services.months.lock_month_writes` before reading the selected rows, then refuses the **whole
@@ -417,6 +423,6 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F2.6 from docs/specs/M2-ledger-core.md: cross-month transaction list with filters/sort/pagination, CSV export
-(delimiter/decimal/BOM options), bulk recategorize with audit event. Use a query object in the repository, not ad-hoc SQL in routes.
+(delimiter/decimal/BOM options; columns of M4's transactions.csv), bulk recategorize with audit event. Use a query object in the repository, not ad-hoc SQL in routes.
 Add an index review note to the PR (EXPLAIN for the main filters).
 ```

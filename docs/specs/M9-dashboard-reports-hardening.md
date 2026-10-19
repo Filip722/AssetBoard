@@ -2,7 +2,7 @@
 
 **Goal:** make the app pleasant to live in and safe to expose in a homelab: an at-a-glance dashboard, reports, full export and backups, a read/write API with tokens, security hardening, documentation and a polished release.
 
-**Exit criteria:** a new user can install from the compose file, import a workbook (or start fresh), and use every module; backups and restores are tested; a security checklist is completed; docs cover install, reverse proxies, SSO, backup/restore and upgrade; `v1.0.0` is tagged and the multi-arch image is published.
+**Exit criteria:** a new user can install from the compose file, import their history in the documented archive format of M4 (or start fresh), and use every module; backups and restores are tested; a security checklist is completed; docs cover install, reverse proxies, SSO, backup/restore and upgrade; `v1.0.0` is tagged and the multi-arch image is published.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -13,7 +13,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 ## F9.1 Dashboard
 
 **Acceptance**
-- Cards (each links to its module and can be hidden/reordered per user): **This month** (planned vs actual, savings rate, forecast); **Upcoming 30 days** (with overdue highlighted and one-click confirm); **Net worth** (value + 12-month trend); **Portfolio** (value, gain %, allocation mini-donut); **Loans** (remaining principal, payoff date, % repaid); **FIRE** (progress, FIRE age of the default scenario); **Missing data** (stale prices, missing work logs, unreconciled imports).
+- Cards (each links to its module and can be hidden/reordered per user): **This month** (planned vs actual, savings rate, forecast); **Upcoming 30 days** (with overdue highlighted and one-click confirm); **Net worth** (value + 12-month trend); **Portfolio** (value, gain %, allocation mini-donut); **Loans** (remaining principal, payoff date, % repaid); **FIRE** (progress, FIRE age of the default scenario); **Missing data** (stale prices, missing work logs, imports planned but not applied).
 - Cards degrade gracefully when a module has no data ("Set up investments →").
 - Each card is its own HTMX fragment (lazy-loaded) so a slow card never blocks the page; every figure comes from existing services (no duplicated math).
 - Privacy mode toggle (hide amounts everywhere, persisted per user).
@@ -48,20 +48,31 @@ Property tests: grid totals equal transaction sums; treatment rules respected. I
 
 ---
 
-## F9.3 Full export and import (portability)
+## F9.3 Archive completeness, secrets and final round-trip
+
+The workspace archive format, export, import and restore are built in M4
+(docs/specs/M4-ledger-export-import.md, ADR-0016) and extended by M3 and M5–M8. This feature
+closes the gaps before 1.0.
 
 **Acceptance**
-- **Export everything** for a workspace as a single ZIP: one JSON/CSV per entity plus `manifest.json` (schema version, app version, counts, checksums). Secrets (notification URLs, provider keys, tokens) are excluded unless the owner ticks "include secrets" (then encrypted with a passphrase).
-- **Import** of such a ZIP into a new empty workspace (or a fresh instance), with schema-version migration hooks and a dry-run summary; IDs preserved; referential integrity validated.
-- Round-trip test: export → import into a fresh DB → re-export yields byte-identical data files (ignoring timestamps in the manifest).
-- Owner-only; audit event written.
+- The M4 archive coverage test passes with every workspace-owned model either archived or
+  excluded with a reason; the exclusion list is reviewed and documented in
+  docs/archive-format.md.
+- **Secrets** (notification URLs, price-provider keys, API tokens) stay out of the archive
+  unless the owner ticks "include secrets"; they are then written to a separate member encrypted
+  with a passphrase (algorithm and any new dependency justified in the PR, per AGENTS.md) and
+  restored only with that passphrase. A minor format version per ADR-0016.
+- Round-trip test over a fully populated synthetic workspace (the F9.7 demo builder, touching
+  every model): export → restore into an empty workspace → export gives byte-identical data
+  files (ignoring `exported_at` and the app version in the manifest).
+- Golden archives of every released format version restore on the current version.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F9.3 from docs/specs/M9-dashboard-reports-hardening.md: workspace export (ZIP of per-entity files + manifest with checksums, optional encrypted secrets),
-import into an empty workspace with dry-run and integrity validation, and the round-trip test over a fully populated synthetic workspace
-(use a data builder that touches every model; fail the test if a new model is not covered).
+Implement F9.3 from docs/specs/M9-dashboard-reports-hardening.md: review the archive coverage and exclusions, the optional
+passphrase-encrypted secrets member, the full round-trip test over the demo builder (fail if a new model is not covered),
+and the golden-archive regression tests for every released format version.
 ```
 
 ---
@@ -127,7 +138,7 @@ compose hardening options. List every gap you find rather than hiding it.
 ## F9.7 Documentation and demo data
 
 **Acceptance**
-- User docs: install (compose, env reference), first run, reverse proxies (Traefik, Caddy, nginx examples), OIDC setup, proxy-auth, notifications (Apprise examples), price providers, importing from a spreadsheet, backup/restore, upgrading, troubleshooting.
+- User docs: install (compose, env reference), first run, reverse proxies (Traefik, Caddy, nginx examples), OIDC setup, proxy-auth, notifications (Apprise examples), price providers, importing from a spreadsheet (links M4's docs/import-export.md and docs/archive-format.md), backup/restore, upgrading, troubleshooting.
 - `assetboard demo-seed` CLI creates a realistic synthetic workspace (12+ months of ledger data, recurring items incl. a yearly insurance, a variable income source with tax rules, assets and debts, a small portfolio with an 80/20 fund, a mortgage, a FIRE scenario); used for screenshots and by tests.
 - Screenshots (light/dark, desktop/mobile) generated by a Playwright script against the demo data; README updated.
 - Polish translation completeness check (percentage reported in CI; v1.0 requires ≥ 95% for user-facing strings).

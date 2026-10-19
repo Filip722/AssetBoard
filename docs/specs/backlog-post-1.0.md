@@ -64,3 +64,32 @@ docs/accounts.md). The confirm page does not warn about it.
   active owner, and says that nobody can manage those workspaces until it is activated again.
 - Deactivation stays allowed; the warning is information, not a block.
 - If ownership transfer (above) exists by then, the page links to it.
+
+---
+
+## Generic CSV import with column mapping
+
+Moved out of M4 (owner decision, 2026-10-18; was the stretch feature F4.6). M4 imports only the
+documented archive format and its CSV files (docs/specs/M4-ledger-export-import.md), so files
+from banks or other apps must be converted first. This feature reads arbitrary CSV files
+directly, on top of M4's import framework (upload limits, dry-run, `ImportBatch`, rollback,
+dedupe, category mapping).
+
+**Acceptance**
+- Upload any CSV; encoding, delimiter and decimal separator are detected, with manual
+  overrides; preview of the first 20 rows.
+- Column mapping: date (with a date-format choice), amount, description, optional category, and
+  either a direction column or a bank convention: **signed amounts** (negative = expense,
+  positive = income) or separate **debit/credit columns**; no direction column needed.
+- Saved mapping profiles (user-named, for example per bank), reused on the next upload.
+- Dedupe as in M4 (content key with an occurrence number); category suggestions from previous
+  descriptions.
+- Synthetic sample files only in tests (no real bank exports).
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement "Generic CSV import with column mapping" from docs/specs/backlog-post-1.0.md on top of the M4 import
+framework: detection with overrides, preview, column mapping incl. signed amounts and debit/credit columns, saved
+mapping profiles, dedupe and category suggestions. Synthetic sample CSVs for tests only.
+```
