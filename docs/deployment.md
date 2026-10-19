@@ -203,6 +203,13 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: self-service workspaces (pre-release A)
+
+- Migration `0013_instance_settings` adds the `instance_settings` table with one row. Any
+  signed-in account can now create a workspace from the "No workspace" page or "New workspace"
+  next to the workspace name. Instance administrators turn this off under **Instance settings**
+  (account menu); it is on by default, also for existing instances. No environment variable.
+
 ### Unreleased: new workspaces start with the suggested categories (pre-release A)
 
 - Every workspace created from now on (first-run setup, registration, `assetboard create-admin`,

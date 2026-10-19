@@ -1,4 +1,8 @@
-"""Workspace settings and members (F1.2 part B1). Every function is for owners only.
+"""Workspace settings and members (F1.2 part B1), and creating a workspace (pre-release A).
+
+Settings, members and invitations are for owners only. ``create_own_workspace`` is for any
+signed-in account while ``instance_settings.allow_workspace_creation`` is on (instance
+administrators always): it needs no Context, since the user may have no workspace yet.
 
 A ``Context`` is built at the start of a request and can be stale by the time a write runs (the
 actor may have been demoted or removed meanwhile). So every write runs in one
@@ -23,17 +27,28 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
+from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
     InvitationRepository,
     MembershipRepository,
     WorkspaceMember,
+    create_owned_workspace,
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
+from assetboard.services import categories
 from assetboard.services.budget import workspace_has_budget_lines
-from assetboard.services.context import Context, PermissionDenied, Role, require_role
+from assetboard.services.context import (
+    Context,
+    PermissionDenied,
+    Role,
+    require_role,
+    select_workspace,
+)
+from assetboard.services.instance_settings import read_settings
 from assetboard.services.invitations import new_token
 from assetboard.services.transactions import workspace_has_transactions
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
@@ -71,6 +86,12 @@ class InvalidWorkspaceSettings(WorkspaceError):
         super().__init__(code)
         self.field = field
         self.code = code
+
+
+class WorkspaceCreationDisabled(WorkspaceError):
+    """Self-service workspace creation is off for this account (or the account is inactive)."""
+
+    code = "creation_disabled"
 
 
 class InvalidInvitation(WorkspaceError):
@@ -390,3 +411,90 @@ def revoke_invitation(factory: sessionmaker[Session], ctx: Context, *, invitatio
         )
 
     run_immediate(factory, write)
+
+
+# Creating a workspace (pre-release A)
+
+
+def _workspace_name(name: str) -> str | None:
+    """The cleaned name; ``None`` when blank (the account's display name is used then)."""
+    clean = name.strip()
+    if not clean:
+        return None
+    if len(clean) > MAX_WORKSPACE_NAME_LENGTH:
+        raise InvalidWorkspaceSettings("name", "invalid_workspace_name")
+    return clean
+
+
+def create_own_workspace(
+    factory: sessionmaker[Session],
+    *,
+    user_id: UUID,
+    session_hash: str,
+    name: str,
+    base_currency: str,
+    country_code: str | None,
+    timezone: str,
+    locale: str,
+    seed_locale: str,
+    clock: Clock,
+) -> UUID:
+    """Create a workspace the user owns, with the suggested categories, and switch to it.
+
+    One ``BEGIN IMMEDIATE`` transaction re-reads the account (active?) and the instance setting
+    (instance administrators may always create), creates the workspace and the owner
+    membership, seeds the categories in ``seed_locale``, records ``workspace.created`` in the
+    new workspace and selects it in the session ``session_hash``. A blank name becomes the
+    account's display name, as at first-run setup.
+    """
+    clean_name = _workspace_name(name)
+    try:
+        options = validate_workspace_options(
+            base_currency=base_currency,
+            country_code=country_code,
+            timezone=timezone,
+            locale=locale,
+        )
+    except WorkspaceOptionError as exc:
+        raise InvalidWorkspaceSettings(exc.field, f"invalid_{exc.field}") from exc
+
+    def write(session: Session) -> UUID:
+        user = session.get(User, user_id)
+        if user is None or not user.is_active:
+            raise WorkspaceCreationDisabled
+        allowed = read_settings(session, lock=True).allow_workspace_creation
+        if not (allowed or user.is_instance_admin):
+            raise WorkspaceCreationDisabled
+        _checkpoint("create_own_workspace")
+        now = clock.now()
+        workspace, scope = create_owned_workspace(
+            session,
+            name=clean_name or user.display_name,
+            base_currency=options.base_currency,
+            country_code=options.country_code,
+            timezone=options.timezone,
+            locale=options.locale,
+            owner_user_id=user.id,
+        )
+        categories.seed_into(
+            session,
+            scope,
+            locale=seed_locale,
+            actor_user_id=user.id,
+            actor_type="user",
+            now=now,
+            automatic=True,
+        )
+        AuditEventRepository(session, scope).record(
+            actor_user_id=user.id,
+            action="workspace.created",
+            entity_type="workspace",
+            entity_id=str(workspace.id),
+            ts=now,
+        )
+        select_workspace(
+            session, session_hash=session_hash, user_id=user.id, workspace_id=workspace.id
+        )
+        return workspace.id
+
+    return run_immediate(factory, write)

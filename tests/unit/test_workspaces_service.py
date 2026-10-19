@@ -104,8 +104,20 @@ def _public_functions() -> set[str]:
     }
 
 
+# Public functions that are not for owners, each with where its access rule is tested.
+NOT_OWNER_ONLY: dict[str, str] = {
+    "create_own_workspace": (
+        "any signed-in account while the instance setting allows it; "
+        "tests/unit/test_workspace_creation_service.py"
+    ),
+}
+
+
 def test_owner_matrix_registry_matches_the_service_module() -> None:
-    assert set(SERVICE_CALLS) == _public_functions(), "add or remove SERVICE_CALLS entries"
+    assert set(SERVICE_CALLS) | set(NOT_OWNER_ONLY) == _public_functions(), (
+        "add or remove SERVICE_CALLS entries"
+    )
+    assert not set(SERVICE_CALLS) & set(NOT_OWNER_ONLY)
 
 
 @pytest.mark.parametrize("name", sorted(SERVICE_CALLS))

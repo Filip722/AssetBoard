@@ -1275,6 +1275,7 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
         "auth_throttles": "global authentication controls keyed by account/IP",
         "external_identities": "OIDC identities belong to global users",
         "setup_state": "singleton instance setup state",
+        "instance_settings": "singleton instance settings changed by an administrator",
         "user_sessions": "sessions belong to global users, independent of workspace selection",
         "users": "global identities can belong to multiple workspaces",
         "workspaces": "tenant root defines rather than belongs to a workspace",

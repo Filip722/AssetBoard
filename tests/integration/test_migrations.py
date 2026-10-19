@@ -43,6 +43,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "budget_lines",
         "categories",
         "external_identities",
+        "instance_settings",
         "invitations",
         "memberships",
         "month_states",
@@ -612,6 +613,32 @@ def test_0011_round_trip_creates_transactions_with_checks_and_a_composite_catego
 
         command.downgrade(alembic_config(settings), "0010_f25")
         assert "transactions" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0013_round_trip_creates_the_instance_settings_row(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'is.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        with engine.connect() as connection:
+            rows = connection.exec_driver_sql(
+                "SELECT id, allow_workspace_creation, updated_at, updated_by_user_id "
+                "FROM instance_settings"
+            ).all()
+        assert [tuple(row) for row in rows] == [(1, 1, None, None)]
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO instance_settings (id, allow_workspace_creation) VALUES (2, 1)"
+            )
+        command.downgrade(alembic_config(settings), "0012_f23")
+        assert "instance_settings" not in inspect(engine).get_table_names()
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

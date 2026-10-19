@@ -37,6 +37,7 @@ from assetboard.services.auth import (
 )
 from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import HashGate, HashGateBusy
+from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.months import MonthClosed
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
@@ -57,7 +58,7 @@ from assetboard.web.plan_routes import router as plan_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
-from assetboard.web.security import CsrfFailed
+from assetboard.web.security import CsrfFailed, web_session
 from assetboard.web.transaction_routes import router as transaction_router
 from assetboard.web.workspace_routes import router as workspace_router
 
@@ -209,16 +210,38 @@ def create_app(
     @app.exception_handler(NoWorkspace)
     async def handle_no_workspace(request: Request, _exc: NoWorkspace) -> Response:
         locale = request.state.locale
-        return error_response(
-            request,
-            403,
-            gettext("No workspace", locale),
-            gettext(
-                "Your account is not a member of any workspace. Ask a workspace owner to "
-                "invite you.",
-                locale,
-            ),
+        title = gettext("No workspace", locale)
+        message = gettext(
+            "Your account is not a member of any workspace. Ask a workspace owner to invite you.",
+            locale,
         )
+        if _is_htmx_fragment_request(request):
+            return error_response(request, 403, title, message)
+        # The page offers "Create workspace" when this account may create one (pre-release A).
+        signed_in = web_session(request)
+
+        def allowed() -> bool:
+            if signed_in is None:
+                return False
+            with app.state.session_factory() as session:
+                return workspace_creation_allowed(
+                    session, is_instance_admin=signed_in.is_instance_admin
+                )
+
+        response = render_template(
+            request,
+            "errors/no_workspace.html",
+            context={
+                "app_name": APP_NAME,
+                "title": title,
+                "message": message,
+                "status_code": 403,
+                "can_create_workspace": await run_in_threadpool(allowed),
+            },
+            status_code=403,
+        )
+        add_error_response_headers(response, is_fragment=False)
+        return response
 
     @app.exception_handler(PermissionDenied)
     @app.exception_handler(NotInstanceAdmin)

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input, primary_button with context %}
+{% from "workspace/_fields.html" import workspace_fields with context %}
+{% block title %}{{ _("Create workspace") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Create workspace") }}{% endblock %}
+{% block content %}
+<section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="new-workspace-heading" data-new-workspace>
+  <h2 id="new-workspace-heading" class="text-base font-semibold">{{ _("New workspace") }}</h2>
+  <p class="mt-2 text-sm text-muted">{{ _("You become its owner. It starts with the suggested categories, named in your language; you can change them afterwards.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'workspace_new') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>
+    {{ csrf_input() }}
+    {{ workspace_fields(values, errors, options) }}
+    <div class="sm:col-span-2">{{ primary_button(_("Create workspace")) }}</div>
+  </form>
+</section>
+{% endblock %}

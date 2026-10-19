@@ -77,7 +77,11 @@ scoped repositories. Every caller then calls `services.categories.seed_into` in 
 transaction, so each new workspace starts with the suggested categories, recorded as
 `category.seeded` with `automatic: true`. The callers are first-run setup, open registration,
 `assetboard create-admin` and OIDC or proxy auto-create, all through
-`services.auth._create_user_records`, which refuses to create a workspace without a seed.
+`services.auth._create_user_records`, which refuses to create a workspace without a seed, and
+self-service creation (`services.workspaces.create_own_workspace`), which needs no Context: it
+re-reads the account and the instance setting (`services.instance_settings`) inside its
+`BEGIN IMMEDIATE` transaction, then also records `workspace.created` and selects the new
+workspace in the session.
 
 ## Owner actions and stale Contexts
 

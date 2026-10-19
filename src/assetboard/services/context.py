@@ -157,20 +157,29 @@ class WorkspaceNav:
     current: WorkspaceRef
     role: Role
     choices: tuple[WorkspaceChoice, ...]
+    # The account may create another workspace (instance setting, or an administrator).
+    can_create_workspace: bool = False
 
     @property
     def can_switch(self) -> bool:
         return len(self.choices) > 1
 
 
-def workspace_nav(session: Session, ctx: Context) -> WorkspaceNav:
+def workspace_nav(
+    session: Session, ctx: Context, *, can_create_workspace: bool = False
+) -> WorkspaceNav:
     """The user's own memberships (one query), for the switcher on workspace pages."""
     memberships = UserMembershipReader(session, ctx.user.id).memberships()
     choices = tuple(
         WorkspaceChoice(id=m.workspace_id, name=m.workspace_name, role=Role(m.role))
         for m in memberships
     )
-    return WorkspaceNav(current=ctx.workspace, role=ctx.role, choices=choices)
+    return WorkspaceNav(
+        current=ctx.workspace,
+        role=ctx.role,
+        choices=choices,
+        can_create_workspace=can_create_workspace,
+    )
 
 
 def select_workspace(

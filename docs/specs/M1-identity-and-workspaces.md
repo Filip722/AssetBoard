@@ -95,6 +95,23 @@ In the plan, list each acceptance criterion with the test that will prove it, an
 - Changing the base currency is allowed for now; M2 must block or convert once amounts exist.
 - Removing a member does not revoke their sessions: the Context checks membership on every
   request.
+- **Self-service workspaces (owner, pre-release A, 2026-10-18).**
+  - Any signed-in account can create a workspace (`/workspaces/new`) and becomes its owner,
+    while the instance setting `allow_workspace_creation` is on (the default). Instance
+    administrators always can. The setting covers only this self-service creation: open
+    registration and OIDC/proxy auto-create keep following their own flags.
+  - The setting is stored in the database (`instance_settings`, one row, migration 0013) and
+    changed on `/admin/settings` (instance administrators), confirmed like every F1.5 admin
+    action, and audited as the instance-level `instance.settings_updated`
+    (`allow_workspace_creation`).
+  - The form reuses first-run setup's workspace fields (name, base currency, country, time
+    zone, language); a blank name becomes the display name. The workspace gets the suggested
+    categories in the request's language (M2 F2.1), `workspace.created` is recorded in its own
+    log only, and the session switches to it; the response redirects to `/`.
+  - The "No workspace" page offers "Create workspace", and every workspace page offers "New
+    workspace" next to the switcher (or the workspace name), both only when allowed. The
+    service re-reads the account and the setting inside its write transaction.
+  - No limit on how many workspaces an account creates.
 - Backlog: workspace deletion, ownership transfer, leaving a workspace, and F1.6 TOTP second factor; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)); until then use OIDC or proxy auth with an IdP that supports MFA.
 - B2 (invitations), see ADR-0013:
   - Tokens are 256-bit, stored as SHA-256, single use; expiry is 1, 7 (default) or 30 days;
@@ -227,7 +244,9 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   Every action is confirmed by the acting administrator (password, or a fresh external
   sign-in). The temporary password is generated and shown once; the account must change it
   before anything else and starts without a workspace (it sees the "no workspace" page until
-  it is invited). Account creation is not offered under `OIDC_ONLY`.
+  it is invited, or creates its own workspace, pre-release A). Account creation is not
+  offered under `OIDC_ONLY`.
+  Instance settings page (pre-release A): who can create workspaces (see the F1.2 decisions).
 - Audit log page (owner/instance admin): filterable list of `AuditEvent`s; auth and membership events appear.
   Two scopes: the owner sees the current workspace's events; an instance administrator sees
   instance-level events (`workspace_id IS NULL`) only, never another workspace's. Keyset

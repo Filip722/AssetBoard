@@ -6,6 +6,8 @@
 * ``GET /admin/users/new`` and ``POST``: create an account with a generated temporary password,
   shown once in the POST response (no redirect, no cookie, no flash, never logged or audited).
   Both answer 404 under ``OIDC_ONLY``.
+* ``GET /admin/settings`` and ``POST``: instance settings (pre-release A): who may create a
+  workspace.
 
 Only active instance administrators get these pages (403 otherwise); every POST is confirmed
 by the acting administrator through ``web.confirm.run_confirmed``, the one confirmation path.
@@ -43,6 +45,7 @@ from assetboard.services.admin_users import (
     record_user_created,
 )
 from assetboard.services.auth import WebSession, argon2_hash, create_user_with_temporary_password
+from assetboard.services.instance_settings import get_settings, update_settings
 from assetboard.services.profile import ConfirmMethod
 from assetboard.web.confirm import Refusal, confirm_view, refusal, run_confirmed
 from assetboard.web.errors import BUSY_RETRY_AFTER
@@ -86,6 +89,11 @@ GROUP_DECIDES = _(
     "The identity provider decides this at each sign-in; to change it, change the group there."
 )
 ROLE_ACTIONS = frozenset({"promote", "demote"})
+SETTINGS_RESULTS: dict[str, str] = {
+    "done": _("Instance settings saved."),
+    "unchanged": _("Nothing to change: the settings already had these values."),
+}
+SETTINGS_INVALID = _("Choose who can create workspaces.")
 CREATE_ERRORS = {
     "email": _("Enter a valid email address."),
     "email_taken": _("An account with this email address already exists."),
@@ -378,3 +386,80 @@ async def new_user_submit(
     )
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# Instance settings (pre-release A)
+
+
+async def _settings_page(
+    request: Request,
+    current: WebSession,
+    *,
+    allow_workspace_creation: bool | None = None,
+    notice: str | None = None,
+    error: str | None = None,
+    status_code: int = 200,
+) -> Response:
+    state = _state(request)
+    if allow_workspace_creation is None:
+        stored = await run_in_threadpool(get_settings, state.session_factory)
+        allow_workspace_creation = stored.allow_workspace_creation
+    response = render_template(
+        request,
+        "admin/settings.html",
+        context={
+            "allow_workspace_creation": allow_workspace_creation,
+            "confirm": await confirm_view(request, current),
+            "notice": notice,
+            "error": error,
+        },
+        status_code=status_code,
+    )
+    if status_code == 503:
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
+    return response
+
+
+@router.get("/admin/settings", name="admin_settings")
+async def settings_form(request: Request) -> Response:
+    return await _settings_page(request, _require_admin(request))
+
+
+@router.post("/admin/settings")
+async def settings_submit(
+    request: Request, allow_workspace_creation: FormStr = "", confirm_password: FormStr = ""
+) -> Response:
+    current = _require_admin(request)
+    if allow_workspace_creation not in {"on", "off"}:
+        return await _settings_page(
+            request, current, error=_t(request, SETTINGS_INVALID), status_code=400
+        )
+    wanted = allow_workspace_creation == "on"
+    state = _state(request)
+
+    def apply(session: Session, actor: User, _method: ConfirmMethod) -> str:
+        return update_settings(
+            session,
+            actor,
+            allow_workspace_creation=wanted,
+            clock=state.clock,
+            host=client_host(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+
+    outcome = await run_confirmed(
+        request, current, purpose="admin_settings", password=confirm_password, action=apply
+    )
+    if outcome.status != "confirmed" or outcome.value is None:
+        refused = refusal(request, outcome)
+        page = await _settings_page(
+            request,
+            current,
+            allow_workspace_creation=wanted,
+            error=refused.message,
+            status_code=refused.status_code,
+        )
+        return _with_retry_after(page, refused)
+    return await _settings_page(
+        request, current, notice=_t(request, SETTINGS_RESULTS[outcome.value])
+    )

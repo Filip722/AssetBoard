@@ -1,4 +1,5 @@
-"""Workspace switcher, workspace settings and members pages (F1.2 part B1).
+"""Workspace switcher, workspace settings and members pages (F1.2 part B1), and creating a
+workspace (pre-release A: ``/workspaces/new``, for any signed-in account while allowed).
 
 Every state-changing route is protected by the router-level ``require_csrf`` dependency.
 Authorization happens in ``services.workspaces`` (owners only); routes only map outcomes to
@@ -11,7 +12,7 @@ from dataclasses import replace
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -19,12 +20,7 @@ from assetboard.db.engine import run_immediate
 from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.i18n import gettext
 from assetboard.services.context import Role, WorkspaceNotAvailable, select_workspace
-from assetboard.services.workspace_options import (
-    country_names,
-    currency_codes,
-    locale_codes,
-    timezone_names,
-)
+from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.workspaces import (
     DEFAULT_INVITATION_EXPIRY_DAYS,
     INVITATION_EXPIRY_DAYS,
@@ -34,10 +30,12 @@ from assetboard.services.workspaces import (
     InvalidInvitation,
     InvalidWorkspaceSettings,
     TooManyInvitations,
+    WorkspaceCreationDisabled,
     WorkspaceError,
     WorkspaceSettings,
     change_role,
     create_invitation,
+    create_own_workspace,
     list_invitations,
     list_members,
     remove_member,
@@ -48,11 +46,11 @@ from assetboard.services.workspaces import (
 from assetboard.web.context import CurrentContext
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf, web_session
+from assetboard.web.workspace_forms import workspace_form_options
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 FormStr = Annotated[str, Form()]
-LOCALE_NAMES = {"en": "English", "pl": "Polski"}
 
 
 def _(message: str) -> str:
@@ -141,10 +139,7 @@ def _settings_page(
             "values": values,
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
-            "currency_options": [(code, code) for code in currency_codes()],
-            "country_options": list(country_names(request.state.locale).items()),
-            "timezone_options": [(zone, zone) for zone in timezone_names()],
-            "locales": [(code, LOCALE_NAMES.get(code, code)) for code in locale_codes()],
+            **workspace_form_options(request.state.locale),
             "max_name_length": MAX_WORKSPACE_NAME_LENGTH,
         },
         status_code=status_code,
@@ -359,3 +354,107 @@ async def invitation_revoke(request: Request, ctx: CurrentContext, invitation_id
         lambda: revoke_invitation(request.app.state.session_factory, ctx, invitation_id=target)
     )
     return _members_redirect(request)
+
+
+# Creating a workspace (pre-release A)
+
+NEW_WORKSPACE_FIELDS = {
+    "name": "workspace_name",
+    "base_currency": "base_currency",
+    "country_code": "country_code",
+    "timezone": "timezone",
+    "locale": "workspace_locale",
+}
+
+
+async def _creation_allowed(request: Request) -> bool:
+    signed_in = web_session(request)
+    if signed_in is None:  # the gate redirects first; this guards direct use
+        return False
+    factory = request.app.state.session_factory
+
+    def check() -> bool:
+        with factory() as session:
+            return workspace_creation_allowed(
+                session, is_instance_admin=signed_in.is_instance_admin
+            )
+
+    return await run_in_threadpool(check)
+
+
+def _new_workspace_page(
+    request: Request,
+    values: dict[str, str],
+    *,
+    errors: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    return render_template(
+        request,
+        "workspace/new.html",
+        context={
+            "values": values,
+            "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
+            "options": workspace_form_options(request.state.locale),
+        },
+        status_code=status_code,
+    )
+
+
+@router.get("/workspaces/new", name="workspace_new")
+async def new_workspace_form(request: Request) -> Response:
+    if not await _creation_allowed(request):
+        raise HTTPException(status_code=404)
+    signed_in = web_session(request)
+    settings = request.app.state.settings
+    values = {
+        "workspace_name": signed_in.display_name if signed_in else "",
+        "base_currency": settings.default_currency,
+        "country_code": "",
+        "timezone": "UTC",
+        "workspace_locale": request.state.locale,
+    }
+    return _new_workspace_page(request, values)
+
+
+@router.post("/workspaces/new")
+async def new_workspace_submit(
+    request: Request,
+    workspace_name: FormStr = "",
+    base_currency: FormStr = "",
+    country_code: FormStr = "",
+    timezone: FormStr = "",
+    workspace_locale: FormStr = "",
+) -> Response:
+    signed_in = web_session(request)
+    if signed_in is None or not await _creation_allowed(request):
+        raise HTTPException(status_code=404)
+    values = {
+        "workspace_name": workspace_name,
+        "base_currency": base_currency,
+        "country_code": country_code,
+        "timezone": timezone,
+        "workspace_locale": workspace_locale,
+    }
+    state = request.app.state
+    try:
+        await run_in_threadpool(
+            lambda: create_own_workspace(
+                state.session_factory,
+                user_id=signed_in.user_id,
+                session_hash=signed_in.session_hash,
+                name=workspace_name,
+                base_currency=base_currency,
+                country_code=country_code or None,
+                timezone=timezone,
+                locale=workspace_locale,
+                seed_locale=request.state.locale,
+                clock=state.clock,
+            )
+        )
+    except InvalidWorkspaceSettings as exc:
+        errors = {NEW_WORKSPACE_FIELDS[exc.field]: SETTINGS_ERRORS[exc.code]}
+        return _new_workspace_page(request, values, errors=errors, status_code=400)
+    except WorkspaceCreationDisabled as exc:
+        raise HTTPException(status_code=404) from exc
+    return RedirectResponse(request.url_for("home").path, status_code=303)

@@ -1,5 +1,6 @@
 {% extends "auth_base.html" %}
-{% from "macros/components.html" import field, select, csrf_input, primary_button with context %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% from "workspace/_fields.html" import workspace_fields with context %}
 {% block title %}{{ _("First-run setup") }} · {{ app_name }}{% endblock %}
 {% block width %}max-w-2xl{% endblock %}
 {% block heading %}{{ _("First-run setup") }}{% endblock %}
@@ -16,11 +17,7 @@
   </fieldset>
   <fieldset class="grid gap-4 sm:grid-cols-2">
     <legend class="mb-2 text-sm font-semibold sm:col-span-2">{{ _("Workspace") }}</legend>
-    <div class="sm:col-span-2">{{ field("workspace_name", _("Workspace name"), value=values.workspace_name, error=errors.get("workspace_name"), maxlength=120, help=_("Defaults to your display name.")) }}</div>
-    {{ select("base_currency", _("Base currency"), currency_options, selected=values.base_currency, error=errors.get("base_currency")) }}
-    {{ select("country_code", _("Country"), country_options, selected=values.country_code, blank=_("Not set")) }}
-    {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone) }}
-    {{ select("workspace_locale", _("Language"), locales, selected=values.workspace_locale) }}
+    {{ workspace_fields(values, errors, options) }}
   </fieldset>
   {{ primary_button(_("Create administrator")) }}
 </form>

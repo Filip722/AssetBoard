@@ -83,8 +83,28 @@ if your account has none.
   it is not stored in readable form, logged or sent anywhere. Give it to the person. At the
   first sign-in they can only change it (or sign out) until they choose a new password, which
   must differ from the temporary one. An unused temporary password stays valid until it is
-  used or the account is deactivated. The new account has no workspace: until a workspace
-  owner invites it, it sees "Your account is not a member of any workspace".
+  used or the account is deactivated. The new account has no workspace: it sees "Your account
+  is not a member of any workspace" until a workspace owner invites it, or until it creates
+  its own (see below).
+
+## Creating a workspace
+
+Any signed-in account can create a workspace and becomes its owner, unless an instance
+administrator has turned this off. "Create workspace" appears on the "No workspace" page, and
+"New workspace" next to the workspace name at the top of every workspace page. The form asks
+for the same details as first-run setup: a name (your display name unless you change it),
+base currency, country, time zone and language. The new workspace starts with the suggested
+categories in your language ([categories](categories.md#suggested-categories)), and you switch
+to it straight away. Its log records "Workspace created".
+
+**Instance settings** (instance administrators, "Instance settings" in the account menu or on
+the Users page): "Who can create workspaces" is "Every signed-in user" (the default) or "Only
+instance administrators". Instance administrators can always create workspaces. The setting
+does not affect open registration (`ASSETBOARD_ALLOW_REGISTRATION`) or accounts created at the
+first sign-in through an identity provider or a proxy (`ASSETBOARD_OIDC_AUTO_CREATE`,
+`ASSETBOARD_PROXY_AUTH_AUTO_CREATE`): those keep creating their own workspace. A change is
+confirmed like the other administrator actions and appears in the instance audit log
+("Instance settings changed").
 
 ## Audit log
 

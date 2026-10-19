@@ -15,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     false,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
@@ -224,3 +225,23 @@ class SetupState(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+
+
+class InstanceSettings(Base):
+    """Instance-wide settings an administrator changes in the UI (pre-release A).
+
+    A single row (``id = 1``), created by migration 0013; a missing row reads as the defaults.
+    """
+
+    __tablename__ = "instance_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="singleton"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Any signed-in user may create a workspace (instance administrators always may).
+    allow_workspace_creation: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    updated_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

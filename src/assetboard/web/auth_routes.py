@@ -39,12 +39,6 @@ from assetboard.services.auth import (
     verify_setup_token,
 )
 from assetboard.services.profile import ConfirmMethod
-from assetboard.services.workspace_options import (
-    country_names,
-    currency_codes,
-    locale_codes,
-    timezone_names,
-)
 from assetboard.web.confirm import confirm_view, refusal, run_confirmed
 from assetboard.web.errors import error_response, is_htmx_fragment_request
 from assetboard.web.rendering import render_template
@@ -62,6 +56,7 @@ from assetboard.web.security import (
     web_session,
 )
 from assetboard.web.throttle import retry_after, throttled_message
+from assetboard.web.workspace_forms import workspace_form_options
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -108,7 +103,6 @@ ERROR_FIELDS = {
 }
 LOGIN_FAILED = _("The email or password is not correct.")
 SETUP_RACE = _("Setup was already completed, or is being completed. Reload to continue.")
-LOCALE_NAMES = {"en": "English", "pl": "Polski"}
 
 
 def _t(request: Request, message: str) -> str:
@@ -192,10 +186,7 @@ def _setup_page(
         context={
             "values": defaults | (values or {}),
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
-            "currency_options": [(code, code) for code in currency_codes()],
-            "country_options": list(country_names(request.state.locale).items()),
-            "timezone_options": [(zone, zone) for zone in timezone_names()],
-            "locales": [(code, LOCALE_NAMES.get(code, code)) for code in locale_codes()],
+            "options": workspace_form_options(request.state.locale),
         },
         status_code=status_code,
     )

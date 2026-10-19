@@ -5,6 +5,7 @@
 {% if notice %}<p class="mb-6 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p class="mb-6 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>{% endif %}
 {% if can_create %}<p class="mb-6"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'admin_user_new') }}" data-admin-create>{{ _("Create an account") }}</a></p>{% endif %}
+<p class="mb-6"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings>{{ _("Instance settings") }}</a></p>
 <section class="panel overflow-x-auto p-0" aria-label="{{ _('Users') }}">
   <table class="w-full text-left text-sm" data-users>
     <thead class="border-b border-line text-xs uppercase tracking-wide text-muted">

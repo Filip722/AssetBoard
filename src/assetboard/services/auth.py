@@ -2027,13 +2027,15 @@ def record_auth_event(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    entity_type: str = "user",
 ) -> None:
-    """An instance-level auth event about a user (``workspace_id`` NULL)."""
+    """An instance-level event (``workspace_id`` NULL), about a user unless ``entity_type``
+    says otherwise (``instance`` for instance settings)."""
     _audit(
         session,
         clock,
         action=action,
-        entity_type="user",
+        entity_type=entity_type,
         entity_id=entity_id,
         actor_type="user" if actor_user_id else "system",
         actor_user_id=actor_user_id,

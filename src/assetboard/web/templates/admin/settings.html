@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input, confirm_block with context %}
+{% block title %}{{ _("Instance settings") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Instance settings") }}{% endblock %}
+{% block content %}
+<section class="panel max-w-xl p-6 sm:p-7" aria-labelledby="instance-settings-heading" data-instance-settings>
+  <h2 id="instance-settings-heading" class="text-base font-semibold">{{ _("Workspaces") }}</h2>
+  {% if notice %}<p class="mt-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
+  {% if error %}<p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-admin-error>{{ error }}</p>{% endif %}
+  <form method="post" action="{{ scoped_url(request, 'admin_settings') }}" class="mt-5 space-y-4">
+    {{ csrf_input() }}
+    <div class="space-y-1.5">
+      <label for="allow_workspace_creation" class="block text-sm font-medium text-ink">{{ _("Who can create workspaces") }}</label>
+      <select id="allow_workspace_creation" name="allow_workspace_creation" aria-describedby="allow_workspace_creation-help" class="form-select w-full">
+        <option value="on" {% if allow_workspace_creation %}selected{% endif %}>{{ _("Every signed-in user") }}</option>
+        <option value="off" {% if not allow_workspace_creation %}selected{% endif %}>{{ _("Only instance administrators") }}</option>
+      </select>
+      <p id="allow_workspace_creation-help" class="text-xs text-muted">{{ _("Whoever creates a workspace becomes its owner. This does not affect open registration or accounts created at the first sign-in through an identity provider or a proxy: those follow their own settings.") }}</p>
+    </div>
+    <div class="flex flex-wrap items-end gap-3">
+      {{ confirm_block(confirm, "admin-settings", _("Save settings")) }}
+    </div>
+  </form>
+  <p class="mt-6 text-sm"><a class="text-primary-ink" href="{{ scoped_url(request, 'admin_users') }}">{{ _("Back to users") }}</a></p>
+</section>
+{% endblock %}

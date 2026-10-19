@@ -56,6 +56,7 @@
             {% endif %}
             {% if web_session and web_session.is_instance_admin %}
             <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Users") }}</a>
+            <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Instance settings") }}</a>
             <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Audit log: instance") }}</a>
             {% endif %}
             <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Profile") }}</a>
@@ -81,6 +82,7 @@
             <h1 class="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>
           </div>
           {% if workspace_nav %}
+          <div class="flex flex-wrap items-center gap-2">
           {% if workspace_nav.can_switch %}
           <form method="post" action="{{ scoped_url(request, 'workspace_switch') }}" class="flex items-center gap-2" data-workspace-switcher>
             <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
@@ -97,6 +99,10 @@
             {{ _("Workspace") }} <span class="px-1 text-muted">/</span> {{ workspace_nav.current.name }}
           </div>
           {% endif %}
+          {% if workspace_nav.can_create_workspace %}
+          <a href="{{ scoped_url(request, 'workspace_new') }}" class="rounded-full border border-line px-3 py-2 text-sm font-medium hover:bg-subtle" data-new-workspace-link>{{ _("New workspace") }}</a>
+          {% endif %}
+          </div>
           {% endif %}
         </header>
         {{ flashes() }}
