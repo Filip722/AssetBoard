@@ -24,6 +24,7 @@ SEPTEMBER = "/m/2026-09"
 @pytest.fixture
 def plan(owner: OwnerApp) -> OwnerApp:
     owner.app.state.clock = FixedClock(NOW)  # today: October 2026
+    owner.clear_categories()  # these tests build their own categories (no seeded set)
     return owner
 
 
