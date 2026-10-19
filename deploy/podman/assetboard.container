@@ -1,0 +1,42 @@
+# Rootless Podman Quadlet unit; see docs/install/podman.md.
+# Copy to ~/.config/containers/systemd/assetboard.container, then:
+#   systemctl --user daemon-reload && systemctl --user start assetboard
+# Requires Podman 4.4 or later.
+
+[Unit]
+Description=AssetBoard personal finance web app
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=assetboard
+# Pin a release version; see docs/deployment.md#image-tags.
+# x-release-please-start-version
+Image=ghcr.io/lexanderpl/assetboard:0.2.0
+# x-release-please-end
+Volume=assetboard-data:/data
+# Loopback only: publish the app through a reverse proxy.
+PublishPort=127.0.0.1:8000:8000
+Environment=ASSETBOARD_ENV=prod
+Environment=ASSETBOARD_DATA_DIR=/data
+Environment=ASSETBOARD_BASE_URL=http://localhost:8000
+Environment=ASSETBOARD_LOG_FORMAT=json
+Environment=ASSETBOARD_AUTO_MIGRATE=true
+# Optional: settings or secrets in a file you create (mode 0600), same format as the native
+# deploy/assetboard.env.example.
+#EnvironmentFile=%h/.config/assetboard/assetboard.env
+ReadOnly=true
+Tmpfs=/tmp:mode=1777
+DropCapability=ALL
+NoNewPrivileges=true
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"
+HealthInterval=30s
+HealthTimeout=5s
+HealthStartPeriod=20s
+HealthRetries=3
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

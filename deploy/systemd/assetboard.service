@@ -1,0 +1,58 @@
+# Native install unit. deploy/install-debian.sh installs it as
+# /etc/systemd/system/assetboard.service; see docs/install/native.md.
+# Put local changes in a drop-in (systemctl edit assetboard), not in this file:
+# the install script replaces it on every upgrade.
+
+[Unit]
+Description=AssetBoard personal finance web app
+Documentation=https://github.com/LexanderPL/AssetBoard/blob/main/docs/install/native.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=assetboard
+Group=assetboard
+Environment=ASSETBOARD_ENV=prod
+Environment=ASSETBOARD_DATA_DIR=/var/lib/assetboard
+EnvironmentFile=/etc/assetboard/assetboard.env
+# Loopback only: publish the app through a reverse proxy. Change the host in a drop-in when the
+# proxy runs on another machine, and set ASSETBOARD_TRUSTED_PROXIES to its address.
+ExecStart=/opt/assetboard/current/bin/assetboard serve --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# /var/lib/assetboard, created and owned by the service user, mode 0700.
+StateDirectory=assetboard
+StateDirectoryMode=0700
+UMask=0077
+
+# Hardening.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# MemoryDenyWriteExecute is left off on purpose: Python extensions built with cffi (argon2-cffi)
+# may need writable and executable memory for callbacks, and a failure there would only show up
+# at the first password hash. It has not been tested with this app.
+
+[Install]
+WantedBy=multi-user.target

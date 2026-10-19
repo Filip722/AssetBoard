@@ -13,6 +13,10 @@
         {
           "type": "generic",
           "path": "docs/deployment.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/podman/assetboard.container"
         }
       ]
     }
