@@ -31,6 +31,7 @@
       <nav class="mt-7 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:flex-1 lg:flex-col" aria-label="{{ _('Main navigation') }}">
         {% set is_month_page = request.url.path == scoped_url(request, 'month_current') or request.url.path.startswith(scoped_url(request, 'month_current') ~ '/') %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'month_current') }}" data-month-link{% if is_month_page %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>{% endif %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'transactions') }}" data-transactions-link{% if request.url.path.endswith('/transactions') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %}><span aria-hidden="true">▦</span>{{ _("Categories") }}</a>{% endif %}
         <a class="nav-link" href="#recurring"><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>
         <a class="nav-link" href="#net-worth"><span aria-hidden="true">◇</span>{{ _("Net worth") }}</a>

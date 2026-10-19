@@ -59,6 +59,7 @@ from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed, web_session
+from assetboard.web.transaction_list_routes import router as transaction_list_router
 from assetboard.web.transaction_routes import router as transaction_router
 from assetboard.web.workspace_routes import router as workspace_router
 
@@ -182,6 +183,7 @@ def create_app(
     app.include_router(month_router)
     app.include_router(plan_router)
     app.include_router(transaction_router)
+    app.include_router(transaction_list_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)
     app.include_router(proxy_router)

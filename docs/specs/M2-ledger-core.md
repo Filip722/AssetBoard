@@ -495,6 +495,76 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
   row changes in that case. (F2.1's treatment change still applies to every month, closed ones
   included: it changes the category, not the transactions.)
 
+**Product decisions (owner, 2026-10-19)**
+- **Viewers** may use the list **and** the CSV export (it is the filtered view of what they can
+  already read). Bulk recategorize needs editor or owner. (`services.transaction_search.EXPORT_ROLE`.)
+- **Formula guard:** offered as an opt-in checkbox, **off by default**, so the default export
+  stays lossless and re-importable. This answers M4 open question 7.
+  (`domain.ledger_csv.FORMULA_GUARD_DEFAULT`.) When ticked, `guard_formula` changes
+  descriptions and category names:
+  - a value that starts with a trigger (`=`, `+`, `-`, `@` or their full-width forms `＝ ＋ － ＠`),
+    also after leading whitespace, or with a tab or CR, gets a leading `'`;
+  - inside a value, a trigger after `,` or `;` and optional whitespace gets `'` just before it
+    (`a, =1` becomes `a, '=1`), for files opened with the other list separator.
+
+  Guarded values re-import with the apostrophes, and a guarded description can exceed the
+  200 characters the import accepts (that row is then refused on import).
+- **The export is not audited:** it is a read like opening the list, so it is a GET and records
+  nothing (nothing about its contents is logged either).
+
+**As built (F2.6)**
+- Page `/transactions` ("Transactions" in the main navigation). Every part is a plain form
+  (works without JavaScript): the filters are a GET form, so a result is a bookmarkable URL
+  (`from`, `to`, `direction`, `category` (repeatable), `q`, `min`, `max`, `sort`, `page`).
+  Dates are `YYYY-MM-DD` (the date input) or `DD.MM.YYYY`; amounts are typed in the user's
+  locale and refused, never rounded, when they have too many decimals; bounds are inclusive.
+  "Description contains" matches the case-folded description key (`%` and `_` are literal).
+  The category filter lists every category, archived ones included. Invalid filters are marked
+  per field and show no rows. Soft-deleted rows never appear.
+- The query object is `domain.transaction_search.TransactionFilter`;
+  `TransactionRepository.search` / `count_matching` / `iter_matching` / `matching_for_update`
+  turn it into SQL on the workspace scope. Sorts: newest first (default), oldest first,
+  largest and smallest amount first; ties in entry order (`created_at`, id). `amount_minor` is
+  a BIGINT, so ordering by it in SQL is allowed; no DecimalType column is involved.
+- Pages of 50 with "51–100 of 312" and Previous/Next links that keep the filters; a page past
+  the end shows the last page. Rows in closed months are marked "closed"; each date links to
+  its month page (where entries are edited).
+- **Export** (`/transactions/export.csv`, GET): every matching row, always in M4's entry order
+  (date, `created_at`, id) whatever the screen's sort. Rows and their category names come
+  from **one** SELECT (a join, fetched in batches), so every row has the name its category had
+  in that read; what the statement sees of writes committed during a long export is left to
+  the database's default isolation (no stronger level is requested). The file is written to a
+  spooled temporary file and then streamed; the spool is closed when the response ends,
+  including when the client goes away mid-download. Options: delimiter comma
+  (default) or semicolon; decimal dot (default) or comma, comma only with semicolon (as M4's
+  upload options); BOM for Excel (off by default); the formula guard (off by default).
+  `Content-Disposition` file name `<branding.CLI_NAME>-transactions-<YYYYMMDD-HHMMSS>Z.csv`
+  (UTC, from the clock), `Cache-Control: no-store`. The CSV writer is `domain.ledger_csv`,
+  reusable by F4.1 (which adds `deleted_at` and the lineage id from `import_key`; until M4
+  the `id` column is the row's own id).
+- **Bulk recategorize:** rows are ticked on the current page (per-row checkboxes joined to the
+  bulk form), or "Change all N matching entries" applies to every row matching the filters.
+  A preview page shows the target, how many rows move, from which categories, the months and
+  how many are already in the target; it writes nothing and takes no row locks. Confirming
+  re-reads the selection inside one `BEGIN IMMEDIATE` transaction: `require_role_now(editor)`,
+  `lock_month_writes`, then the rows (`FOR UPDATE OF transactions` on PostgreSQL). At most
+  `MAX_RECATEGORIZE_ROWS` + 1 rows are ever loaded. Refused as a whole, with nothing changed:
+  no rows selected; more than 500 ticked ids (`too_many_ticked`, its own message); more than
+  10 000 matching rows (`MAX_RECATEGORIZE_ROWS`; the "Change all N" button is disabled with
+  the reason when the list already shows more); an archived, unknown or foreign target; any
+  row whose direction differs from the target's kind ("filter by expenses or income first");
+  any row in a closed month (the message lists the months, including rows already in the
+  target); the selection differing from the previewed one (a digest of each row's id,
+  category and date, so rows added, deleted, moved or recategorized meanwhile are never
+  changed unseen). Ticked ids of deleted rows or of another workspace select nothing. Rows already in the target are left alone; rows are updated through the ORM (the
+  timestamp listener sets `updated_at`).
+- Audit: one `transaction.recategorized` event per applied change (entity: the target
+  category; data `category`, `direction`, `count`, `from_categories`, `months`; never amounts
+  or descriptions), in the "Transactions" group. A change that moves no row records nothing.
+
+**Follow-ups**
+- Totals of the filtered rows (per direction) on the list (P7 of the F2.6 plan): not in F2.6.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

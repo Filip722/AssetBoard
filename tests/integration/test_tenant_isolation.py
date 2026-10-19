@@ -52,6 +52,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.db.repositories.base import models_marked_workspace_owned, repositories_for
 from assetboard.domain.months import YearMonth
+from assetboard.domain.transaction_search import SortOrder, TransactionFilter
 from tests.tenant.coverage import (
     BASE_METHOD_COVERAGE,
     CURRENT_WORKSPACE_METHOD_COVERAGE,
@@ -535,6 +536,45 @@ def test_transaction_queries_stay_in_their_workspace(
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
     assert [r.id for r in in_a.for_month(october)] == [a_row.id]
+
+
+def test_transaction_search_stays_in_its_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = TransactionRepository(db_session, ctx_a), TransactionRepository(db_session, ctx_b)
+
+    def category(ctx: Any) -> Any:
+        return CategoryRepository(db_session, ctx).create(
+            name="Food", name_key="food", kind="expense", treatment="regular",
+            color="#16a34a", sort_order=0,
+        )  # fmt: skip
+
+    def make(repository: TransactionRepository, category_id: UUID) -> Any:
+        return repository.create(
+            direction="expense", day=date(2026, 10, 7), amount_minor=1250, currency="EUR",
+            category_id=category_id, description="Lidl", description_key="lidl",
+            source="manual", created_by_user_id=None,
+        )  # fmt: skip
+
+    food_a, food_b = category(ctx_a), category(ctx_b)
+    a_row, b_row = make(in_a, food_a.id), make(in_b, food_b.id)
+    # The same filter (even naming the other workspace's category) sees only its own rows.
+    everything = TransactionFilter(text_key="lidl")
+    both = TransactionFilter(category_ids=frozenset({food_a.id, food_b.id}))
+    for repository, own, food in ((in_a, a_row, food_a), (in_b, b_row, food_b)):
+        for where in (everything, both, TransactionFilter()):
+            page = repository.search(where, sort=SortOrder.DATE_DESC, limit=50, offset=0)
+            assert [(r.id, c.id) for r, c in page] == [(own.id, food.id)]
+            assert repository.count_matching(where) == 1
+            assert [(r.id, c.id) for r, c in repository.iter_matching(where)] == [(own.id, food.id)]
+            for lock in (True, False):
+                found = repository.matching_for_update(where=where, lock=lock, limit=10)
+                assert [(r.id, c.id) for r, c in found] == [(own.id, food.id)]
+        # Ids of the other workspace's rows are not found.
+        ids = {a_row.id, b_row.id}
+        assert [r.id for r, _c in repository.matching_for_update(ids=ids)] == [own.id]
+    assert in_b.count_matching(TransactionFilter(category_ids=frozenset({food_a.id}))) == 0
 
 
 def test_budget_line_queries_stay_in_their_workspace(

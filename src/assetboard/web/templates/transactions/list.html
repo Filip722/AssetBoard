@@ -1,0 +1,222 @@
+{# The transaction list (F2.6). Every part is a plain form: the filters and the export are GET
+   forms, the bulk change posts to a confirmation page. Row checkboxes join the bulk form with
+   the ``form`` attribute. No inline script or style. #}
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "categories/_macros.html" import swatch %}
+{% set label_class = "block text-sm font-medium" %}
+{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{% set error_class = "mt-1 text-xs text-danger" %}
+{% set primary_class = "rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
+{% set secondary_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:bg-subtle" %}
+{% set check_class = "h-4 w-4 rounded border-line accent-primary" %}
+
+{% macro hidden(pairs) -%}
+{% for name, value in pairs %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+{%- endmacro %}
+
+{% macro field_error(name) -%}
+{% if errors.get(name) %}<p id="filter-{{ name }}-error" class="{{ error_class }}" data-field-error>{{ errors.get(name) }}</p>{% endif %}
+{%- endmacro %}
+
+{% macro invalid(name) -%}
+{% if errors.get(name) %} aria-invalid="true" aria-describedby="filter-{{ name }}-error"{% endif %}
+{%- endmacro %}
+
+{% macro category_checks(heading, options) -%}
+{% if options %}
+<fieldset class="space-y-1">
+  <legend class="text-xs font-medium text-muted">{{ heading }}</legend>
+  {% for c in options %}
+  <label class="flex items-center gap-2 text-sm">
+    <input type="checkbox" name="category" value="{{ c.id }}"{% if c.id|string in selected_categories %} checked{% endif %} class="{{ check_class }}">
+    {{ swatch(c.color) }}<span>{{ c.name }}</span>
+  </label>
+  {% endfor %}
+</fieldset>
+{% endif %}
+{%- endmacro %}
+
+{% block title %}{{ _("Transactions") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Transactions") }}{% endblock %}
+{% block content %}
+<div class="space-y-6" data-transaction-list>
+  {% if notice %}
+  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  {% endif %}
+  {% if bulk_error %}
+  <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>
+  {% endif %}
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="filters-heading">
+    <h2 id="filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
+    <form method="get" action="{{ scoped_url(request, 'transactions') }}" class="mt-4 space-y-4" novalidate data-filters>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label for="filter-from" class="{{ label_class }}">{{ _("From") }}</label>
+          <input id="filter-from" name="from" type="date" value="{{ raw.date_from }}"{{ invalid("date_from") }} class="{{ input_class }}">
+          {{ field_error("date_from") }}
+        </div>
+        <div>
+          <label for="filter-to" class="{{ label_class }}">{{ _("To") }}</label>
+          <input id="filter-to" name="to" type="date" value="{{ raw.date_to }}"{{ invalid("date_to") }} class="{{ input_class }}">
+          {{ field_error("date_to") }}
+        </div>
+        <div>
+          <label for="filter-min" class="{{ label_class }}">{{ _("Smallest amount") }}</label>
+          <input id="filter-min" name="min" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ raw.amount_min }}"{{ invalid("amount_min") }} class="{{ input_class }}">
+          {{ field_error("amount_min") }}
+        </div>
+        <div>
+          <label for="filter-max" class="{{ label_class }}">{{ _("Largest amount") }}</label>
+          <input id="filter-max" name="max" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ raw.amount_max }}"{{ invalid("amount_max") }} class="{{ input_class }}">
+          {{ field_error("amount_max") }}
+        </div>
+        <div class="sm:col-span-2">
+          <label for="filter-q" class="{{ label_class }}">{{ _("Description contains") }}</label>
+          <input id="filter-q" name="q" type="search" autocomplete="off" maxlength="{{ max_text }}" value="{{ raw.text }}"{{ invalid("text") }} class="{{ input_class }}">
+          {{ field_error("text") }}
+        </div>
+        <div>
+          <label for="filter-direction" class="{{ label_class }}">{{ _("Kind") }}</label>
+          <select id="filter-direction" name="direction"{{ invalid("direction") }} class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            <option value="">{{ _("Expenses and income") }}</option>
+            <option value="expense"{% if raw.direction == "expense" %} selected{% endif %}>{{ _("Expenses") }}</option>
+            <option value="income"{% if raw.direction == "income" %} selected{% endif %}>{{ _("Income") }}</option>
+          </select>
+          {{ field_error("direction") }}
+        </div>
+        <div>
+          <label for="filter-sort" class="{{ label_class }}">{{ _("Order") }}</label>
+          <select id="filter-sort" name="sort" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            {% for value, label in sort_options %}<option value="{{ value }}"{% if value == sort.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <details class="rounded-lg border border-line p-3"{% if selected_categories or errors.get("categories") %} open{% endif %} data-category-filter>
+        <summary class="cursor-pointer text-sm font-medium">{{ _("Categories") }}{% if selected_categories %} <span class="text-muted">({{ selected_categories|length }})</span>{% endif %}</summary>
+        <p class="mt-2 text-xs text-muted">{{ _("None ticked: every category.") }}</p>
+        <div class="mt-3 grid gap-4 sm:grid-cols-3">
+          {{ category_checks(_("Expense categories"), categories.expense) }}
+          {{ category_checks(_("Income categories"), categories.income) }}
+          {{ category_checks(_("Archived categories"), categories.archived) }}
+        </div>
+        {{ field_error("categories") }}
+      </details>
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="submit" class="{{ primary_class }}" data-apply-filters>{{ _("Show entries") }}</button>
+        <a href="{{ scoped_url(request, 'transactions') }}" class="{{ secondary_class }}" data-clear-filters>{{ _("Clear filters") }}</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="results-heading" data-results>
+    <h2 id="results-heading" class="text-base font-semibold">{{ _("Entries") }}</h2>
+    {% if filter_invalid %}
+    <p class="mt-2 text-sm text-danger" role="alert" data-filter-invalid>{{ filter_invalid }}</p>
+    {% elif window %}
+    <p class="mt-1 text-sm text-muted" data-result-count>{% if window.total %}{{ ngettext("%(first)d–%(last)d of %(num)d entry", "%(first)d–%(last)d of %(num)d entries", window.total, first=window.first_item, last=window.last_item) }}{% else %}{{ _("No entries match these filters.") }}{% endif %}</p>
+    {% endif %}
+    {% if rows %}
+    <div class="mt-3 overflow-x-auto">
+      <table class="w-full min-w-[40rem] text-sm">
+        <caption class="sr-only">{{ _("Entries matching the filters") }}{% if window and window.pages > 1 %}, {{ _("page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}{% endif %}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            {% if can_edit %}<th scope="col" class="w-8 py-2 pr-2 font-medium"><span class="sr-only">{{ _("Select") }}</span></th>{% endif %}
+            <th scope="col" class="w-36 py-2 pr-2 font-medium">{{ _("Date") }}</th>
+            <th scope="col" class="w-36 py-2 pr-2 text-right font-medium">{{ _("Amount") }}</th>
+            <th scope="col" class="py-2 pr-2 font-medium">{{ _("Description") }}</th>
+            <th scope="col" class="w-48 py-2 pr-2 font-medium">{{ _("Category") }}</th>
+            <th scope="col" class="w-24 py-2 font-medium">{{ _("Kind") }}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-line">
+          {% for r in rows %}
+          {% set row_id = r.t.id|string %}
+          <tr data-row="{{ row_id }}">
+            {% if can_edit %}<td class="py-2 pr-2"><input id="select-{{ row_id }}" type="checkbox" name="ids" value="{{ row_id }}" form="bulk-form"{% if row_id in bulk_values.get("ids", ()) %} checked{% endif %} class="{{ check_class }}"><label for="select-{{ row_id }}" class="sr-only">{{ _("Select the entry of %(date)s, %(amount)s", date=r.full_date, amount=r.amount) }}</label></td>{% endif %}
+            <td class="whitespace-nowrap py-2 pr-2"><a href="{{ r.month_href }}" class="text-primary-ink underline" data-date><time datetime="{{ r.t.date.isoformat() }}">{{ r.full_date }}</time></a>{% if r.t.month_closed %} <span class="text-xs text-muted" data-closed>{{ _("closed") }}</span>{% endif %}</td>
+            <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums" data-amount>{{ r.amount }}</td>
+            <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}</td>
+            <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span></td>
+            <td class="py-2 text-muted" data-direction>{{ r.direction }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% if window and window.pages > 1 %}
+    <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="{{ _('Pages') }}" data-pages>
+      {% if pages.previous %}<a href="{{ pages.previous }}" rel="prev" class="{{ secondary_class }}" data-previous>{{ _("Previous") }}</a>{% endif %}
+      <span class="text-muted" data-page-number>{{ _("Page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}</span>
+      {% if pages.next %}<a href="{{ pages.next }}" rel="next" class="{{ secondary_class }}" data-next>{{ _("Next") }}</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+
+  {% if can_edit and rows %}
+  <section class="panel p-4 sm:p-6" aria-labelledby="bulk-heading" data-bulk>
+    <h2 id="bulk-heading" class="text-base font-semibold">{{ _("Change category") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Tick entries in the list, or change all entries that match the filters. You confirm the change on the next page.") }}</p>
+    <form id="bulk-form" method="post" action="{{ scoped_url(request, 'transactions_recategorize_preview') }}" class="mt-4 flex flex-wrap items-end gap-3">
+      {{ csrf_input() }}
+      {{ hidden(state_fields) }}
+      <div>
+        <label for="bulk-category" class="{{ label_class }}">{{ _("New category") }}</label>
+        <select id="bulk-category" name="category_id" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+          <option value="">{{ _("Choose a category") }}</option>
+          {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
+          {% if categories[kind] %}
+          <optgroup label="{{ heading }}">
+            {% for c in categories[kind] %}<option value="{{ c.id }}"{% if c.id|string == bulk_values.get("category_id") %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+          </optgroup>
+          {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" name="scope" value="selected" class="{{ secondary_class }}" data-bulk-selected>{{ _("Change the ticked entries") }}</button>
+      <button type="submit" name="scope" value="filtered" class="{{ secondary_class }} disabled:cursor-not-allowed disabled:opacity-50"{% if too_many_for_bulk %} disabled aria-describedby="bulk-too-many"{% endif %} data-bulk-filtered>{{ ngettext("Change all %(num)d matching entry", "Change all %(num)d matching entries", window.total) }}</button>
+    </form>
+    {% if too_many_for_bulk %}<p id="bulk-too-many" class="mt-2 text-xs text-muted" data-bulk-too-many>{{ too_many_for_bulk }}</p>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="export-heading" data-export>
+    <h2 id="export-heading" class="text-base font-semibold">{{ _("Export as CSV") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Downloads every entry that matches the filters, oldest first, in the columns of the workspace archive's transactions.csv. With the standard options the file can be imported again.") }}</p>
+    {% if export_error %}<p class="mt-2 text-sm text-danger" role="alert" data-export-error>{{ export_error }}</p>{% endif %}
+    <form method="get" action="{{ scoped_url(request, 'transactions_export') }}" class="mt-4 space-y-3" data-export-form>
+      {{ hidden(filter_fields) }}
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label for="export-delimiter" class="{{ label_class }}">{{ _("Delimiter") }}</label>
+          <select id="export-delimiter" name="delimiter" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            <option value="comma"{% if export_values.get("delimiter") != "semicolon" %} selected{% endif %}>{{ _("Comma (standard)") }}</option>
+            <option value="semicolon"{% if export_values.get("delimiter") == "semicolon" %} selected{% endif %}>{{ _("Semicolon") }}</option>
+          </select>
+        </div>
+        <div>
+          <label for="export-decimal" class="{{ label_class }}">{{ _("Decimal separator") }}</label>
+          <select id="export-decimal" name="decimal" aria-describedby="export-decimal-help" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            <option value="dot"{% if export_values.get("decimal") != "comma" %} selected{% endif %}>{{ _("Dot (standard)") }}</option>
+            <option value="comma"{% if export_values.get("decimal") == "comma" %} selected{% endif %}>{{ _("Comma") }}</option>
+          </select>
+          <p id="export-decimal-help" class="mt-1 text-xs text-muted">{{ _("A decimal comma needs the semicolon delimiter.") }}</p>
+        </div>
+      </div>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="bom" value="1"{% if export_values.get("bom") %} checked{% endif %} class="mt-0.5 {{ check_class }}">
+        <span>{{ _("For Excel: start the file with a byte order mark, so that Excel reads it as UTF-8") }}</span>
+      </label>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="guard" value="1"{% if export_values.get("guard") %} checked{% endif %} aria-describedby="export-guard-help" class="mt-0.5 {{ check_class }}">
+        <span>{{ _("Protect against spreadsheet formulas") }}</span>
+      </label>
+      <p id="export-guard-help" class="text-xs text-muted">{{ _("Puts an apostrophe before =, +, -, @ (also their full-width forms) at the start of a description or category name, after leading spaces, or after a comma or semicolon inside it, so that a spreadsheet does not run them as formulas. Such values then differ from the stored ones, and a protected description may be too long to import again.") }}</p>
+      <button type="submit" class="{{ primary_class }}" data-export-download>{{ _("Download CSV") }}</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

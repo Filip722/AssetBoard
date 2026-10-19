@@ -149,6 +149,7 @@ TRANSACTION_ACTIONS = {
     "transaction.updated",
     "transaction.deleted",
     "transaction.restored",
+    "transaction.recategorized",
 }
 
 

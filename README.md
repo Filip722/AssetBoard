@@ -56,7 +56,7 @@ make check
 - [Your account](docs/accounts.md): profile, sign-in methods and the audit log.
 - [Categories](docs/categories.md): expense and income categories, savings and transfers.
 - [Months](docs/months.md): moving between months, closing and reopening a month.
-- [Transactions](docs/transactions.md): entering, editing and deleting expenses and income.
+- [Transactions](docs/transactions.md): entering, editing and deleting expenses and income; searching, CSV export and changing the category of many entries.
 - [Workspace settings](docs/workspace-settings.md): name, base currency, time zone and formats.
 
 ## Roadmap

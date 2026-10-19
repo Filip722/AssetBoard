@@ -616,9 +616,11 @@ After the files:
    workspace from an archive" (proposed for the post-1.0 backlog)?
 6. **CLI.** Should `assetboard workspace export|import` exist (for scheduled off-site exports),
    or is F9.4's database backup enough for automation?
-7. **CSV formula injection in F2.6's spreadsheet-oriented export.** The archive is lossless and
-   never prefixes values starting with `=`, `+`, `-` or `@`; should F2.6 offer that protection
-   (which then breaks exact re-import of such descriptions)?
+7. **CSV formula injection in F2.6's spreadsheet-oriented export.** Decided (owner,
+   2026-10-19; see [F2.6](M2-ledger-core.md#f26-transaction-search-and-csv-export)): F2.6
+   offers the protection as an opt-in checkbox, off by default, so its default export stays
+   lossless and re-importable. The archive never prefixes values starting with `=`, `+`, `-`
+   or `@`.
 8. **Rollback of rows edited after the import.** Decided here: a merge rollback soft-deletes
    every transaction of the batch, edited ones included (the confirm page says how many were
    edited). Keep edited ones instead?

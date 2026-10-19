@@ -244,6 +244,9 @@ msgstr ""
 msgid "Deleted transaction restored"
 msgstr ""
 
+msgid "Category of several transactions changed"
+msgstr ""
+
 msgid "Planned value added"
 msgstr ""
 
@@ -365,6 +368,12 @@ msgid "Previous amount"
 msgstr ""
 
 msgid "Currency"
+msgstr ""
+
+msgid "Previous categories"
+msgstr ""
+
+msgid "Months"
 msgstr ""
 
 msgid "Copied from"
@@ -1159,6 +1168,84 @@ msgid_plural "Too many attempts. Try again in %(num)d minutes."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Enter a date such as 2026-10-07 or 07.10.2026."
+msgstr ""
+
+msgid "The end date is before the start date."
+msgstr ""
+
+msgid "Choose expenses, income or both."
+msgstr ""
+
+msgid "The amount cannot be negative."
+msgstr ""
+
+msgid "The largest amount is below the smallest."
+msgstr ""
+
+msgid "Choose one of the listed options."
+msgstr ""
+
+msgid ""
+"A decimal comma needs the semicolon delimiter, so that amounts stay one "
+"column."
+msgstr ""
+
+msgid "Select at least one entry."
+msgstr ""
+
+#, python-format
+msgid ""
+"Too many entries for one change (at most %(max)d). Narrow the filters "
+"first."
+msgstr ""
+
+#, python-format
+msgid ""
+"Too many ticked entries (at most %(max)d at a time). Tick fewer, or "
+"change all matching entries."
+msgstr ""
+
+msgid "Choose an active category."
+msgstr ""
+
+msgid ""
+"Choose a category of the same kind as the entries. To change expenses and"
+" income, filter by one of them first."
+msgstr ""
+
+msgid ""
+"The entries changed after you reviewed the change. Nothing was changed; "
+"review it again."
+msgstr ""
+
+#, python-format
+msgid ""
+"Nothing was changed: some entries are in closed months (%(months)s). An "
+"owner can reopen them."
+msgstr ""
+
+msgid "Correct the marked filters to see the entries."
+msgstr ""
+
+msgid "Newest first"
+msgstr ""
+
+msgid "Oldest first"
+msgstr ""
+
+msgid "Largest amount first"
+msgstr ""
+
+msgid "Smallest amount first"
+msgstr ""
+
+#, python-format
+msgid "Category changed for %(num)d entry."
+msgid_plural "Category changed for %(num)d entries."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Entry deleted."
 msgstr ""
 
@@ -1932,9 +2019,6 @@ msgstr ""
 msgid "Closed"
 msgstr ""
 
-msgid "Months"
-msgstr ""
-
 #, python-format
 msgid "Previous month: %(month)s"
 msgstr ""
@@ -1995,6 +2079,149 @@ msgid "Closing protects the month from accidental changes."
 msgstr ""
 
 msgid "Future months stay open for planning."
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Smallest amount"
+msgstr ""
+
+msgid "Largest amount"
+msgstr ""
+
+msgid "Description contains"
+msgstr ""
+
+msgid "Expenses and income"
+msgstr ""
+
+msgid "None ticked: every category."
+msgstr ""
+
+msgid "Show entries"
+msgstr ""
+
+msgid "Clear filters"
+msgstr ""
+
+msgid "Entries"
+msgstr ""
+
+#, python-format
+msgid "%(first)d–%(last)d of %(num)d entry"
+msgid_plural "%(first)d–%(last)d of %(num)d entries"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No entries match these filters."
+msgstr ""
+
+msgid "Entries matching the filters"
+msgstr ""
+
+#, python-format
+msgid "page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Select"
+msgstr ""
+
+#, python-format
+msgid "Select the entry of %(date)s, %(amount)s"
+msgstr ""
+
+msgid "closed"
+msgstr ""
+
+#, python-format
+msgid "Page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Change category"
+msgstr ""
+
+msgid ""
+"Tick entries in the list, or change all entries that match the filters. "
+"You confirm the change on the next page."
+msgstr ""
+
+msgid "New category"
+msgstr ""
+
+msgid "Change the ticked entries"
+msgstr ""
+
+#, python-format
+msgid "Change all %(num)d matching entry"
+msgid_plural "Change all %(num)d matching entries"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Export as CSV"
+msgstr ""
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+
+msgid "Delimiter"
+msgstr ""
+
+msgid "Comma (standard)"
+msgstr ""
+
+msgid "Semicolon"
+msgstr ""
+
+msgid "Decimal separator"
+msgstr ""
+
+msgid "Dot (standard)"
+msgstr ""
+
+msgid "Comma"
+msgstr ""
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr ""
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+
+msgid "Protect against spreadsheet formulas"
+msgstr ""
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+
+msgid "Download CSV"
+msgstr ""
+
+#, python-format
+msgid "Move %(num)d entry to %(category)s?"
+msgid_plural "Move %(num)d entries to %(category)s?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Already in this category"
+msgstr ""
+
+msgid ""
+"The change is recorded in the workspace audit log. Monthly totals of "
+"these categories change with it."
+msgstr ""
+
+msgid "Every selected entry is already in this category; nothing would change."
 msgstr ""
 
 msgid "Defaults to your display name."

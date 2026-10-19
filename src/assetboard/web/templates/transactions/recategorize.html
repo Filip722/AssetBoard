@@ -1,0 +1,32 @@
+{# Confirmation of a bulk category change (F2.6): what the preview found, then a POST that
+   applies it. The hidden fields carry the selection and the preview's fingerprint. #}
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Change category") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Change category") }}{% endblock %}
+{% block content %}
+<section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="confirm-heading" data-recategorize-confirm>
+  <h2 id="confirm-heading" class="text-base font-semibold">{{ ngettext("Move %(num)d entry to %(category)s?", "Move %(num)d entries to %(category)s?", plan.changing, category=plan.target.name) }}</h2>
+  <dl class="mt-4 space-y-2 text-sm">
+    <div class="flex flex-wrap gap-2"><dt class="text-muted">{{ _("New category") }}:</dt><dd data-target>{{ plan.target.name }} ({{ target_kind }})</dd></div>
+    {% if plan.changing %}
+    <div class="flex flex-wrap gap-2"><dt class="text-muted">{{ _("Previous categories") }}:</dt><dd data-from>{{ from_categories }}</dd></div>
+    <div class="flex flex-wrap gap-2"><dt class="text-muted">{{ _("Months") }}:</dt><dd data-months>{{ months }}</dd></div>
+    {% endif %}
+    {% if unchanged %}
+    <div class="flex flex-wrap gap-2"><dt class="text-muted">{{ _("Already in this category") }}:</dt><dd data-unchanged>{{ unchanged }}</dd></div>
+    {% endif %}
+  </dl>
+  {% if plan.changing %}
+  <p class="mt-4 text-sm text-muted">{{ _("The change is recorded in the workspace audit log. Monthly totals of these categories change with it.") }}</p>
+  {% else %}
+  <p class="mt-4 text-sm text-muted" data-nothing>{{ _("Every selected entry is already in this category; nothing would change.") }}</p>
+  {% endif %}
+  <form method="post" action="{{ scoped_url(request, 'transactions_recategorize') }}" class="mt-6 flex flex-wrap gap-3">
+    {{ csrf_input() }}
+    {% for name, value in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+    {% if plan.changing %}<button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-confirm-change>{{ _("Change category") }}</button>{% endif %}
+    <a href="{{ back_url }}" class="rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-subtle" data-cancel>{{ _("Cancel") }}</a>
+  </form>
+</section>
+{% endblock %}
