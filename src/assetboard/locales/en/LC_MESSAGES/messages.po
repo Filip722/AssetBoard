@@ -1761,11 +1761,58 @@ msgid ""
 "an edit."
 msgstr ""
 
+msgid "(favourable)"
+msgstr ""
+
+msgid "(unfavourable)"
+msgstr ""
+
 #, python-format
 msgid "Planned for %(name)s"
 msgstr ""
 
-msgid "Not planned"
+msgid "not counted"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+msgid "Earned"
+msgstr ""
+
+msgid "Spent"
+msgstr ""
+
+msgid "Saved"
+msgstr ""
+
+msgid "Net"
+msgstr ""
+
+msgid "Savings rate"
+msgstr ""
+
+msgid "Not available: nothing earned"
+msgstr ""
+
+#, python-format
+msgid "Spent %(actual)s of %(planned)s planned"
+msgstr ""
+
+#, python-format
+msgid "Earned %(actual)s of %(planned)s planned"
+msgstr ""
+
+msgid "(over plan)"
+msgstr ""
+
+msgid "Order"
+msgstr ""
+
+msgid "Largest first"
+msgstr ""
+
+msgid "Your order"
 msgstr ""
 
 msgid "This month has no plan yet."
@@ -1801,10 +1848,16 @@ msgstr[1] ""
 msgid "Undo"
 msgstr ""
 
-msgid "Plan"
+msgid "Summary"
 msgstr ""
 
 msgid "Planned"
+msgstr ""
+
+msgid "Actual"
+msgstr ""
+
+msgid "Difference"
 msgstr ""
 
 msgid ""
@@ -2072,6 +2125,9 @@ msgstr ""
 #~ " in this currency."
 #~ msgstr ""
 
-#~ msgid "Added with the new workspace"
+#~ msgid "Not planned"
+#~ msgstr ""
+
+#~ msgid "Plan"
 #~ msgstr ""
 

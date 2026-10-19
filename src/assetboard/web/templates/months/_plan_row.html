@@ -1,7 +1,15 @@
-{# One planned cell's row after a save (F2.3 part B), with the copy banner and the status line
-   out of band. ``row_view`` is None when the row left the plan (an archived or transfer
-   category's line was removed): the swap then removes the row. #}
-{% from "months/_plan.html" import plan_row, banner with context %}
-{% if row_view %}{{ plan_row(row_view) }}{% endif %}
+{# One planned cell's row after a save (F2.3 part B, F2.4), with the group totals, the KPIs and
+   bars, the copy banner and the status line out of band (actuals and the order do not change,
+   so no row moves). When the row left the summary (an archived or transfer category's line was
+   removed), the whole summary comes out of band instead and the target row is replaced by
+   nothing. #}
+{% from "months/_plan.html" import plan_row, totals_row, banner, kpis with context %}
+{% if row_view %}
+{{ plan_row(row_view, plan_only=group_view is not none and group_view.totals is none) }}
+{% for g in summary.groups %}{% if g.totals %}{{ totals_row(g, oob=true) }}{% endif %}{% endfor %}
+{{ kpis(oob=true) }}
 {{ banner(oob=true) }}
+{% else %}
+{% with summary_oob = true %}{% include "months/_summary.html" %}{% endwith %}
+{% endif %}
 <p id="plan-status" hx-swap-oob="innerHTML">{{ status }}</p>

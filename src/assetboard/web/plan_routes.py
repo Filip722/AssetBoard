@@ -26,6 +26,7 @@ from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
 from assetboard.domain.months import YearMonth
+from assetboard.domain.summary import SortOrder
 from assetboard.i18n import gettext
 from assetboard.services.budget import (
     CopyResult,
@@ -40,7 +41,11 @@ from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.month_routes import _month_path, _parse, month_context
 from assetboard.web.plan import PLAN_STATUS, CellState, build_summary, plan_error, summary_context
 from assetboard.web.rendering import render_template
-from assetboard.web.security import require_csrf
+from assetboard.web.security import (
+    require_csrf,
+    set_preference_cookie,
+    summary_sort_cookie_name,
+)
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -80,6 +85,7 @@ def _row(
     context: dict[str, object] = {
         **summary_context(summary),
         "row_view": summary.row(category_id),
+        "group_view": summary.group_of(category_id),
         "status": status,
     }
     response = render_template(
@@ -108,14 +114,47 @@ async def plan_copy(request: Request, ctx: CurrentContext, month: str) -> Respon
 
 
 def _summary(
-    request: Request, ctx: Context, month: YearMonth, copied: CopyResult | None
+    request: Request,
+    ctx: Context,
+    month: YearMonth,
+    copied: CopyResult | None,
+    *,
+    focus_first: bool = True,
+    sort: SortOrder | None = None,
+    alone: bool = False,
 ) -> Response:
+    """The summary block; after a copy also its result on the status line (``alone``: only the
+    block, so a re-sort leaves the status line as it was)."""
     factory = request.app.state.session_factory
     summary = build_summary(
-        factory, ctx, request, get_month(factory, ctx, month), copied=copied, focus_first=True
-    )
-    response = render_template(request, "months/_plan_copy.html", context=summary_context(summary))
+        factory, ctx, request, get_month(factory, ctx, month), copied=copied,
+        focus_first=focus_first, sort=sort,
+    )  # fmt: skip
+    template = "months/_summary.html" if alone else "months/_plan_copy.html"
+    response = render_template(request, template, context=summary_context(summary))
     response.headers["Vary"] = "HX-Request"
+    return response
+
+
+@router.post("/m/{month}/summary/sort", name="summary_sort")
+async def summary_sort_set(
+    request: Request, ctx: CurrentContext, month: str, sort: FormStr = ""
+) -> Response:
+    """Choose the summary's row order (F2.4): largest actual first, or the user's category
+    order. Kept in this browser (cookie; owner decision P4), so every later render, including
+    the out-of-band summary after a transaction write, uses it."""
+    target = _parse(month)
+    chosen: SortOrder = "manual" if sort == "manual" else "actual"
+    settings = request.app.state.settings
+    if is_htmx_fragment_request(request):
+        # The cookie arrives with this response; this render uses the chosen order directly.
+        response = await run_in_threadpool(
+            lambda: _summary(request, ctx, target, None, focus_first=False, sort=chosen, alone=True)
+        )
+    else:
+        path = _month_path(request, target) + "#month-summary"
+        response = RedirectResponse(path, status_code=303)
+    set_preference_cookie(response, settings, summary_sort_cookie_name(settings), chosen)
     return response
 
 

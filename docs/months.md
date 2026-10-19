@@ -22,11 +22,26 @@ zone, not at midnight UTC.
 Every month from January 1900 to December 2199 can be opened, including months with no data yet
 and future months, which you can use for planning.
 
+## The month summary
+
+The **Summary** block at the top of the month page shows how the month is going:
+
+- **Earned**, **Spent**, **Saved**, **Net** (earned minus spent minus saved) and the **Savings
+  rate** (earned minus spent, as a share of earned; "—" when nothing was earned). Money moved
+  between your own accounts (transfer categories) counts nowhere.
+- Two bars compare what you spent and earned with what you planned.
+- A table with every category in groups (Expenses, Saved / invested, Income, Withdrawn from
+  savings): **Planned**, **Actual** and **Difference**, and a total per group. A positive
+  difference is always good news: spent less, earned more, saved more or withdrew less than
+  planned. A category with entries but no plan shows a plan of 0.00.
+- **Largest first** sorts each group by the actual amount; **Your order** uses the order of
+  your categories. This browser remembers the choice.
+
+The summary updates as soon as you add, change or delete an entry or a planned value.
+
 ## Planning a month
 
-The **Plan** block at the top of the month page lists your categories in groups: Expenses,
-Saved / invested, Income and Withdrawn from savings. Type the amount you plan for a category in
-its **Planned** field:
+Type the amount you plan for a category in its **Planned** field in the summary:
 
 - **Enter** saves and moves to the next category; leaving the field (Tab or a click elsewhere)
   saves too. Amounts are typed as for entries (`550`, `1 234,56`, `12,5`).

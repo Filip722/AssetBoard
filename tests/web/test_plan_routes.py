@@ -260,7 +260,8 @@ def test_viewers_see_planned_values_read_only_and_cannot_write(plan: OwnerApp) -
     summary = _summary(_page(plan))
     assert "data-plan-input" not in summary and "data-plan-banner" not in summary
     assert re.search(r"data-planned>€1,234.50<", _row(summary, food))
-    assert '<span class="sr-only">Not planned</span>' in _row(summary, rent)
+    # Not planned: 0.00, as text (F2.4: categories are never shown without an amount).
+    assert re.search(r"data-planned>€0.00<", _row(summary, rent))
     assert "aria-label" not in _row(summary, rent)
     assert "Copied" not in _page(plan, f"{MONTH}?plan_copied=2")  # not for viewers
     response = plan.post(f"{MONTH}/plan/{food}", {"amount": "1"}, token_from=MONTH)

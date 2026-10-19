@@ -1,32 +1,98 @@
-{# The plan in the month summary (F2.3 part B). ``summary`` is web.plan.SummaryView. Each
-   planned cell is a one-input form: Enter submits it without JavaScript (implicit submission);
-   with JavaScript a change saves it too, and app.js moves Enter to the next cell and makes Esc
-   restore the saved value (data-* hooks; no inline script or style). F2.4 adds the actual and
-   difference cells to these rows. #}
+{# The month summary's rows (F2.3 part B, F2.4). ``summary`` is web.plan.SummaryView. Each
+   editable planned cell is a one-input form: Enter submits it without JavaScript (implicit
+   submission); with JavaScript a change saves it too, and app.js moves Enter to the next cell
+   and makes Esc restore the saved value (data-* hooks; no inline script or style). Actual and
+   difference follow; the plan-only transfer group has neither. #}
 {% from "macros/components.html" import csrf_input with context %}
 {% from "categories/_macros.html" import swatch %}
 
-{% macro plan_row(r) -%}
+{% set tone_class = {"favourable": "text-success-strong", "unfavourable": "text-danger", "even": "text-muted"} %}
+
+{% macro difference(text, tone) -%}
+<span class="tabular-nums {{ tone_class[tone] }}">{{ text }}</span>{% if tone == "favourable" %}<span class="sr-only"> {{ _("(favourable)") }}</span>{% elif tone == "unfavourable" %}<span class="sr-only"> {{ _("(unfavourable)") }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro plan_row(r, plan_only=false) -%}
 {% set row_id = "plan-" ~ r.category_id %}
 <tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}">
   <th scope="row" class="py-1.5 pr-2 text-left font-normal">
     <span class="flex items-center gap-2">{{ swatch(r.color) }}<span data-plan-category>{{ r.name }}</span>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
   </th>
-  <td class="py-1.5 text-right align-top">
-    {% if summary.can_write %}
+  <td class="py-1.5 pr-2 text-right align-top">
+    {% if r.editable %}
     {% set action = scoped_url(request, 'plan_set', month=summary.month, category_id=r.category_id) %}
     <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-trigger="change, submit" hx-target="#{{ row_id }}" hx-swap="outerHTML" hx-sync="this:replace" novalidate data-plan-form>
       {{ csrf_input() }}
       <label for="{{ row_id }}-amount" class="sr-only">{{ _("Planned for %(name)s", name=r.name) }}</label>
-      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="0" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
+      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="{{ summary.zero_input }}" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
              class="form-control ml-auto w-36 rounded-lg px-2.5 py-1.5 text-right tabular-nums">
       {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
     </form>
     {% else %}
-    <span class="tabular-nums" data-planned>{% if r.display %}{{ r.display }}{% else %}<span class="text-muted" aria-hidden="true">—</span><span class="sr-only">{{ _("Not planned") }}</span>{% endif %}</span>
+    <span class="tabular-nums" data-planned>{{ r.display }}</span>
     {% endif %}
   </td>
+  {% if plan_only %}
+  <td colspan="2" class="py-1.5 text-right text-xs text-muted">{{ _("not counted") }}</td>
+  {% else %}
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-actual>{{ r.actual }}</td>
+  <td class="whitespace-nowrap py-1.5 text-right" data-difference>{{ difference(r.difference, r.tone) }}</td>
+  {% endif %}
 </tr>
+{%- endmacro %}
+
+{% macro totals_row(g, oob=false) -%}
+<tr id="summary-total-{{ g.key }}" class="font-semibold" data-summary-total="{{ g.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
+  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.planned }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.actual }}</td>
+  <td class="whitespace-nowrap py-2 text-right">{{ difference(g.totals.difference, g.totals.tone) }}</td>
+</tr>
+{%- endmacro %}
+
+{# KPI cards and the planned-vs-actual bars. The bars are inline SVG (CSP forbids inline
+   styles, so widths are SVG attributes) and hidden from screen readers: the text beside them
+   says the same. #}
+{% macro kpis(oob=false) -%}
+{% set k = summary.kpis %}
+<div id="summary-kpis" class="mt-4 space-y-4" data-summary-kpis{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+    {% for label, value, extra in [(_("Earned"), k.earned, ""), (_("Spent"), k.spent, ""), (_("Saved"), k.saved, ""), (_("Net"), k.net, tone_class[k.net_tone] if k.net_tone == "unfavourable" else "")] %}
+    <div class="rounded-xl border border-line bg-subtle px-3 py-2">
+      <dt class="text-xs text-muted">{{ label }}</dt>
+      <dd class="mt-1 text-base font-semibold tabular-nums {{ extra }}" data-kpi>{{ value }}</dd>
+    </div>
+    {% endfor %}
+    <div class="rounded-xl border border-line bg-subtle px-3 py-2">
+      <dt class="text-xs text-muted">{{ _("Savings rate") }}</dt>
+      <dd class="mt-1 text-base font-semibold tabular-nums" data-kpi="savings-rate">{% if k.savings_rate is not none %}{{ k.savings_rate }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ _("Not available: nothing earned") }}</span>{% endif %}</dd>
+    </div>
+  </dl>
+  <div class="grid gap-3 sm:grid-cols-2">
+    {% for b in summary.bars %}
+    <div data-summary-bar="{{ b.key }}">
+      <p class="text-xs text-muted">{% if b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
+      <svg class="mt-1 h-3 w-full" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <rect x="0" y="0" width="100" height="6" class="fill-subtle"></rect>
+        <rect x="0" y="0" width="{{ b.planned_width }}" height="6" class="fill-line-strong" data-bar-planned></rect>
+        <rect x="0" y="1.5" width="{{ b.actual_width }}" height="3" class="{% if b.over and b.key == "expense" %}fill-danger{% else %}fill-primary{% endif %}" data-bar-actual></rect>
+      </svg>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro sort_toggle() -%}
+{% set action = scoped_url(request, 'summary_sort', month=summary.month) %}
+<form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#month-summary" hx-swap="outerHTML" class="flex items-center gap-2 text-xs" data-summary-sort>
+  {{ csrf_input() }}
+  <span class="text-muted" id="summary-sort-label">{{ _("Order") }}</span>
+  <div role="group" aria-labelledby="summary-sort-label" class="inline-flex overflow-hidden rounded-lg border border-line">
+    <button id="summary-sort-actual" type="submit" name="sort" value="actual" aria-pressed="{{ 'true' if summary.sort == 'actual' else 'false' }}" class="px-2.5 py-1 {% if summary.sort == "actual" %}bg-primary text-on-primary{% else %}hover:bg-subtle{% endif %}">{{ _("Largest first") }}</button>
+    <button id="summary-sort-manual" type="submit" name="sort" value="manual" aria-pressed="{{ 'true' if summary.sort == 'manual' else 'false' }}" class="px-2.5 py-1 {% if summary.sort == "manual" %}bg-primary text-on-primary{% else %}hover:bg-subtle{% endif %}">{{ _("Your order") }}</button>
+  </div>
+</form>
 {%- endmacro %}
 
 {% macro banner(oob=false) -%}

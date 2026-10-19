@@ -8,6 +8,7 @@ from babel.core import UnknownLocaleError
 from babel.numbers import (
     UnknownCurrencyError,
     format_currency,
+    format_percent,
     get_decimal_symbol,
     get_group_symbol,
 )
@@ -156,3 +157,10 @@ def format_amount_input(money: Money, locale: str) -> str:
     decimal_symbol = get_decimal_symbol(_normalize_number_locale(locale))
     text = format(money.to_decimal(), "f")
     return text.replace(".", decimal_symbol)
+
+
+def format_rate_tenths(tenths: int, locale: str) -> str:
+    """A rate given in tenths of a percent (already rounded once), with one decimal:
+    ``-43.3%`` (en), ``-43,3%`` (pl). Exact: the value is a Decimal, never a float."""
+    value = Decimal(tenths).scaleb(-3)
+    return format_percent(value, format="#,##0.0%", locale=_normalize_number_locale(locale))

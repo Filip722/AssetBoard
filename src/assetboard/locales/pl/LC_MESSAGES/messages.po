@@ -1872,12 +1872,59 @@ msgstr ""
 "07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
 "czyści wiersz lub anuluje edycję."
 
+msgid "(favourable)"
+msgstr "(korzystnie)"
+
+msgid "(unfavourable)"
+msgstr "(niekorzystnie)"
+
 #, python-format
 msgid "Planned for %(name)s"
 msgstr "Plan dla: %(name)s"
 
-msgid "Not planned"
-msgstr "Nie zaplanowano"
+msgid "not counted"
+msgstr "nieliczone"
+
+msgid "Total"
+msgstr "Razem"
+
+msgid "Earned"
+msgstr "Zarobione"
+
+msgid "Spent"
+msgstr "Wydane"
+
+msgid "Saved"
+msgstr "Zaoszczędzone"
+
+msgid "Net"
+msgstr "Bilans"
+
+msgid "Savings rate"
+msgstr "Stopa oszczędności"
+
+msgid "Not available: nothing earned"
+msgstr "Niedostępne: brak zarobków"
+
+#, python-format
+msgid "Spent %(actual)s of %(planned)s planned"
+msgstr "Wydano %(actual)s z zaplanowanych %(planned)s"
+
+#, python-format
+msgid "Earned %(actual)s of %(planned)s planned"
+msgstr "Zarobiono %(actual)s z zaplanowanych %(planned)s"
+
+msgid "(over plan)"
+msgstr "(ponad plan)"
+
+msgid "Order"
+msgstr "Kolejność"
+
+msgid "Largest first"
+msgstr "Od największych"
+
+msgid "Your order"
+msgstr "Twoja kolejność"
 
 msgid "This month has no plan yet."
 msgstr "Ten miesiąc nie ma jeszcze planu."
@@ -1929,11 +1976,17 @@ msgstr[2] ""
 msgid "Undo"
 msgstr "Cofnij"
 
-msgid "Plan"
-msgstr "Plan"
+msgid "Summary"
+msgstr "Podsumowanie"
 
 msgid "Planned"
 msgstr "Plan"
+
+msgid "Actual"
+msgstr "Wykonanie"
+
+msgid "Difference"
+msgstr "Różnica"
 
 msgid ""
 "Enter or leaving the field saves a planned value; 0 or an empty field "
@@ -2174,6 +2227,9 @@ msgstr "Zapisz ustawienia"
 #~ msgid "Entries and planned values for this month will appear here."
 #~ msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 
-#~ msgid "Added with the new workspace"
-#~ msgstr "Dodane z nowym obszarem roboczym"
+#~ msgid "Not planned"
+#~ msgstr "Nie zaplanowano"
+
+#~ msgid "Plan"
+#~ msgstr "Plan"
 

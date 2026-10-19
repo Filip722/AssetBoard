@@ -58,6 +58,19 @@ def csrf_cookie_name(settings: Settings) -> str:
     return _cookie_name(settings, "csrf")
 
 
+def summary_sort_cookie_name(settings: Settings) -> str:
+    """The month summary's row order chosen in this browser (F2.4; not sensitive)."""
+    return _cookie_name(settings, "summary_sort")
+
+
+# A display preference: kept for a year in this browser.
+PREFERENCE_COOKIE_SECONDS = 365 * 24 * 3600
+
+
+def set_preference_cookie(response: Response, settings: Settings, name: str, value: str) -> None:
+    response.set_cookie(name, value, max_age=PREFERENCE_COOKIE_SECONDS, **_cookie_options(settings))
+
+
 def _cookie_options(settings: Settings) -> dict[str, Any]:
     return {"path": "/", "secure": is_https(settings), "httponly": True, "samesite": "lax"}
 
