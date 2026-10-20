@@ -22,6 +22,14 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
 
 # Public methods a subclass adds: (repository class name, method) -> covering test.
 EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
+    **{
+        ("ScheduledItemRepository", method): "test_scheduled_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "category_counts")
+    },
+    **{
+        ("ScheduledOccurrenceRepository", method): "test_scheduled_queries_stay_in_their_workspace"
+        for method in ("create", "for_item", "delete_pending_future", "category_counts")
+    },
     ("MembershipRepository", "members"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",

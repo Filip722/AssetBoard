@@ -189,7 +189,8 @@ def _plant_transaction(owner: OwnerApp, *, deleted: bool) -> None:
 
 
 LOCKED_HELP = (
-    "Locked: transactions (deleted ones included) or planned values exist, and their amounts "
+    "Locked: transactions (deleted ones included) or planned values or recurring items exist, "
+    "and their amounts "
     "are stored in this currency."
 )
 
@@ -212,8 +213,9 @@ def test_the_settings_page_shows_why_the_base_currency_is_locked(
     assert LOCKED_HELP in page
     polish = owner.client.get("/workspace/settings", headers={"Accept-Language": "pl"}).text
     assert (
-        "Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane, a ich kwoty "
-        "są zapisane w tej walucie." in polish
+        "Zablokowana: istnieją transakcje (również usunięte), wartości planowane "
+        "lub pozycje cykliczne, "
+        "a ich kwoty są zapisane w tej walucie." in polish
     )
 
 

@@ -124,6 +124,24 @@ msgstr "Wypłata z oszczędności"
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
+msgid "Recurring item created"
+msgstr "Utworzono pozycję cykliczną"
+
+msgid "Recurring item updated"
+msgstr "Zaktualizowano pozycję cykliczną"
+
+msgid "Recurring item paused"
+msgstr "Wstrzymano pozycję cykliczną"
+
+msgid "Recurring item resumed"
+msgstr "Wznowiono pozycję cykliczną"
+
+msgid "Recurring item archived"
+msgstr "Zarchiwizowano pozycję cykliczną"
+
+msgid "Recurring item deleted"
+msgstr "Usunięto pozycję cykliczną"
+
 msgid "First administrator created at setup"
 msgstr "Pierwszy administrator utworzony podczas konfiguracji"
 
@@ -1227,6 +1245,27 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
+msgid "Monday"
+msgstr "Poniedziałek"
+
+msgid "Tuesday"
+msgstr "Wtorek"
+
+msgid "Wednesday"
+msgstr "Środa"
+
+msgid "Thursday"
+msgstr "Czwartek"
+
+msgid "Friday"
+msgstr "Piątek"
+
+msgid "Saturday"
+msgstr "Sobota"
+
+msgid "Sunday"
+msgstr "Niedziela"
+
 msgid "Too many attempts. Try again later."
 msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 
@@ -2232,6 +2271,148 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
+msgid "Recurring item"
+msgstr "Pozycja cykliczna"
+
+msgid "Edit recurring item"
+msgstr "Edytuj pozycję cykliczną"
+
+msgid "New recurring item"
+msgstr "Nowa pozycja cykliczna"
+
+msgid ""
+"Check the name, amount, category and recurrence dates. Choose an active "
+"category matching the direction. Holiday adjustments require a supported "
+"workspace country."
+msgstr ""
+"Sprawdź nazwę, kwotę, kategorię i daty powtarzania. Wybierz aktywną "
+"kategorię zgodną z kierunkiem. Uwzględnianie świąt wymaga obsługiwanego "
+"kraju przestrzeni roboczej."
+
+msgid "Amount type"
+msgstr "Rodzaj kwoty"
+
+msgid "Fixed"
+msgstr "Stała"
+
+msgid "Estimate"
+msgstr "Szacunkowa"
+
+msgid "Start date"
+msgstr "Data początkowa"
+
+msgid "End date (optional)"
+msgstr "Data końcowa (opcjonalnie)"
+
+msgid "Maximum occurrences (optional)"
+msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
+
+msgid "Repeat"
+msgstr "Powtarzanie"
+
+msgid "Weekly"
+msgstr "Co tydzień"
+
+msgid "Monthly"
+msgstr "Co miesiąc"
+
+msgid "Yearly"
+msgstr "Co rok"
+
+msgid "Every N weeks, months or years"
+msgstr "Co ile tygodni, miesięcy lub lat"
+
+msgid "Weekdays (weekly rules)"
+msgstr "Dni tygodnia (reguły tygodniowe)"
+
+msgid "Day (monthly or yearly rules)"
+msgstr "Dzień (reguły miesięczne lub roczne)"
+
+msgid "Last day"
+msgstr "Ostatni dzień"
+
+msgid "First working day"
+msgstr "Pierwszy dzień roboczy"
+
+msgid "Last working day"
+msgstr "Ostatni dzień roboczy"
+
+msgid "Month number (yearly rules)"
+msgstr "Numer miesiąca (reguły roczne)"
+
+msgid "Weekend and holiday adjustment"
+msgstr "Przesunięcie na wypadek weekendu lub święta"
+
+msgid "Keep the date"
+msgstr "Zachowaj datę"
+
+msgid "Previous working day"
+msgstr "Poprzedni dzień roboczy"
+
+msgid "Next working day"
+msgstr "Następny dzień roboczy"
+
+msgid "Notes"
+msgstr "Notatki"
+
+msgid "Include past occurrences"
+msgstr "Uwzględnij przeszłe wystąpienia"
+
+msgid ""
+"Saving a rule creates planned occurrences, never transactions. Edits "
+"replace only pending dates from today onward."
+msgstr ""
+"Zapisanie reguły tworzy planowane wystąpienia, a nie transakcje. Edycja "
+"zastępuje tylko oczekujące wystąpienia od dzisiaj."
+
+msgid "Save recurring item"
+msgstr "Zapisz pozycję cykliczną"
+
+msgid "Next six due dates"
+msgstr "Sześć najbliższych terminów"
+
+msgid ""
+"Enable JavaScript for the live preview. You can still save this form "
+"without it."
+msgstr ""
+"Włącz JavaScript, aby zobaczyć podgląd na żywo. Bez niego nadal możesz "
+"zapisać formularz."
+
+msgid "Recurring items"
+msgstr "Pozycje cykliczne"
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "Paused"
+msgstr "Wstrzymana"
+
+msgid "Edit rule"
+msgstr "Edytuj regułę"
+
+msgid "Resume"
+msgstr "Wznów"
+
+msgid "Pause"
+msgstr "Wstrzymaj"
+
+msgid "No recurring items yet."
+msgstr "Nie ma jeszcze pozycji cyklicznych."
+
+msgid ""
+"Pausing or archiving removes pending dates from today onward. Existing "
+"history is kept; deleting an item with history archives it instead."
+msgstr ""
+"Wstrzymanie lub archiwizacja usuwa oczekujące wystąpienia od dzisiaj. "
+"Historia zostaje zachowana; usunięcie pozycji z historią powoduje jej "
+"archiwizację."
+
+msgid "Choose valid recurrence dates to see the preview."
+msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
+
+msgid "No more occurrences match this rule."
+msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
+
 msgid "Filters"
 msgstr "Filtry"
 
@@ -2493,11 +2674,11 @@ msgid "General"
 msgstr "Ogólne"
 
 msgid ""
-"Locked: transactions (deleted ones included) or planned values exist, and"
-" their amounts are stored in this currency."
+"Locked: transactions (deleted ones included) or planned values or "
+"recurring items exist, and their amounts are stored in this currency."
 msgstr ""
-"Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane,"
-" a ich kwoty są zapisane w tej walucie."
+"Zablokowana: istnieją transakcje (również usunięte), wartości planowane "
+"lub pozycje cykliczne, a ich kwoty są zapisane w tej walucie."
 
 msgid "Formatting default"
 msgstr "Domyślne formatowanie"

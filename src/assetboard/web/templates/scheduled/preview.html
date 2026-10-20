@@ -1,0 +1,3 @@
+{% if invalid %}<p class="text-sm text-muted">{{ _("Choose valid recurrence dates to see the preview.") }}</p>
+{% elif dates %}<ol class="space-y-2 text-sm">{% for day in dates %}<li><time datetime="{{ day }}">{{ day }}</time></li>{% endfor %}</ol>
+{% else %}<p class="text-sm text-muted">{{ _("No more occurrences match this rule.") }}</p>{% endif %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Recurring") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Recurring items") }}{% endblock %}
+{% block content %}
+{% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="mb-6 inline-block rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("New recurring item") }}</a>{% endif %}
+<div class="space-y-4">
+{% for item in items %}
+<section class="panel p-6" data-scheduled-item="{{ item.id }}">
+  <h2 class="font-semibold break-words">{{ item.values.name }}</h2>
+  <p class="mt-2 text-sm">{{ format_money(item.values.amount, locale) }} · {{ _("Income") if item.values.direction == 'income' else _("Expense") }} · {{ _("Estimate") if item.values.amount_mode == 'estimate' else _("Fixed") }}</p>
+  {% if item.values.notes %}<p class="mt-2 break-words text-sm text-muted">{{ item.values.notes }}</p>{% endif %}
+  {% if item.archived %}<p class="mt-3 text-sm text-muted">{{ _("Archived") }}</p>
+  {% else %}
+  <p class="mt-3 text-sm text-muted">{{ _("Paused") if item.paused else _("Active") }}</p>
+  {% if can_edit %}
+  <div class="mt-4 flex flex-wrap items-center gap-3">
+    <a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}">{{ _("Edit rule") }}</a>
+    {% for action, label in [('resume' if item.paused else 'pause', _('Resume') if item.paused else _('Pause')), ('archive', _('Archive')), ('delete', _('Delete'))] %}
+    <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action=action) }}">{{ csrf_input() }}<button type="submit" class="rounded-xl border border-line px-3 py-2 text-sm">{{ label }}</button></form>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+</section>
+{% else %}<p class="panel p-6 text-muted">{{ _("No recurring items yet.") }}</p>{% endfor %}
+</div>
+<p class="mt-6 text-sm text-muted">{{ _("Pausing or archiving removes pending dates from today onward. Existing history is kept; deleting an item with history archives it instead.") }}</p>
+{% endblock %}

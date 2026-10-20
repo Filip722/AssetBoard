@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% block title %}{{ _("Recurring item") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Edit recurring item") if item_id else _("New recurring item") }}{% endblock %}
+{% block content %}
+<div class="grid gap-6 lg:grid-cols-2">
+<section class="panel p-6 sm:p-7">
+{% if error %}<p role="alert" class="mb-4 text-danger">{{ _("Check the name, amount, category and recurrence dates. Choose an active category matching the direction. Holiday adjustments require a supported workspace country.") }}</p>{% endif %}
+<form id="schedule-form" method="post" action="{{ scoped_url(request, 'scheduled_update', item_id=item_id) if item_id else scoped_url(request, 'scheduled_create') }}" class="space-y-4">
+  {{ csrf_input() }}
+  {{ field("name", _("Name"), value=values.get('name', ''), required=true, maxlength=200) }}
+  <label class="block text-sm font-medium" for="direction">{{ _("Direction") }}</label>
+  <select id="direction" name="direction" class="form-select w-full">
+    <option value="expense"{% if values.get('direction') == 'expense' %} selected{% endif %}>{{ _("Expense") }}</option>
+    <option value="income"{% if values.get('direction') == 'income' %} selected{% endif %}>{{ _("Income") }}</option>
+  </select>
+  <label class="block text-sm font-medium" for="category_id">{{ _("Category") }}</label>
+  <select id="category_id" name="category_id" class="form-select w-full" required>
+    {% for category in categories %}<option value="{{ category.id }}"{% if values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }} · {{ _("Income") if category.kind == 'income' else _("Expense") }}</option>{% endfor %}
+  </select>
+  {{ field("amount", _("Amount"), value=values.get('amount', ''), required=true, maxlength=40, help=workspace_nav.current.base_currency) }}
+  <label class="block text-sm font-medium" for="amount_mode">{{ _("Amount type") }}</label>
+  <select id="amount_mode" name="amount_mode" class="form-select w-full">
+    <option value="fixed"{% if values.get('amount_mode') == 'fixed' %} selected{% endif %}>{{ _("Fixed") }}</option>
+    <option value="estimate"{% if values.get('amount_mode') == 'estimate' %} selected{% endif %}>{{ _("Estimate") }}</option>
+  </select>
+  {{ field("start_date", _("Start date"), type="date", value=values.get('start_date', ''), required=true) }}
+  {{ field("end_date", _("End date (optional)"), type="date", value=values.get('end_date', '')) }}
+  {{ field("max_count", _("Maximum occurrences (optional)"), type="number", value=values.get('max_count', '')) }}
+  <label class="block text-sm font-medium" for="freq">{{ _("Repeat") }}</label>
+  <select id="freq" name="freq" class="form-select w-full">
+    {% for value, label in [('weekly', _('Weekly')), ('monthly', _('Monthly')), ('yearly', _('Yearly'))] %}<option value="{{ value }}"{% if values.get('freq') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  {{ field("interval", _("Every N weeks, months or years"), type="number", value=values.get('interval', '1'), required=true) }}
+  <fieldset><legend class="text-sm font-medium">{{ _("Weekdays (weekly rules)") }}</legend>
+    <div class="mt-2 flex flex-wrap gap-3">{% for value, label in weekdays %}<label class="text-sm"><input type="checkbox" name="weekday" value="{{ value }}"{% if value in values.get('weekdays', '').split(',') %} checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+  </fieldset>
+  <label class="block text-sm font-medium" for="month_day">{{ _("Day (monthly or yearly rules)") }}</label>
+  <select id="month_day" name="month_day" class="form-select w-full">
+    {% for day in days %}<option value="{{ day }}"{% if values.get('month_day') == day|string %} selected{% endif %}>{{ day }}</option>{% endfor %}
+    {% for value, label in [('-1', _('Last day')), ('first_working_day', _('First working day')), ('last_working_day', _('Last working day'))] %}<option value="{{ value }}"{% if values.get('month_day') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <label class="block text-sm font-medium" for="month">{{ _("Month number (yearly rules)") }}</label>
+  <select id="month" name="month" class="form-select w-full">{% for month in months %}<option value="{{ month }}"{% if values.get('month') == month|string %} selected{% endif %}>{{ month }}</option>{% endfor %}</select>
+  <label class="block text-sm font-medium" for="weekend_policy">{{ _("Weekend and holiday adjustment") }}</label>
+  <select id="weekend_policy" name="weekend_policy" class="form-select w-full">
+    {% for value, label in [('none', _('Keep the date')), ('previous_working_day', _('Previous working day')), ('next_working_day', _('Next working day'))] %}<option value="{{ value }}"{% if values.get('weekend_policy') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  {{ field("notes", _("Notes"), value=values.get('notes', ''), maxlength=200) }}
+  {% if not item_id %}<label class="block text-sm"><input type="checkbox" name="include_past" value="1"{% if values.get('include_past') == '1' %} checked{% endif %}> {{ _("Include past occurrences") }}</label>{% endif %}
+  <p class="text-xs text-muted">{{ _("Saving a rule creates planned occurrences, never transactions. Edits replace only pending dates from today onward.") }}</p>
+  {{ primary_button(_("Save recurring item")) }}
+</form>
+<a class="mt-4 block text-primary-ink" href="{{ scoped_url(request, 'scheduled_items') }}">{{ _("Cancel") }}</a>
+</section>
+<section class="panel self-start p-6 sm:p-7">
+  <h2 class="font-semibold">{{ _("Next six due dates") }}</h2>
+  <div id="schedule-preview" class="mt-4" hx-post="{{ scoped_url(request, 'scheduled_preview') }}" hx-trigger="load, change from:#schedule-form delay:300ms, input from:#schedule-form delay:400ms" hx-include="#schedule-form" hx-sync="this:replace" hx-target="this"></div>
+  <noscript><p class="text-sm text-muted">{{ _("Enable JavaScript for the live preview. You can still save this form without it.") }}</p></noscript>
+</section>
+</div>
+{% endblock %}

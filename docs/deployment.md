@@ -52,6 +52,7 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_PROXY_AUTH_NAME_HEADER` | unset | App | Optional header with a display name, used only when an account is created. |
 | `ASSETBOARD_PROXY_AUTH_AUTO_CREATE` | `false` | App | Proxy-authenticated people without an account get one with their own workspace. |
 | `ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL` | `false` | App | A first proxy sign-in whose email matches an existing account with a password links them after that password is entered once. |
+| `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Positive number of calendar months of recurring occurrences to generate ahead. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -74,6 +75,13 @@ Sessions are stored on the server. The session cookie lasts for the absolute ses
 prefer OIDC or reverse-proxy auth backed by an IdP that enforces multi-factor authentication; TOTP
 is intentionally deferred to the post-1.0 backlog. Run a single application process (one Uvicorn
 worker): the setup token, the password-hashing limit and some caches live in the process.
+
+### Recurring-item generation
+
+`ASSETBOARD_RECURRENCE_HORIZON_MONTHS` is a positive integer (default `13`). Planned occurrences
+are generated immediately on rule changes, at startup and daily at 03:00 in each workspace's
+time zone. Keep one application process/worker. New workspaces/time-zone changes are discovered
+within a minute. Calendars are local; no external service is contacted. See [Recurring items](recurring.md).
 
 ### Invitations
 

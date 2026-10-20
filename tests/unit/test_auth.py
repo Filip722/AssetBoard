@@ -1261,6 +1261,8 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
 
 # Workspace-owned tables with a non-null workspace_id (F1.2, F2.1, F2.5, F2.2, F2.3).
 WORKSPACE_TABLES = {
+    "scheduled_items",
+    "scheduled_occurrences",
     "memberships",
     "invitations",
     "categories",

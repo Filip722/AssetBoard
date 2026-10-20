@@ -16,7 +16,7 @@
       <label for="base_currency" class="block text-sm font-medium text-ink">{{ _("Base currency") }}</label>
       <input type="hidden" name="base_currency" value="{{ values.base_currency }}">
       <select id="base_currency" disabled aria-describedby="base_currency-help{% if errors.get('base_currency') %} base_currency-error{% endif %}" class="form-select w-full"><option selected>{{ values.base_currency }}</option></select>
-      <p id="base_currency-help" class="text-xs text-muted">{{ _("Locked: transactions (deleted ones included) or planned values exist, and their amounts are stored in this currency.") }}</p>
+      <p id="base_currency-help" class="text-xs text-muted">{{ _("Locked: transactions (deleted ones included) or planned values or recurring items exist, and their amounts are stored in this currency.") }}</p>
       {% if errors.get("base_currency") %}<p id="base_currency-error" class="text-sm text-danger">{{ errors.get("base_currency") }}</p>{% endif %}
     </div>
     {% else %}

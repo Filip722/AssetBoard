@@ -886,3 +886,63 @@ def test_relationship_check_detects_a_seeded_relationship() -> None:
         home: Mapped[Home] = relationship(viewonly=True)  # owned -> unowned is fine
 
     assert relationships_into_owned_models(RelationshipBase) == ["Home.notes -> Note"]
+
+
+def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -> None:
+    from assetboard.db.models.ledger import Category
+    from assetboard.db.repositories.scheduled import (
+        ScheduledItemRepository,
+        ScheduledOccurrenceRepository,
+    )
+
+    ctx_a, ctx_b = two_workspaces
+    items = ScheduledItemRepository(db_session, ctx_a)
+    rows = ScheduledOccurrenceRepository(db_session, ctx_a)
+    category = CategoryRepository(db_session, ctx_a).add(
+        TENANT_CASES[Category].factory(db_session, ctx_a.workspace.id)
+    )
+    item = items.create(
+        name="Insurance",
+        direction="expense",
+        category_id=category.id,
+        amount_mode="fixed",
+        amount_minor=180000,
+        currency="EUR",
+        start_date=date(2026, 1, 1),
+        freq="monthly",
+        interval=1,
+        weekdays=[],
+        month_day="14",
+        month=1,
+        weekend_policy="none",
+        notes="",
+    )
+    row = rows.create(
+        scheduled_item_id=item.id,
+        category_id=category.id,
+        direction="expense",
+        due_date=date(2026, 3, 14),
+        expected_minor=180000,
+        currency="EUR",
+        amount_state="confirmed",
+        status="pending",
+        label="Insurance",
+    )
+    assert item.workspace_id == row.workspace_id == ctx_a.workspace.id
+    other_items = ScheduledItemRepository(db_session, ctx_b)
+    other_rows = ScheduledOccurrenceRepository(db_session, ctx_b)
+    with pytest.raises(ForeignWorkspace):
+        other_items.create(workspace_id=ctx_a.workspace.id)
+    with pytest.raises(ForeignWorkspace):
+        other_rows.create(workspace_id=ctx_a.workspace.id)
+    assert other_items.ordered() == [] and other_items.ordered(active_only=True) == []
+    assert other_items.category_counts() == {} and other_rows.category_counts() == {}
+    assert other_rows.for_item(item.id) == []
+    other_rows.delete_pending_future(item.id, date(2026, 1, 1))
+    assert rows.for_item(item.id)[0].id == row.id
+    assert item.id in {value.id for value in items.ordered()}
+    assert item.id in {value.id for value in items.ordered(active_only=True)}
+    assert items.category_counts()[item.category_id] >= 1
+    assert rows.category_counts() == {item.category_id: 1}
+    rows.delete_pending_future(item.id, date(2026, 1, 1))
+    assert rows.for_item(item.id) == []

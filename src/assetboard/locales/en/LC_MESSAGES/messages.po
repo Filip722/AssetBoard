@@ -121,6 +121,24 @@ msgstr ""
 msgid "Enter a valid amount."
 msgstr ""
 
+msgid "Recurring item created"
+msgstr ""
+
+msgid "Recurring item updated"
+msgstr ""
+
+msgid "Recurring item paused"
+msgstr ""
+
+msgid "Recurring item resumed"
+msgstr ""
+
+msgid "Recurring item archived"
+msgstr ""
+
+msgid "Recurring item deleted"
+msgstr ""
+
 msgid "First administrator created at setup"
 msgstr ""
 
@@ -1159,6 +1177,27 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
+msgid "Monday"
+msgstr ""
+
+msgid "Tuesday"
+msgstr ""
+
+msgid "Wednesday"
+msgstr ""
+
+msgid "Thursday"
+msgstr ""
+
+msgid "Friday"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
 msgid "Too many attempts. Try again later."
 msgstr ""
 
@@ -2081,6 +2120,138 @@ msgstr ""
 msgid "Future months stay open for planning."
 msgstr ""
 
+msgid "Recurring item"
+msgstr ""
+
+msgid "Edit recurring item"
+msgstr ""
+
+msgid "New recurring item"
+msgstr ""
+
+msgid ""
+"Check the name, amount, category and recurrence dates. Choose an active "
+"category matching the direction. Holiday adjustments require a supported "
+"workspace country."
+msgstr ""
+
+msgid "Amount type"
+msgstr ""
+
+msgid "Fixed"
+msgstr ""
+
+msgid "Estimate"
+msgstr ""
+
+msgid "Start date"
+msgstr ""
+
+msgid "End date (optional)"
+msgstr ""
+
+msgid "Maximum occurrences (optional)"
+msgstr ""
+
+msgid "Repeat"
+msgstr ""
+
+msgid "Weekly"
+msgstr ""
+
+msgid "Monthly"
+msgstr ""
+
+msgid "Yearly"
+msgstr ""
+
+msgid "Every N weeks, months or years"
+msgstr ""
+
+msgid "Weekdays (weekly rules)"
+msgstr ""
+
+msgid "Day (monthly or yearly rules)"
+msgstr ""
+
+msgid "Last day"
+msgstr ""
+
+msgid "First working day"
+msgstr ""
+
+msgid "Last working day"
+msgstr ""
+
+msgid "Month number (yearly rules)"
+msgstr ""
+
+msgid "Weekend and holiday adjustment"
+msgstr ""
+
+msgid "Keep the date"
+msgstr ""
+
+msgid "Previous working day"
+msgstr ""
+
+msgid "Next working day"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "Include past occurrences"
+msgstr ""
+
+msgid ""
+"Saving a rule creates planned occurrences, never transactions. Edits "
+"replace only pending dates from today onward."
+msgstr ""
+
+msgid "Save recurring item"
+msgstr ""
+
+msgid "Next six due dates"
+msgstr ""
+
+msgid ""
+"Enable JavaScript for the live preview. You can still save this form "
+"without it."
+msgstr ""
+
+msgid "Recurring items"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "Paused"
+msgstr ""
+
+msgid "Edit rule"
+msgstr ""
+
+msgid "Resume"
+msgstr ""
+
+msgid "Pause"
+msgstr ""
+
+msgid "No recurring items yet."
+msgstr ""
+
+msgid ""
+"Pausing or archiving removes pending dates from today onward. Existing "
+"history is kept; deleting an item with history archives it instead."
+msgstr ""
+
+msgid "Choose valid recurrence dates to see the preview."
+msgstr ""
+
+msgid "No more occurrences match this rule."
+msgstr ""
+
 msgid "Filters"
 msgstr ""
 
@@ -2314,8 +2485,8 @@ msgid "General"
 msgstr ""
 
 msgid ""
-"Locked: transactions (deleted ones included) or planned values exist, and"
-" their amounts are stored in this currency."
+"Locked: transactions (deleted ones included) or planned values or "
+"recurring items exist, and their amounts are stored in this currency."
 msgstr ""
 
 msgid "Formatting default"
@@ -2434,5 +2605,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Plan"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Locked: transactions (deleted ones included)"
+#~ " or planned values exist, and their"
+#~ " amounts are stored in this currency."
 #~ msgstr ""
 

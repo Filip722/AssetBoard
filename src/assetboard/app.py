@@ -28,6 +28,7 @@ from assetboard.middleware import (
     SecurityHeadersMiddleware,
     add_security_headers,
 )
+from assetboard.recurring_jobs import RecurringJobs
 from assetboard.services.admin_users import NotInstanceAdmin
 from assetboard.services.auth import (
     derive_subkey,
@@ -58,6 +59,7 @@ from assetboard.web.plan_routes import router as plan_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
+from assetboard.web.scheduled_routes import router as scheduled_router
 from assetboard.web.security import CsrfFailed, web_session
 from assetboard.web.transaction_list_routes import router as transaction_list_router
 from assetboard.web.transaction_routes import router as transaction_router
@@ -107,6 +109,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        recurring_jobs = RecurringJobs(session_factory, settings, lambda: app.state.clock, logger)
         try:
             # Decided once per process start; a restart picks up an upgraded database.
             state = schema_state(settings)
@@ -137,8 +140,11 @@ def create_app(
                 logger.error("database schema is newer than this version of %s", APP_NAME)
             # Unknown-user logins verify against this; compute it once, before any request.
             await run_in_threadpool(prepare_dummy_hash)
+            if state == "current":
+                await run_in_threadpool(recurring_jobs.start)
             yield
         finally:
+            await run_in_threadpool(recurring_jobs.stop)
             engine.dispose()
             touch_engine.dispose()
 
@@ -174,6 +180,7 @@ def create_app(
     static_directory = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
+    app.include_router(scheduled_router)
     app.include_router(auth_router)
     app.include_router(account_router)
     app.include_router(admin_router)

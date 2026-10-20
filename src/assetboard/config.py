@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     auto_migrate: bool = True
     setup_token: SecretStr | None = None
     allow_registration: bool = False
+    recurrence_horizon_months: int = Field(default=13, ge=1)
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)
     auth_account_free_failures: int = Field(default=5, ge=1)

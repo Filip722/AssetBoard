@@ -64,6 +64,12 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "auth.instance_admin_granted": ("source",),
     "auth.instance_admin_revoked": ("source",),
     **AUDIT_DATA_KEYS,
+    "scheduled.created": (),
+    "scheduled.updated": (),
+    "scheduled.pause": (),
+    "scheduled.resume": (),
+    "scheduled.archive": (),
+    "scheduled.delete": (),
     # Workspace scope
     "setup.create_admin": (),
     "workspace.settings_updated": ("fields",),
@@ -111,6 +117,12 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 ACTION_LABELS: dict[str, str] = {
+    "scheduled.created": _("Recurring item created"),
+    "scheduled.updated": _("Recurring item updated"),
+    "scheduled.pause": _("Recurring item paused"),
+    "scheduled.resume": _("Recurring item resumed"),
+    "scheduled.archive": _("Recurring item archived"),
+    "scheduled.delete": _("Recurring item deleted"),
     "setup.create_admin": _("First administrator created at setup"),
     "cli.create_admin": _("Administrator created on the command line"),
     "cli.reset_password": _("Password reset on the command line"),

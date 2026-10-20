@@ -63,12 +63,13 @@ from assetboard.i18n import gettext
 from assetboard.services.budget import category_usage as budget_line_usage
 from assetboard.services.category_usage import CategoryUsage, UsageSource
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.scheduled import category_usage as scheduled_usage
 from assetboard.services.transactions import category_usage as transaction_usage
 
 __all__ = ["USAGE_SOURCES", "CategoryUsage", "UsageSource"]
 
 # Every feature whose rows reference categories (see the module docstring).
-USAGE_SOURCES: list[UsageSource] = [transaction_usage, budget_line_usage]
+USAGE_SOURCES: list[UsageSource] = [transaction_usage, budget_line_usage, scheduled_usage]
 
 
 class CategoryError(Exception):

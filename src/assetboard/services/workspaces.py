@@ -50,6 +50,7 @@ from assetboard.services.context import (
 )
 from assetboard.services.instance_settings import read_settings
 from assetboard.services.invitations import new_token
+from assetboard.services.scheduled import workspace_has_scheduled_amounts
 from assetboard.services.transactions import workspace_has_transactions
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
@@ -62,6 +63,7 @@ MAX_PENDING_INVITATIONS = 50
 BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_transactions,
     workspace_has_budget_lines,
+    workspace_has_scheduled_amounts,
 ]
 
 
