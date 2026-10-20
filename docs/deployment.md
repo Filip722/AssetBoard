@@ -71,9 +71,14 @@ alternative that needs no token.
 
 Sessions are stored on the server. The session cookie lasts for the absolute session lifetime
 (`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. For MFA,
-prefer OIDC or reverse-proxy auth backed by an IdP that enforces multi-factor authentication; TOTP
-is intentionally deferred to the post-1.0 backlog. Run a single application process (one Uvicorn
-worker): the setup token, the password-hashing limit and some caches live in the process.
+users with local passwords can enroll TOTP in their profile
+(see [account security](accounts.md#two-factor-authentication)).
+OIDC and reverse-proxy sign-ins delegate MFA to their identity provider.
+Back up `ASSETBOARD_SECRET_KEY` or the persistent `DATA_DIR/secret_key` together with the database:
+TOTP secrets are encrypted with a key derived from it. Replacing or losing this key makes existing
+authenticator secrets unreadable; recovery codes still work. A password reset does not remove MFA.
+Keep the key outside database-only exports. Run a single application process (one Uvicorn worker):
+the setup token, the password-hashing limit and some caches live in the process.
 
 ### Invitations
 

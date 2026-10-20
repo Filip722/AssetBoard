@@ -32,6 +32,10 @@
         <p id="auto_copy_plan-help" class="text-xs text-muted">{{ _("Applies to the current and later months that have never had planned values, when an editor or owner opens them. Existing planned values are never overwritten.") }}</p>
       </div>
     </div>
+    <div class="flex items-start gap-3 sm:col-span-2">
+      <input id="require_two_factor" name="require_two_factor" type="checkbox" value="1"{% if values.require_two_factor %} checked{% endif %} class="mt-1 h-4 w-4 rounded border-line accent-primary">
+      <label for="require_two_factor" class="text-sm font-medium text-ink">{{ _("Require two-factor authentication for password-based access to this workspace") }}</label>
+    </div>
     <p class="text-xs text-muted sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>

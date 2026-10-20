@@ -541,6 +541,7 @@ def link_identity(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
     verify: Verifier | None = None,
+    second_factor: str = "",
 ) -> LinkOutcome:
     """Link a verified identity to the account with the same email, after its password.
 
@@ -596,6 +597,7 @@ def link_identity(
         host=host,
         user_agent=user_agent,
         verify=verify,
+        second_factor=second_factor,
     )
     if isinstance(outcome, Throttled):
         return LinkOutcome(status="throttled", throttled_until=outcome.until)
@@ -613,6 +615,7 @@ async def link_identity_async(
     host: str | None,
     user_agent: str | None = None,
     existing_session_id: str | None = None,
+    second_factor: str = "",
 ) -> LinkOutcome:
     """Web entry point: verifies through the hashing limit (``HashGateBusy`` when saturated)."""
     verify = gate_verifier(gate)
@@ -627,5 +630,6 @@ async def link_identity_async(
             user_agent=user_agent,
             existing_session_id=existing_session_id,
             verify=verify,
+            second_factor=second_factor,
         )
     )

@@ -13,6 +13,7 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 
 __all__ = [
     "AuditEvent",
@@ -26,6 +27,8 @@ __all__ = [
     "MonthState",
     "SetupState",
     "Transaction",
+    "TotpFactor",
+    "TotpRecoveryCode",
     "User",
     "UserSession",
     "Workspace",

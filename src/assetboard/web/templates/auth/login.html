@@ -19,6 +19,7 @@
   {% if next_path %}<input type="hidden" name="next" value="{{ next_path }}">{% endif %}
   {{ field("email", _("Email"), type="email", value=email, required=true, autocomplete="username", maxlength=320) }}
   {{ field("password", _("Password"), type="password", required=true, autocomplete="current-password", maxlength=1024) }}
+  {{ field("second_factor", _("Authenticator or recovery code"), autocomplete="one-time-code", maxlength=64, help=_("Leave blank if two-factor authentication is not enabled.")) }}
   {{ primary_button(_("Sign in")) }}
 </form>
 {% endif %}

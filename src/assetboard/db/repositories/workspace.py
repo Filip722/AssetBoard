@@ -23,7 +23,15 @@ from assetboard.db.repositories.base import NotFound, WorkspaceScope
 from assetboard.db.repositories.membership import MembershipRepository
 
 UPDATABLE_FIELDS = frozenset(
-    {"name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan"}
+    {
+        "name",
+        "base_currency",
+        "country_code",
+        "timezone",
+        "locale",
+        "auto_copy_plan",
+        "require_two_factor",
+    }
 )
 
 

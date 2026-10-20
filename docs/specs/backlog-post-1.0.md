@@ -8,32 +8,6 @@ transfer, and leaving a workspace.
 
 ---
 
-## F1.6 TOTP two-factor authentication
-
-Moved out of M1. Until it exists, use OIDC or reverse-proxy authentication backed by an identity
-provider that supports MFA.
-
-**Acceptance**
-- Optional per user; TOTP via `pyotp`.
-- Enrollment shows a QR code and the manual key; it completes only after a valid code.
-- Ten single-use recovery codes, stored hashed, shown once.
-- Verified at password sign-in (including `/login/local`); OIDC and proxy sign-ins skip it (the
-  identity provider's responsibility).
-- Code entry is throttled like password sign-in.
-- An owner can require a second factor for local logins (scope to be decided when planned).
-- Disabling requires the password, through the profile's confirmation entry point
-  (`web.confirm.run_confirmed`).
-
-**Agent prompt**
-```
-Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F1.6 from docs/specs/backlog-post-1.0.md: TOTP enrollment (QR + manual key), verification
-at login, hashed recovery codes, throttling, disable flow requiring password. Tests with a fixed
-Clock for TOTP windows.
-```
-
----
-
 ## Administrator password reset from the Users page
 
 Today an administrator can reset someone's password only on the command line

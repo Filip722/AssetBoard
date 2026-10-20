@@ -249,6 +249,11 @@ def test_user_membership_reader_returns_only_its_users_rows(
     assert alice_reader.membership_in(ctx_a.workspace.id) is not None
     assert alice_reader.membership_in(ctx_b.workspace.id) is None
     assert bob_reader.membership_in(ctx_a.workspace.id) is None
+    CurrentWorkspaceRepository(db_session, ctx_a).update(require_two_factor=True)
+    assert alice_reader.authorization_in(ctx_a.workspace.id) == ("owner", True)
+    assert alice_reader.authorization_in(ctx_b.workspace.id) is None
+    assert bob_reader.authorization_in(ctx_a.workspace.id) is None
+    assert bob_reader.authorization_in(ctx_b.workspace.id) == ("owner", False)
 
 
 def _member(session: Session, workspace_id: UUID, email: str, role: str) -> Membership:
@@ -354,7 +359,7 @@ def test_current_workspace_repository_touches_only_its_workspace(
     assert b_repo.get().id == ctx_b.workspace.id
     before_b = raw_row(db_session, Workspace, ctx_b.workspace.id)
 
-    a_repo.update(name="Renamed A", base_currency="PLN")
+    a_repo.update(name="Renamed A", base_currency="PLN", require_two_factor=True)
     db_session.expire_all()
     after_a = raw_row(db_session, Workspace, ctx_a.workspace.id)
     assert after_a is not None and (after_a["name"], after_a["base_currency"]) == (
@@ -364,7 +369,8 @@ def test_current_workspace_repository_touches_only_its_workspace(
     assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
 
     assert {
-        "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan"
+        "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
+        "require_two_factor"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):

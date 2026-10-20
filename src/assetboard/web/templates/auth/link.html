@@ -15,6 +15,7 @@
 <form method="post" action="{{ scoped_url(request, 'oidc_link') }}" class="mt-6 space-y-4" novalidate>
   {{ csrf_input() }}
   {{ field("password", _("Password"), type="password", required=true, autocomplete="current-password", maxlength=1024) }}
+  {{ field("second_factor", _("Authenticator or recovery code"), autocomplete="one-time-code", maxlength=64, help=_("Leave blank if two-factor authentication is not enabled.")) }}
   {{ primary_button(_("Link and sign in")) }}
 </form>
 <p class="mt-6 text-center text-sm"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'login') }}">{{ _("Cancel") }}</a></p>

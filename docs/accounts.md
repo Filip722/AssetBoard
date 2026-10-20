@@ -20,6 +20,37 @@ are on "Account security".
   (5 free, then the same pause); they never block signing in, and a correct password clears
   them.
 
+## Two-factor authentication
+
+Choose **Two-factor authentication** in your profile. Confirm your password, scan the QR code
+with an authenticator app (or enter its manual key), then enter a six-digit code within ten
+minutes. Nothing is enabled until that code succeeds. Enrollment ends other password sessions.
+Save the ten recovery codes shown on completion: this is the only time they are displayed.
+Each code can replace the authenticator code for one sign-in. Store them separately from your
+password. The enrollment code has already been used; wait for the next code before signing in
+on another device.
+
+After enrollment, enter your password and an authenticator or recovery code on the sign-in
+form, including the emergency local administrator login. Missing, invalid, expired or reused
+codes show the same generic failure as an incorrect password; code attempts are throttled.
+When linking a new identity provider or proxy identity by email during sign-in, enter the code
+alongside the existing account's password too. Already-linked external sign-ins rely on their
+provider's MFA instead. Accounts without passwords configure MFA at their identity provider.
+
+Workspace owners can select **Require two-factor authentication for password-based access to
+this workspace** in workspace settings. It applies to every member, including owners, and to
+existing password sessions immediately. A member without verified enrollment is sent to the
+security page before accessing workspace data. They can still manage their account, enroll,
+sign out, or switch to an unrelated workspace. Other workspaces and OIDC/proxy sessions are
+unaffected.
+
+Disabling on the same security page requires your password, removes the authenticator and all
+recovery codes, and signs out other password sessions. A workspace requiring MFA stays protected
+and will ask you to enroll again. To replace a lost authenticator, sign in with a recovery code,
+disable, then enroll the replacement. A CLI password reset does not remove your second factor.
+If both your authenticator and every recovery code are lost, there is no automatic MFA reset
+in this feature. An already-linked external provider can still sign you in.
+
 ## Details, language and theme
 
 - **Display name**: 1 to 120 characters, no control or invisible characters.

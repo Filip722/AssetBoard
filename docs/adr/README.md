@@ -23,6 +23,7 @@ The decisions below are accepted unless noted otherwise.
 | [0014](0014-oidc-sign-in.md) | OIDC sign-in | Accepted |
 | [0015](0015-proxy-header-authentication.md) | Reverse-proxy header authentication | Accepted |
 | [0016](0016-workspace-archive-format.md) | Workspace archive format (export, import and restore) | Proposed |
+| [0017](0017-local-totp.md) | Local TOTP and workspace enforcement | Proposed |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.

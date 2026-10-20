@@ -368,7 +368,13 @@ async def login_form(request: Request, next: str = "") -> Response:  # noqa: A00
 
 
 async def _password_sign_in(
-    request: Request, email: str, password: str, next_path: str, *, break_glass: bool
+    request: Request,
+    email: str,
+    password: str,
+    next_path: str,
+    *,
+    break_glass: bool,
+    second_factor: str = "",
 ) -> Response:
     state = _state(request)
     if len(email) > MAX_EMAIL_LENGTH or len(password) > MAX_PASSWORD_LENGTH:
@@ -393,6 +399,7 @@ async def _password_sign_in(
         user_agent=_user_agent(request),
         existing_session_id=existing,
         require_instance_admin=break_glass,
+        second_factor=second_factor,
     )
     if not outcome.succeeded or outcome.session_id is None:
         # Throttled attempts keep the 401 that log-based tools count (ADR-0012), plus a
@@ -423,10 +430,13 @@ async def login_submit(
     email: FormStr = "",
     password: FormStr = "",
     next: FormStr = "",  # noqa: A002
+    second_factor: FormStr = "",
 ) -> Response:
     if _state(request).settings.oidc_only:
         raise HTTPException(status_code=404)
-    return await _password_sign_in(request, email, password, next, break_glass=False)
+    return await _password_sign_in(
+        request, email, password, next, break_glass=False, second_factor=second_factor
+    )
 
 
 # Break-glass password sign-in for instance administrators under OIDC_ONLY (ADR-0014). Not
@@ -453,9 +463,12 @@ async def login_local_submit(
     email: FormStr = "",
     password: FormStr = "",
     next: FormStr = "",  # noqa: A002
+    second_factor: FormStr = "",
 ) -> Response:
     _require_break_glass(request)
-    return await _password_sign_in(request, email, password, next, break_glass=True)
+    return await _password_sign_in(
+        request, email, password, next, break_glass=True, second_factor=second_factor
+    )
 
 
 @router.post("/logout", name="logout")

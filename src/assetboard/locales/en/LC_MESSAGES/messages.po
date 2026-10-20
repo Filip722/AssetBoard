@@ -145,6 +145,12 @@ msgstr ""
 msgid "Password changed"
 msgstr ""
 
+msgid "Two-factor authentication enabled"
+msgstr ""
+
+msgid "Two-factor authentication disabled"
+msgstr ""
+
 msgid "Password confirmation failed"
 msgstr ""
 
@@ -1168,6 +1174,9 @@ msgid_plural "Too many attempts. Try again in %(num)d minutes."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "The code is not valid or enrollment has expired."
+msgstr ""
+
 msgid "Enter a date such as 2026-10-07 or 07.10.2026."
 msgstr ""
 
@@ -1426,6 +1435,9 @@ msgstr ""
 msgid "Use the saved theme on this device"
 msgstr ""
 
+msgid "Two-factor authentication"
+msgstr ""
+
 msgid "Password and devices"
 msgstr ""
 
@@ -1468,6 +1480,52 @@ msgid "Your proxy signs you in as %(user)s."
 msgstr ""
 
 msgid "Link this proxy sign-in"
+msgstr ""
+
+msgid ""
+"Protect password sign-ins with an authenticator app. A workspace owner "
+"may require this for access. Identity provider and proxy sign-ins use "
+"their provider's security instead."
+msgstr ""
+
+msgid "Save your recovery codes"
+msgstr ""
+
+msgid ""
+"These ten codes are shown only once. Store them safely. Each replaces an "
+"authenticator code for one sign-in."
+msgstr ""
+
+msgid "Two-factor authentication is enabled."
+msgstr ""
+
+msgid "Disable two-factor authentication"
+msgstr ""
+
+msgid "Scan with your authenticator app"
+msgstr ""
+
+msgid "Authenticator enrollment QR code"
+msgstr ""
+
+msgid "Or enter this key manually:"
+msgstr ""
+
+msgid "Enter a six-digit code to finish enrollment within ten minutes."
+msgstr ""
+
+msgid "Authenticator code"
+msgstr ""
+
+msgid "Enable two-factor authentication"
+msgstr ""
+
+msgid "Set up two-factor authentication"
+msgstr ""
+
+msgid ""
+"This account signs in through an identity provider or proxy. Configure "
+"multi-factor authentication there."
 msgstr ""
 
 msgid "Back to users"
@@ -1642,6 +1700,12 @@ msgid ""
 msgstr ""
 
 msgid "This signs the account out on all other devices."
+msgstr ""
+
+msgid "Authenticator or recovery code"
+msgstr ""
+
+msgid "Leave blank if two-factor authentication is not enabled."
 msgstr ""
 
 msgid "Link and sign in"
@@ -2328,6 +2392,11 @@ msgid ""
 "Applies to the current and later months that have never had planned "
 "values, when an editor or owner opens them. Existing planned values are "
 "never overwritten."
+msgstr ""
+
+msgid ""
+"Require two-factor authentication for password-based access to this "
+"workspace"
 msgstr ""
 
 msgid ""

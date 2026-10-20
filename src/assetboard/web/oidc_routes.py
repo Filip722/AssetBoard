@@ -493,7 +493,9 @@ async def link_form(request: Request) -> Response:
 
 
 @router.post("/login/link")
-async def link_submit(request: Request, password: FormStr = "") -> Response:
+async def link_submit(
+    request: Request, password: FormStr = "", second_factor: FormStr = ""
+) -> Response:
     _linking_available(request)
     state = _state(request)
     pending = _pending(request)
@@ -507,6 +509,7 @@ async def link_submit(request: Request, password: FormStr = "") -> Response:
             state.hash_gate,
             pending,
             password,
+            second_factor=second_factor,
             settings=state.settings,
             clock=state.clock,
             host=client_host(request),

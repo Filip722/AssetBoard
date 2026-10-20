@@ -43,9 +43,9 @@ from assetboard.services import categories
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
     Context,
-    PermissionDenied,
     Role,
     require_role,
+    require_role_now,
     select_workspace,
 )
 from assetboard.services.instance_settings import read_settings
@@ -138,6 +138,7 @@ class WorkspaceSettings:
     auto_copy_plan: bool = False
     # True once amounts are stored in the base currency (it can no longer change).
     base_currency_locked: bool = False
+    require_two_factor: bool = False
 
 
 def _checkpoint(_name: str) -> None:
@@ -146,10 +147,7 @@ def _checkpoint(_name: str) -> None:
 
 def _require_owner_now(session: Session, ctx: Context) -> None:
     """Re-read the actor's membership inside the write transaction; it must still be owner."""
-    actor = MembershipRepository(session, ctx).for_user(ctx.user.id)
-    actual = Role(actor.role) if actor is not None else Role.VIEWER
-    if actor is None or actual is not Role.OWNER:
-        raise PermissionDenied(Role.OWNER, actual)
+    require_role_now(session, ctx, Role.OWNER)
 
 
 def _base_currency_locked(session: Session, ctx: Context) -> bool:
@@ -174,6 +172,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             timezone=workspace.timezone,
             locale=workspace.locale,
             auto_copy_plan=workspace.auto_copy_plan,
+            require_two_factor=workspace.require_two_factor,
             base_currency_locked=_base_currency_locked(session, ctx),
         )
 
@@ -188,6 +187,7 @@ def update_settings(
     timezone: str,
     locale: str,
     auto_copy_plan: bool,
+    require_two_factor: bool = False,
 ) -> WorkspaceSettings:
     """Change the workspace's settings; the audit event lists changed fields, not values."""
     require_role(ctx, Role.OWNER)
@@ -210,6 +210,7 @@ def update_settings(
         timezone=options.timezone,
         locale=options.locale,
         auto_copy_plan=auto_copy_plan,
+        require_two_factor=require_two_factor,
     )
 
     def write(session: Session) -> WorkspaceSettings:
@@ -227,6 +228,7 @@ def update_settings(
                 ("timezone", wanted.timezone),
                 ("locale", wanted.locale),
                 ("auto_copy_plan", wanted.auto_copy_plan),
+                ("require_two_factor", wanted.require_two_factor),
             )
             if getattr(workspace, field) != value
         }

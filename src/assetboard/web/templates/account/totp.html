@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button, confirm_block with context %}
+{% block title %}{{ _("Two-factor authentication") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Two-factor authentication") }}{% endblock %}
+{% block content %}
+<section class="panel max-w-2xl space-y-4 p-6 sm:p-7">
+  <p class="text-sm text-muted">{{ _("Protect password sign-ins with an authenticator app. A workspace owner may require this for access. Identity provider and proxy sign-ins use their provider's security instead.") }}</p>
+  {% if error %}<p role="alert" class="text-sm text-danger">{{ error }}</p>{% endif %}
+  {% if codes %}
+  <h2 class="text-base font-semibold">{{ _("Save your recovery codes") }}</h2>
+  <p class="text-sm">{{ _("These ten codes are shown only once. Store them safely. Each replaces an authenticator code for one sign-in.") }}</p>
+  <ul class="space-y-2 break-all font-mono text-sm" data-recovery-codes>{% for code in codes %}<li>{{ code }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if factor.enabled %}
+  <p role="status">{{ _("Two-factor authentication is enabled.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'totp_disable') }}" class="space-y-4">
+    {{ csrf_input() }}
+    {{ confirm_block(confirm, "totp-disable", _("Disable two-factor authentication")) }}
+  </form>
+  {% elif factor.secret %}
+  <h2 class="text-base font-semibold">{{ _("Scan with your authenticator app") }}</h2>
+  <div class="[&_svg]:h-auto [&_svg]:max-w-full" role="img" aria-label="{{ _('Authenticator enrollment QR code') }}">{{ qr|safe }}</div>
+  <p class="text-sm">{{ _("Or enter this key manually:") }} <code class="break-all" data-totp-secret>{{ factor.secret }}</code></p>
+  <p class="text-sm text-muted">{{ _("Enter a six-digit code to finish enrollment within ten minutes.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'totp_verify') }}" class="space-y-4">
+    {{ csrf_input() }}
+    {{ field("code", _("Authenticator code"), required=true, autocomplete="one-time-code", maxlength=6) }}
+    {{ primary_button(_("Enable two-factor authentication")) }}
+  </form>
+  {% elif has_password %}
+  <form method="post" action="{{ scoped_url(request, 'totp_start') }}" class="space-y-4">
+    {{ csrf_input() }}
+    {{ confirm_block(confirm, "totp-start", _("Set up two-factor authentication")) }}
+  </form>
+  {% else %}
+  <p>{{ _("This account signs in through an identity provider or proxy. Configure multi-factor authentication there.") }}</p>
+  {% endif %}
+  {% if factor.workspaces|length > 1 %}
+  <form method="post" action="{{ scoped_url(request, 'workspace_switch') }}" class="flex flex-wrap items-center gap-2" data-workspace-switcher>
+    {{ csrf_input() }}
+    <label for="totp-workspace" class="text-sm text-muted">{{ _("Workspace") }}</label>
+    <select id="totp-workspace" name="workspace_id" class="form-select">
+      {% for choice in factor.workspaces %}<option value="{{ choice.id }}">{{ choice.name }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="rounded-full border border-line px-3 py-2 text-sm font-medium">{{ _("Switch") }}</button>
+  </form>
+  {% endif %}
+  <a class="block font-semibold text-primary-ink" href="{{ scoped_url(request, 'home') }}">{{ _("Continue") }}</a>
+</section>
+{% endblock %}

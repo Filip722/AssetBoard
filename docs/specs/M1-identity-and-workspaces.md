@@ -2,7 +2,7 @@
 
 **Goal:** secure multi-user foundation before any financial feature exists, so tenant scoping is never retrofitted.
 
-**Exit criteria:** first-run setup creates an admin + workspace; users can log in locally or via OIDC; roles are enforced; an automated test proves no cross-workspace data access for every workspace-owned model. TOTP MFA is explicitly out of scope for M1 and is moved to the [post-1.0 backlog](backlog-post-1.0.md); use OIDC or reverse-proxy auth backed by an IdP that supports MFA until then.
+**Exit criteria:** first-run setup creates an admin + workspace; users can log in locally or via OIDC; roles are enforced; an automated test proves no cross-workspace data access for every workspace-owned model. Optional TOTP MFA for password sign-ins is specified in F1.6 below; OIDC and proxy sign-ins delegate MFA to their identity provider.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -112,7 +112,7 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     workspace" next to the switcher (or the workspace name), both only when allowed. The
     service re-reads the account and the setting inside its write transaction.
   - No limit on how many workspaces an account creates.
-- Backlog: workspace deletion, ownership transfer, leaving a workspace, and F1.6 TOTP second factor; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)); until then use OIDC or proxy auth with an IdP that supports MFA.
+- Backlog: workspace deletion, ownership transfer, and leaving a workspace; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)).
 - B2 (invitations), see ADR-0013:
   - Tokens are 256-bit, stored as SHA-256, single use; expiry is 1, 7 (default) or 30 days;
     at most 50 pending invitations per workspace.
@@ -263,3 +263,41 @@ Tests for authorization (viewer/editor cannot reach admin pages).
 ```
 
 ---
+
+## F1.6 TOTP two-factor authentication
+
+Originally deferred to the post-1.0 backlog in PR #93; this contribution implements it earlier.
+
+**Story:** A user with a local password can protect password sign-ins with an authenticator.
+A workspace owner can require a verified second factor for password-based access to that
+workspace, without affecting any other workspace or external sign-in method.
+
+**Acceptance**
+- Optional per user, using `pyotp`: six-digit SHA-1 TOTP, 30-second steps, accepting the current
+  step and one adjacent step in either direction for clock drift. A step can succeed only once;
+  accepting a future step also rejects earlier steps. The injected Clock determines the window.
+- Profile links to enrollment: confirm the password through `web.confirm.run_confirmed`, then
+  show a locally generated QR code and manual key. Pending enrollment belongs to that session,
+  expires after ten minutes, and is enabled only after a valid code. Starting again replaces
+  a pending key, never an enabled factor.
+- Ten independent 128-bit recovery codes are shown once in the successful enrollment response.
+  Store only SHA-256 hashes; each code can be consumed once, including concurrent attempts.
+- Enabled TOTP is checked with the password at `/login` and `/login/local`, in one form; no
+  session is issued until both factors pass. Invalid codes get the generic sign-in failure.
+  Password-confirmed linking by email (`/login/link`) also needs the factor to prevent a bypass.
+  Already-linked OIDC and proxy sign-ins skip local TOTP (the IdP's responsibility).
+- Sign-in code attempts share the existing account/address reservation and backoff. Enrollment
+  has a separate per-user bucket with the same free attempts, window and backoff, counted
+  independently of password-confirmation successes and enrollment restarts.
+- An owner can enable `Workspace.require_two_factor` (default false) in workspace settings.
+  Service Context construction and write role guards refuse password sessions that have not
+  verified TOTP for that workspace. Existing sessions are affected immediately; account security,
+  enrollment, sign-out and switching to another workspace remain accessible. OIDC and proxy
+  sessions are exempt. Owners are subject to the policy too, including the owner who enables it.
+- Disabling requires the password through `web.confirm.run_confirmed`. Enabling and disabling
+  revoke other password sessions; the current password session is marked verified on enrollment
+  and unverified on disable. Disabling can require re-enrollment to access a protected workspace.
+- Encrypt shared secrets using a purpose-separated key derived from the existing persistent
+  instance secret. Do not reveal an enabled secret again or log secrets/codes. Audit enable and
+  disable without secret data. Preserve the instance secret with backups; see ADR-0017.
+- English and Polish UI, CSRF-protected forms, reversible migration and updated account docs.

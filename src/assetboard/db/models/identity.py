@@ -83,6 +83,9 @@ class Workspace(IdMixin, TimestampMixin, Base):
     __tablename__ = "workspaces"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    require_two_factor: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
@@ -158,6 +161,9 @@ class UserSession(Base):
     # applies to "oidc" sessions only.
     auth_method: Mapped[str] = mapped_column(
         String(16), nullable=False, default="password", server_default="password"
+    )
+    second_factor_verified: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
     )
     # The workspace chosen with the switcher; NULL means "the oldest membership" (F1.2).
     current_workspace_id: Mapped[UUID | None] = mapped_column(

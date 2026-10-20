@@ -35,7 +35,12 @@ from assetboard.services.auth import (
     setup_is_open,
     setup_token_at_startup,
 )
-from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
+from assetboard.services.context import (
+    NoWorkspace,
+    PermissionDenied,
+    TwoFactorRequired,
+    WorkspaceNotAvailable,
+)
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.months import MonthClosed
@@ -59,6 +64,7 @@ from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.security import CsrfFailed, web_session
+from assetboard.web.totp_routes import router as totp_router
 from assetboard.web.transaction_list_routes import router as transaction_list_router
 from assetboard.web.transaction_routes import router as transaction_router
 from assetboard.web.workspace_routes import router as workspace_router
@@ -175,6 +181,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
     app.include_router(auth_router)
+    app.include_router(totp_router)
     app.include_router(account_router)
     app.include_router(admin_router)
     app.include_router(audit_router)
@@ -244,6 +251,13 @@ def create_app(
         )
         add_error_response_headers(response, is_fragment=False)
         return response
+
+    @app.exception_handler(TwoFactorRequired)
+    async def handle_two_factor_required(request: Request, _exc: Exception) -> Response:
+        target = request.url_for("account_totp").path
+        if _is_htmx_fragment_request(request):
+            return Response(status_code=204, headers={"HX-Redirect": target})
+        return Response(status_code=303, headers={"Location": target})
 
     @app.exception_handler(PermissionDenied)
     @app.exception_handler(NotInstanceAdmin)

@@ -163,6 +163,7 @@ async def settings_submit(
     timezone: FormStr = "",
     locale: FormStr = "",
     auto_copy_plan: FormStr = "",
+    require_two_factor: FormStr = "",
 ) -> Response:
     copy_plan = auto_copy_plan == "1"  # an unchecked box sends nothing
     submitted = WorkspaceSettings(
@@ -172,6 +173,7 @@ async def settings_submit(
         timezone=timezone,
         locale=locale,
         auto_copy_plan=copy_plan,
+        require_two_factor=require_two_factor == "1",
     )
     try:
         await run_in_threadpool(
@@ -184,6 +186,7 @@ async def settings_submit(
                 timezone=timezone,
                 locale=locale,
                 auto_copy_plan=copy_plan,
+                require_two_factor=require_two_factor == "1",
             )
         )
     except InvalidWorkspaceSettings as exc:

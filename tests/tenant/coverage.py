@@ -78,6 +78,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
 READER_METHOD_COVERAGE: dict[str, str] = {
     "memberships": "test_user_membership_reader_returns_only_its_users_rows",
     "membership_in": "test_user_membership_reader_returns_only_its_users_rows",
+    "authorization_in": "test_user_membership_reader_returns_only_its_users_rows",
 }
 
 # CurrentWorkspaceRepository is not a ScopedRepository (Workspace is the tenant row itself).

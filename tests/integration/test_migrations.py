@@ -49,6 +49,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "month_states",
         "setup_state",
         "transactions",
+        "totp_factors",
+        "totp_recovery_codes",
         "user_sessions",
         "users",
         "workspaces",

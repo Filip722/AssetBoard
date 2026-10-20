@@ -148,6 +148,12 @@ msgstr "Zarejestrowano konto"
 msgid "Password changed"
 msgstr "Zmieniono hasło"
 
+msgid "Two-factor authentication enabled"
+msgstr "Włączono uwierzytelnianie dwuskładnikowe"
+
+msgid "Two-factor authentication disabled"
+msgstr "Wyłączono uwierzytelnianie dwuskładnikowe"
+
 msgid "Password confirmation failed"
 msgstr "Nieudane potwierdzenie hasłem"
 
@@ -1237,6 +1243,9 @@ msgstr[0] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minutę."
 msgstr[1] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minuty."
 msgstr[2] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minut."
 
+msgid "The code is not valid or enrollment has expired."
+msgstr "Kod jest nieprawidłowy lub czas konfiguracji upłynął."
+
 msgid "Enter a date such as 2026-10-07 or 07.10.2026."
 msgstr "Podaj datę, na przykład 2026-10-07 lub 07.10.2026."
 
@@ -1512,6 +1521,9 @@ msgstr "Przycisk trybu ciemnego zmienia motyw tylko na jednym urządzeniu."
 msgid "Use the saved theme on this device"
 msgstr "Użyj zapisanego motywu na tym urządzeniu"
 
+msgid "Two-factor authentication"
+msgstr "Uwierzytelnianie dwuskładnikowe"
+
 msgid "Password and devices"
 msgstr "Hasło i urządzenia"
 
@@ -1557,6 +1569,61 @@ msgstr "Serwer proxy loguje Cię jako %(user)s."
 
 msgid "Link this proxy sign-in"
 msgstr "Powiąż to logowanie przez proxy"
+
+msgid ""
+"Protect password sign-ins with an authenticator app. A workspace owner "
+"may require this for access. Identity provider and proxy sign-ins use "
+"their provider's security instead."
+msgstr ""
+"Zabezpiecz logowanie hasłem za pomocą aplikacji uwierzytelniającej. "
+"Właściciel przestrzeni roboczej może tego wymagać. Przy logowaniu przez "
+"dostawcę tożsamości lub proxy obowiązują zabezpieczenia tego dostawcy."
+
+msgid "Save your recovery codes"
+msgstr "Zapisz kody odzyskiwania"
+
+msgid ""
+"These ten codes are shown only once. Store them safely. Each replaces an "
+"authenticator code for one sign-in."
+msgstr ""
+"Te dziesięć kodów jest wyświetlanych tylko raz. Przechowuj je "
+"bezpiecznie. Każdy zastępuje kod z aplikacji podczas jednego logowania."
+
+msgid "Two-factor authentication is enabled."
+msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
+
+msgid "Disable two-factor authentication"
+msgstr "Wyłącz uwierzytelnianie dwuskładnikowe"
+
+msgid "Scan with your authenticator app"
+msgstr "Zeskanuj w aplikacji uwierzytelniającej"
+
+msgid "Authenticator enrollment QR code"
+msgstr "Kod QR do konfiguracji aplikacji uwierzytelniającej"
+
+msgid "Or enter this key manually:"
+msgstr "Lub wprowadź ten klucz ręcznie:"
+
+msgid "Enter a six-digit code to finish enrollment within ten minutes."
+msgstr ""
+"Wprowadź sześciocyfrowy kod, aby zakończyć konfigurację w ciągu "
+"dziesięciu minut."
+
+msgid "Authenticator code"
+msgstr "Kod z aplikacji uwierzytelniającej"
+
+msgid "Enable two-factor authentication"
+msgstr "Włącz uwierzytelnianie dwuskładnikowe"
+
+msgid "Set up two-factor authentication"
+msgstr "Skonfiguruj uwierzytelnianie dwuskładnikowe"
+
+msgid ""
+"This account signs in through an identity provider or proxy. Configure "
+"multi-factor authentication there."
+msgstr ""
+"To konto korzysta z logowania przez dostawcę tożsamości lub proxy. "
+"Skonfiguruj uwierzytelnianie wieloskładnikowe u tego dostawcy."
 
 msgid "Back to users"
 msgstr "Wróć do użytkowników"
@@ -1742,6 +1809,12 @@ msgstr ""
 
 msgid "This signs the account out on all other devices."
 msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
+
+msgid "Authenticator or recovery code"
+msgstr "Kod z aplikacji lub kod odzyskiwania"
+
+msgid "Leave blank if two-factor authentication is not enabled."
+msgstr "Pozostaw puste, jeśli uwierzytelnianie dwuskładnikowe nie jest włączone."
 
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
@@ -2513,6 +2586,13 @@ msgstr ""
 "Dotyczy bieżącego i późniejszych miesięcy, które nigdy nie miały wartości"
 " planowanych, gdy otworzy je edytor lub właściciel. Istniejące wartości "
 "planowane nigdy nie są nadpisywane."
+
+msgid ""
+"Require two-factor authentication for password-based access to this "
+"workspace"
+msgstr ""
+"Wymagaj uwierzytelniania dwuskładnikowego przy dostępie hasłem do tej "
+"przestrzeni roboczej"
 
 msgid ""
 "The formatting default is used for numbers and dates where no personal "

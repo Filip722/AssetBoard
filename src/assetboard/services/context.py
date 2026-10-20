@@ -17,7 +17,6 @@ from sqlalchemy.orm import Session
 
 from assetboard.clock import Clock
 from assetboard.db.models.identity import UserSession
-from assetboard.db.repositories.membership import MembershipRepository
 from assetboard.db.repositories.user_memberships import UserMembershipReader
 
 if TYPE_CHECKING:
@@ -51,6 +50,7 @@ class WorkspaceRef:
     locale: str
     timezone: str
     country_code: str | None
+    require_two_factor: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +61,8 @@ class Context:
     workspace: WorkspaceRef
     role: Role
     clock: Clock
+    auth_method: str = "password"
+    second_factor_verified: bool = False
 
 
 class PermissionDenied(Exception):
@@ -70,6 +72,10 @@ class PermissionDenied(Exception):
         super().__init__(f"requires {required.value}, has {actual.value}")
         self.required = required
         self.actual = actual
+
+
+class TwoFactorRequired(Exception):
+    pass
 
 
 class NoWorkspace(Exception):
@@ -86,6 +92,12 @@ def has_role(ctx: Context, minimum: Role | str) -> bool:
 
 def require_role(ctx: Context, minimum: Role | str) -> None:
     """Raise ``PermissionDenied`` unless ``ctx.role`` is at least ``minimum``."""
+    if (
+        ctx.workspace.require_two_factor
+        and ctx.auth_method == "password"
+        and not ctx.second_factor_verified
+    ):
+        raise TwoFactorRequired
     required = Role(minimum)
     if not has_role(ctx, required):
         raise PermissionDenied(required, ctx.role)
@@ -99,10 +111,17 @@ def require_role_now(session: Session, ctx: Context, minimum: Role | str) -> Non
     ``BEGIN IMMEDIATE`` transaction, after the cheap ``require_role`` check on the Context.
     A removed member counts as a viewer for the error.
     """
+    access = UserMembershipReader(session, ctx.user.id).authorization_in(ctx.workspace.id)
+    if (
+        access is not None
+        and access[1]
+        and ctx.auth_method == "password"
+        and not ctx.second_factor_verified
+    ):
+        raise TwoFactorRequired
     required = Role(minimum)
-    membership = MembershipRepository(session, ctx).for_user(ctx.user.id)
-    actual = Role(membership.role) if membership is not None else Role.VIEWER
-    if membership is None or ROLE_RANK[actual] < ROLE_RANK[required]:
+    actual = Role(access[0]) if access is not None else Role.VIEWER
+    if access is None or ROLE_RANK[actual] < ROLE_RANK[required]:
         raise PermissionDenied(required, actual)
 
 
@@ -122,7 +141,7 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
         if not memberships:
             raise NoWorkspace
         membership = memberships[0]
-    return Context(
+    ctx = Context(
         user=UserRef(
             id=web_session.user_id,
             email=web_session.email,
@@ -137,10 +156,15 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
             locale=membership.workspace_locale,
             timezone=membership.timezone,
             country_code=membership.country_code,
+            require_two_factor=membership.require_two_factor,
         ),
         role=Role(membership.role),
         clock=clock,
+        auth_method=web_session.auth_method,
+        second_factor_verified=web_session.second_factor_verified,
     )
+    require_role(ctx, Role.VIEWER)
+    return ctx
 
 
 @dataclass(frozen=True, slots=True)

@@ -27,6 +27,7 @@ class MembershipView:
     country_code: str | None
     role: str
     created_at: datetime
+    require_two_factor: bool = False
 
 
 class UserMembershipReader:
@@ -51,6 +52,14 @@ class UserMembershipReader:
         row = self._session.execute(statement).one_or_none()
         return _view(row[0], row[1]) if row else None
 
+    def authorization_in(self, workspace_id: UUID) -> tuple[str, bool] | None:
+        row = self._session.execute(
+            select(Membership.role, Workspace.require_two_factor)
+            .join(Workspace, Workspace.id == Membership.workspace_id)
+            .where(Membership.user_id == self._user_id, Membership.workspace_id == workspace_id)
+        ).one_or_none()
+        return (row[0], row[1]) if row is not None else None
+
 
 def _view(membership: Membership, workspace: Workspace) -> MembershipView:
     return MembershipView(
@@ -63,4 +72,5 @@ def _view(membership: Membership, workspace: Workspace) -> MembershipView:
         country_code=workspace.country_code,
         role=membership.role,
         created_at=membership.created_at,
+        require_two_factor=workspace.require_two_factor,
     )
