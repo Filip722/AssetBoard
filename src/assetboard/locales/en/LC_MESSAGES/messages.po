@@ -151,6 +151,9 @@ msgstr ""
 msgid "Two-factor authentication disabled"
 msgstr ""
 
+msgid "Two-factor recovery codes regenerated"
+msgstr ""
+
 msgid "Password confirmation failed"
 msgstr ""
 
@@ -185,6 +188,9 @@ msgid "Account activated"
 msgstr ""
 
 msgid "Account deactivated"
+msgstr ""
+
+msgid "Two-factor authentication reset by an administrator"
 msgstr ""
 
 msgid "Workspace settings changed"
@@ -683,6 +689,9 @@ msgstr ""
 msgid "Remove instance administrator"
 msgstr ""
 
+msgid "Reset two-factor authentication"
+msgstr ""
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr ""
@@ -701,6 +710,13 @@ msgstr ""
 msgid "%(user)s can no longer manage accounts on this instance."
 msgstr ""
 
+#, python-format
+msgid ""
+"Remove %(user)s's authenticator and recovery codes, end every session, "
+"and require them to enroll again before accessing workspaces that require"
+" two-factor authentication."
+msgstr ""
+
 msgid "Done."
 msgstr ""
 
@@ -710,6 +726,11 @@ msgstr ""
 msgid ""
 "You cannot deactivate your own account or remove your own administrator "
 "role."
+msgstr ""
+
+msgid ""
+"Use your own account security page to manage your two-factor "
+"authentication."
 msgstr ""
 
 msgid "This is the last active administrator, so this would leave none."
@@ -1499,6 +1520,18 @@ msgstr ""
 msgid "Two-factor authentication is enabled."
 msgstr ""
 
+msgid ""
+"Replace all recovery codes if they are lost or exposed. Your current "
+"password and authenticator or an unused recovery code are both required. "
+"Existing recovery codes stop working immediately."
+msgstr ""
+
+msgid "Authenticator or recovery code"
+msgstr ""
+
+msgid "Generate new recovery codes"
+msgstr ""
+
 msgid "Disable two-factor authentication"
 msgstr ""
 
@@ -1526,6 +1559,9 @@ msgstr ""
 msgid ""
 "This account signs in through an identity provider or proxy. Configure "
 "multi-factor authentication there."
+msgstr ""
+
+msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 
 msgid "Back to users"
@@ -1700,9 +1736,6 @@ msgid ""
 msgstr ""
 
 msgid "This signs the account out on all other devices."
-msgstr ""
-
-msgid "Authenticator or recovery code"
 msgstr ""
 
 msgid "Leave blank if two-factor authentication is not enabled."

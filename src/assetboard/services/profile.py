@@ -102,6 +102,7 @@ def confirm_sensitive[T](
     host: str | None = None,
     user_agent: str | None = None,
     verify: Verifier | None = None,
+    second_factor: str | None = None,
 ) -> ConfirmOutcome[T]:
     """Confirm, then run ``on_success`` in the same write transaction (one entry point)."""
     with factory() as session:
@@ -120,6 +121,7 @@ def confirm_sensitive[T](
             host=host,
             user_agent=user_agent,
             verify=verify,
+            second_factor=second_factor,
         )
         if isinstance(value, Throttled):
             return ConfirmOutcome("throttled", throttled_until=value.until)

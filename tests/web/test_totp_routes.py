@@ -86,6 +86,13 @@ def _context(owner: OwnerApp):
 def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
     owner: OwnerApp,
 ) -> None:
+    disabled = owner.post("/account/totp/disable", {"confirm_password": owner.web.admin_password})
+    assert disabled.status_code == 403
+    with owner.db() as session:
+        assert not session.scalar(
+            select(AuditEvent.id).where(AuditEvent.action == "auth.totp_disabled")
+        )
+
     assert owner.post("/account/totp/start", {"confirm_password": "wrong"}).status_code == 401
     secret = _begin(owner)
     with owner.db() as session:
@@ -110,6 +117,46 @@ def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
     assert all(code not in page.text for code in codes)
     assert secret not in page.text and "<svg" not in page.text
     assert owner.post("/account/totp/verify", {"code": "123456"}).status_code == 400
+
+
+def test_recovery_codes_can_be_regenerated_only_with_password_and_factor(owner: OwnerApp) -> None:
+    secret, old_codes = _enable(owner)
+    wrong = owner.post(
+        "/account/totp/recovery-codes",
+        {
+            "confirm_password": owner.web.admin_password,
+            "second_factor": "",
+        },
+    )
+    assert wrong.status_code == 401
+    with owner.db() as session:
+        assert set(session.scalars(select(TotpRecoveryCode.code_hash))) == {
+            recovery_hash(code) for code in old_codes
+        }
+
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    response = owner.post(
+        "/account/totp/recovery-codes",
+        {
+            "confirm_password": owner.web.admin_password,
+            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+        },
+    )
+    assert response.status_code == 200
+    new_codes = re.findall(r"<li>([a-f0-9]{32})</li>", response.text)
+    assert len(set(new_codes)) == 10
+    assert not set(new_codes) & set(old_codes)
+    with owner.db() as session:
+        assert set(session.scalars(select(TotpRecoveryCode.code_hash))) == {
+            recovery_hash(code) for code in new_codes
+        }
+        event = session.scalar(
+            select(AuditEvent).where(AuditEvent.action == "auth.totp_recovery_codes_regenerated")
+        )
+        assert event is not None and event.data == {}
+    page = owner.client.get("/account/totp")
+    assert all(code not in page.text for code in new_codes)
+    assert all(code not in str(event.data) for code in new_codes)
 
 
 def test_password_login_requires_factor_prevents_replay_and_consumes_recovery_once(
@@ -314,7 +361,7 @@ def test_recovery_code_is_consumed_atomically_and_scoped_to_its_user(owner: Owne
 
 
 def test_every_totp_post_requires_csrf(owner: OwnerApp) -> None:
-    for path in ("start", "verify", "disable"):
+    for path in ("start", "verify", "disable", "recovery-codes"):
         assert owner.client.post(f"/account/totp/{path}", data={}).status_code == 403
 
 
@@ -372,3 +419,74 @@ def test_totp_messages_are_translated_and_secrets_are_not_logged(
         secret, codes = _enable(owner)
     assert secret not in caplog.text
     assert all(code not in caplog.text for code in codes)
+
+
+def test_instance_admin_can_reset_another_users_factor(owner: OwnerApp) -> None:
+    admin_secret, _admin_recovery_codes = _enable(owner)
+    target_id = owner.add_user("mfa-user")
+    target_email = "mfa-user@example.com"
+    target_client = TestClient(owner.app)
+    assert (
+        owner.web.sign_in(
+            target_client, email=target_email, password=owner.web.admin_password
+        ).status_code
+        == 303
+    )
+    secret = pyotp.random_base32()
+    with owner.app.state.session_factory.begin() as session:
+        session.add(
+            TotpFactor(
+                user_id=target_id,
+                encrypted_secret=totp._cipher(owner.app.state.settings)
+                .encrypt(secret.encode())
+                .decode(),
+                enabled_at=owner.app.state.clock.now(),
+                last_step=-1,
+            )
+        )
+        session.add(TotpRecoveryCode(user_id=target_id, code_hash=recovery_hash("recovery")))
+
+    users_page = owner.client.get("/admin/users")
+    assert "Two-factor authentication enabled" in users_page.text
+    assert f"/admin/users/{target_id}/reset_totp" in users_page.text
+    confirm_page = owner.client.get(f"/admin/users/{target_id}/reset_totp")
+    missing_factor = owner.client.post(
+        f"/admin/users/{target_id}/reset_totp",
+        data={
+            "csrf_token": owner.web.csrf(confirm_page.text),
+            "confirm_password": owner.web.admin_password,
+        },
+        follow_redirects=False,
+    )
+    assert missing_factor.status_code == 401
+    with owner.db() as session:
+        assert session.get(TotpFactor, target_id) is not None
+
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    confirm_page = owner.client.get(f"/admin/users/{target_id}/reset_totp")
+    response = owner.client.post(
+        f"/admin/users/{target_id}/reset_totp",
+        data={
+            "csrf_token": owner.web.csrf(confirm_page.text),
+            "confirm_password": owner.web.admin_password,
+            "second_factor": pyotp.TOTP(admin_secret).at(owner.app.state.clock.now()),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 200 and "data-admin-notice" in response.text
+    assert target_client.get("/account", follow_redirects=False).status_code == 303
+    with owner.db() as session:
+        assert session.get(TotpFactor, target_id) is None
+        assert (
+            list(
+                session.scalars(
+                    select(TotpRecoveryCode).where(TotpRecoveryCode.user_id == target_id)
+                )
+            )
+            == []
+        )
+        event = session.scalar(select(AuditEvent).where(AuditEvent.action == "admin.totp_reset"))
+        assert event is not None
+        assert event.entity_id == str(target_id)
+        assert event.actor_user_id == owner.admin_id
+        assert event.data == {"sessions_revoked": 1}

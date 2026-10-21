@@ -11,7 +11,9 @@ import pytest
 from sqlalchemy import select, update
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import SetupState, User
+from assetboard.db.models.identity import AuditEvent, SetupState, User
+from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
+from assetboard.domain.totp import recovery_hash
 from assetboard.services import admin_users
 from assetboard.services.admin_users import (
     AUDIT_DATA_KEYS,
@@ -113,7 +115,7 @@ def test_the_last_active_administrator_is_kept(db: WorkspaceDb) -> None:
 def test_a_non_administrator_cannot_act(db: WorkspaceDb) -> None:
     actor = add_user(db, "user@example.com")
     target = add_user(db, "other@example.com")
-    for action in ("activate", "deactivate", "promote", "demote"):
+    for action in ("activate", "deactivate", "promote", "demote", "reset_totp"):
         with pytest.raises(NotInstanceAdmin):
             run(db, actor, target, action)
 
@@ -125,7 +127,39 @@ def test_audit_data_keys_are_named_for_every_action() -> None:
         "admin.user_deactivated": ("sessions_revoked",),
         "admin.admin_granted": (),
         "admin.admin_revoked": (),
+        "admin.totp_reset": ("sessions_revoked",),
     }
+
+
+def test_admin_totp_reset_clears_factor_codes_and_rejects_self_reset(db: WorkspaceDb) -> None:
+    actor_id = add_user(db, "admin@example.com", admin=True)
+    target_id = add_user(db, "target@example.com")
+    with db.factory.begin() as session:
+        session.add(
+            TotpFactor(
+                user_id=target_id,
+                encrypted_secret="encrypted",
+                enabled_at=db.clock.now(),
+                last_step=42,
+            )
+        )
+        session.add(TotpRecoveryCode(user_id=target_id, code_hash=recovery_hash("recovery")))
+
+    assert run(db, actor_id, actor_id, "reset_totp") == "self_totp_reset"
+    assert run(db, actor_id, target_id, "reset_totp") == "done"
+    assert run(db, actor_id, target_id, "reset_totp") == "unchanged"
+    with db.factory() as session:
+        assert session.get(TotpFactor, target_id) is None
+        assert (
+            list(
+                session.scalars(
+                    select(TotpRecoveryCode).where(TotpRecoveryCode.user_id == target_id)
+                )
+            )
+            == []
+        )
+        audit = session.scalar(select(AuditEvent).where(AuditEvent.action == "admin.totp_reset"))
+        assert audit is not None and audit.data == {"sessions_revoked": 0}
 
 
 def test_temporary_passwords_pass_the_policy_and_differ() -> None:

@@ -100,19 +100,54 @@ async def disable(request: Request, confirm_password: FormStr = "") -> Response:
     return await _confirmed(request, current, confirm_password, "totp_disable", action)
 
 
+@router.post("/account/totp/recovery-codes", name="totp_recovery_codes")
+async def recovery_codes(
+    request: Request,
+    confirm_password: FormStr = "",
+    second_factor: FormStr = "",
+) -> Response:
+    current = _current(request)
+
+    def action(session: Session, user: User, method: ConfirmMethod) -> bool | list[str]:
+        if method != "password":
+            return False
+        codes = totp.regenerate_recovery_codes(
+            session, user, session_hash=current.session_hash, clock=request.app.state.clock
+        )
+        return codes if codes is not None else False
+
+    return await _confirmed(
+        request,
+        current,
+        confirm_password,
+        "totp_recovery_codes",
+        action,
+        second_factor=second_factor,
+        show_codes=True,
+    )
+
+
 async def _confirmed(
     request: Request,
     current: WebSession,
     password: str,
     purpose: str,
-    action: Callable[[Session, User, ConfirmMethod], bool],
+    action: Callable[[Session, User, ConfirmMethod], bool | list[str]],
+    *,
+    second_factor: str | None = None,
+    show_codes: bool = False,
 ) -> Response:
     if len(password) > MAX_PASSWORD_LENGTH:
         return await _page(
             request, error=gettext("The password is not correct.", request.state.locale), status=401
         )
     outcome = await run_confirmed(
-        request, current, purpose=purpose, password=password, action=action
+        request,
+        current,
+        purpose=purpose,
+        password=password,
+        second_factor=second_factor,
+        action=action,
     )
     if outcome.status != "confirmed":
         failed = refusal(request, outcome)
@@ -120,6 +155,12 @@ async def _confirmed(
         if failed.retry_after:
             response.headers["Retry-After"] = failed.retry_after
         return response
+    if show_codes:
+        if not isinstance(outcome.value, list) or not all(
+            isinstance(code, str) for code in outcome.value
+        ):
+            raise HTTPException(status_code=403)
+        return await _page(request, codes=outcome.value)
     if not outcome.value:
         raise HTTPException(status_code=403)
     return RedirectResponse(request.url_for("account_totp").path, status_code=303)

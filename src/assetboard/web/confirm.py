@@ -106,6 +106,7 @@ async def run_confirmed[T](
     *,
     purpose: str,
     password: str,
+    second_factor: str | None = None,
     action: Callable[[Session, User, ConfirmMethod], T],
 ) -> ConfirmOutcome[T]:
     """Confirm the signed-in user, then run ``action`` in the same write transaction.
@@ -115,7 +116,9 @@ async def run_confirmed[T](
     state: Any = request.app.state
     verify = gate_verifier(state.hash_gate)
     try:
-        return await _confirm_in_thread(request, current, state, verify, purpose, password, action)
+        return await _confirm_in_thread(
+            request, current, state, verify, purpose, password, second_factor, action
+        )
     except OperationalError as exc:
         if not is_database_locked(exc):
             raise
@@ -129,6 +132,7 @@ async def _confirm_in_thread[T](
     verify: Any,
     purpose: str,
     password: str,
+    second_factor: str | None,
     action: Callable[[Session, User, ConfirmMethod], T],
 ) -> ConfirmOutcome[T]:
     return await anyio.to_thread.run_sync(
@@ -144,5 +148,6 @@ async def _confirm_in_thread[T](
             host=client_host(request),
             user_agent=request.headers.get("user-agent"),
             verify=verify,
+            second_factor=second_factor,
         )
     )

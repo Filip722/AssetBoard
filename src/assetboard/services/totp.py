@@ -159,6 +159,34 @@ def complete_enrollment(
     return run_immediate(factory, complete)
 
 
+def regenerate_recovery_codes(
+    session: Session,
+    user: User,
+    *,
+    session_hash: str,
+    clock: Clock,
+) -> list[str] | None:
+    repository = TotpRepository(session, user.id)
+    factor = repository.factor(lock=True)
+    if (
+        user.password_hash is None
+        or factor is None
+        or factor.enabled_at is None
+        or not repository.owns_session(session_hash)
+    ):
+        return None
+    codes = [secrets.token_hex(16) for _ in range(RECOVERY_CODE_COUNT)]
+    repository.replace_recovery_codes([recovery_hash(code) for code in codes])
+    record_auth_event(
+        session,
+        clock,
+        action="auth.totp_recovery_codes_regenerated",
+        entity_id=str(user.id),
+        actor_user_id=user.id,
+    )
+    return codes
+
+
 def verify_sign_in(
     session: Session,
     user_id: UUID,
@@ -195,7 +223,9 @@ def disable(
     repository = TotpRepository(session, user.id)
     if user.password_hash is None or not repository.owns_session(session_hash):
         return False
-    repository.factor(lock=True)
+    factor = repository.factor(lock=True)
+    if factor is None or factor.enabled_at is None:
+        return False
     repository.clear()
     repository.update_password_sessions(session_hash, verified=False)
     record_auth_event(

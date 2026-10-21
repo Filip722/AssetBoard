@@ -154,6 +154,9 @@ msgstr "Włączono uwierzytelnianie dwuskładnikowe"
 msgid "Two-factor authentication disabled"
 msgstr "Wyłączono uwierzytelnianie dwuskładnikowe"
 
+msgid "Two-factor recovery codes regenerated"
+msgstr "Wygenerowano nowe kody odzyskiwania"
+
 msgid "Password confirmation failed"
 msgstr "Nieudane potwierdzenie hasłem"
 
@@ -189,6 +192,9 @@ msgstr "Aktywowano konto"
 
 msgid "Account deactivated"
 msgstr "Dezaktywowano konto"
+
+msgid "Two-factor authentication reset by an administrator"
+msgstr "Administrator zresetował uwierzytelnianie dwuskładnikowe"
 
 msgid "Workspace settings changed"
 msgstr "Zmieniono ustawienia obszaru roboczego"
@@ -698,6 +704,9 @@ msgstr "Nadaj uprawnienia administratora instancji"
 msgid "Remove instance administrator"
 msgstr "Odbierz uprawnienia administratora instancji"
 
+msgid "Reset two-factor authentication"
+msgstr "Zresetuj uwierzytelnianie dwuskładnikowe"
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr "%(user)s znów może się logować."
@@ -719,6 +728,16 @@ msgstr "%(user)s może zarządzać wszystkimi kontami w tej instancji."
 msgid "%(user)s can no longer manage accounts on this instance."
 msgstr "%(user)s nie może już zarządzać kontami w tej instancji."
 
+#, python-format
+msgid ""
+"Remove %(user)s's authenticator and recovery codes, end every session, "
+"and require them to enroll again before accessing workspaces that require"
+" two-factor authentication."
+msgstr ""
+"Usuń aplikację uwierzytelniającą i kody odzyskiwania użytkownika %(user)s, "
+"zakończ wszystkie jego sesje i wymagaj ponownej konfiguracji przed dostępem "
+"do obszarów roboczych wymagających uwierzytelniania dwuskładnikowego."
+
 msgid "Done."
 msgstr "Gotowe."
 
@@ -731,6 +750,11 @@ msgid ""
 msgstr ""
 "Nie możesz dezaktywować własnego konta ani odebrać sobie uprawnień "
 "administratora."
+
+msgid ""
+"Use your own account security page to manage your two-factor "
+"authentication."
+msgstr "Do zarządzania własnym uwierzytelnianiem dwuskładnikowym użyj strony zabezpieczeń konta."
 
 msgid "This is the last active administrator, so this would leave none."
 msgstr "To ostatni aktywny administrator; po tej zmianie nie zostałby żaden."
@@ -1592,6 +1616,22 @@ msgstr ""
 msgid "Two-factor authentication is enabled."
 msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
 
+msgid ""
+"Replace all recovery codes if they are lost or exposed. Your current "
+"password and authenticator or an unused recovery code are both required. "
+"Existing recovery codes stop working immediately."
+msgstr ""
+"Wygeneruj nowe kody odzyskiwania, jeśli poprzednie zostały zgubione lub "
+"ujawnione. Wymagane jest bieżące hasło oraz kod z aplikacji uwierzytelniającej "
+"lub niewykorzystany kod odzyskiwania. Dotychczasowe kody odzyskiwania "
+"przestaną działać natychmiast."
+
+msgid "Authenticator or recovery code"
+msgstr "Kod z aplikacji lub kod odzyskiwania"
+
+msgid "Generate new recovery codes"
+msgstr "Wygeneruj nowe kody odzyskiwania"
+
 msgid "Disable two-factor authentication"
 msgstr "Wyłącz uwierzytelnianie dwuskładnikowe"
 
@@ -1624,6 +1664,9 @@ msgid ""
 msgstr ""
 "To konto korzysta z logowania przez dostawcę tożsamości lub proxy. "
 "Skonfiguruj uwierzytelnianie wieloskładnikowe u tego dostawcy."
+
+msgid "Required only if your account has two-factor authentication enabled."
+msgstr "Wymagane tylko wtedy, gdy na Twoim koncie włączono uwierzytelnianie dwuskładnikowe."
 
 msgid "Back to users"
 msgstr "Wróć do użytkowników"
@@ -1809,9 +1852,6 @@ msgstr ""
 
 msgid "This signs the account out on all other devices."
 msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
-
-msgid "Authenticator or recovery code"
-msgstr "Kod z aplikacji lub kod odzyskiwania"
 
 msgid "Leave blank if two-factor authentication is not enabled."
 msgstr "Pozostaw puste, jeśli uwierzytelnianie dwuskładnikowe nie jest włączone."
@@ -2653,4 +2693,3 @@ msgstr ""
 
 #~ msgid "Plan"
 #~ msgstr "Plan"
-

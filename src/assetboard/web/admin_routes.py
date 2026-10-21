@@ -67,6 +67,7 @@ ACTION_TITLES: dict[str, str] = {
     "deactivate": _("Deactivate account"),
     "promote": _("Make instance administrator"),
     "demote": _("Remove instance administrator"),
+    "reset_totp": _("Reset two-factor authentication"),
 }
 ACTION_EXPLANATIONS: dict[str, str] = {
     "activate": _("%(user)s can sign in again."),
@@ -76,11 +77,18 @@ ACTION_EXPLANATIONS: dict[str, str] = {
     ),
     "promote": _("%(user)s can manage every account on this instance."),
     "demote": _("%(user)s can no longer manage accounts on this instance."),
+    "reset_totp": _(
+        "Remove %(user)s's authenticator and recovery codes, end every session, and require "
+        "them to enroll again before accessing workspaces that require two-factor authentication."
+    ),
 }
 ACTION_RESULTS: dict[str, str] = {
     "done": _("Done."),
     "unchanged": _("Nothing to change: the account is already in that state."),
     "self": _("You cannot deactivate your own account or remove your own administrator role."),
+    "self_totp_reset": _(
+        "Use your own account security page to manage your two-factor authentication."
+    ),
     "last_admin": _("This is the last active administrator, so this would leave none."),
 }
 # With OIDC_ADMIN_GROUP set, the provider's group decides the role again at each OIDC sign-in
@@ -230,7 +238,11 @@ async def action_form(request: Request, user_id: str, action: str) -> Response:
 
 @router.post("/admin/users/{user_id}/{action}")
 async def action_submit(
-    request: Request, user_id: str, action: str, confirm_password: FormStr = ""
+    request: Request,
+    user_id: str,
+    action: str,
+    confirm_password: FormStr = "",
+    second_factor: FormStr = "",
 ) -> Response:
     current = _require_admin(request)
     chosen = _action(action)
@@ -249,7 +261,12 @@ async def action_submit(
         )
 
     outcome = await run_confirmed(
-        request, current, purpose=f"admin_{chosen}", password=confirm_password, action=apply
+        request,
+        current,
+        purpose=f"admin_{chosen}",
+        password=confirm_password,
+        second_factor=second_factor if chosen == "reset_totp" else None,
+        action=apply,
     )
     if outcome.status != "confirmed" or outcome.value is None:
         refused = refusal(request, outcome)
@@ -262,7 +279,7 @@ async def action_submit(
     message = _t(request, ACTION_RESULTS[outcome.value])
     if outcome.value == "done" and _group_decides(request, chosen):
         message = f"{message} {_t(request, GROUP_DECIDES)}"
-    if outcome.value in {"self", "last_admin"}:
+    if outcome.value in {"self", "self_totp_reset", "last_admin"}:
         return await _confirm_page(request, current, chosen, target, error=message, status_code=409)
     return await _users_page(request, current, notice=message)
 

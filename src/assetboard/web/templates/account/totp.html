@@ -13,6 +13,14 @@
   {% endif %}
   {% if factor.enabled %}
   <p role="status">{{ _("Two-factor authentication is enabled.") }}</p>
+  {% if has_password %}
+  <p class="text-sm">{{ _("Replace all recovery codes if they are lost or exposed. Your current password and authenticator or an unused recovery code are both required. Existing recovery codes stop working immediately.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'totp_recovery_codes') }}" class="space-y-4">
+    {{ csrf_input() }}
+    {{ field("second_factor", _("Authenticator or recovery code"), required=true, autocomplete="one-time-code", maxlength=64) }}
+    {{ confirm_block(confirm, "totp-recovery-codes", _("Generate new recovery codes")) }}
+  </form>
+  {% endif %}
   <form method="post" action="{{ scoped_url(request, 'totp_disable') }}" class="space-y-4">
     {{ csrf_input() }}
     {{ confirm_block(confirm, "totp-disable", _("Disable two-factor authentication")) }}

@@ -47,9 +47,18 @@ unaffected.
 Disabling on the same security page requires your password, removes the authenticator and all
 recovery codes, and signs out other password sessions. A workspace requiring MFA stays protected
 and will ask you to enroll again. To replace a lost authenticator, sign in with a recovery code,
-disable, then enroll the replacement. A CLI password reset does not remove your second factor.
-If both your authenticator and every recovery code are lost, there is no automatic MFA reset
-in this feature. An already-linked external provider can still sign you in.
+disable, then enroll the replacement. You can also generate a replacement set of recovery codes
+on the security page; confirm your password and enter your current authenticator code or an
+unused recovery code. This immediately invalidates every previous recovery code, and the new
+codes are shown only once.
+
+If you lose your authenticator and every recovery code, contact an instance administrator. In
+**Users**, the administrator can reset your two-factor authentication after confirming their own
+account. This removes your authenticator and recovery codes and ends all your sessions. You can
+then sign in with your password and enroll again; a workspace that requires two-factor
+authentication remains inaccessible until you do. Administrators cannot use this action on
+their own account; use the account security page instead. A CLI password reset does not remove
+your second factor.
 
 ## Details, language and theme
 

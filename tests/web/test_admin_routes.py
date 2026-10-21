@@ -162,7 +162,9 @@ def test_a_throttled_admin_confirmation_says_how_long_to_wait(h: Harness) -> Non
         assert user is not None and user.is_active
 
 
-@pytest.mark.parametrize("action", ["create", "activate", "deactivate", "promote", "demote"])
+@pytest.mark.parametrize(
+    "action", ["create", "activate", "deactivate", "promote", "demote", "reset_totp"]
+)
 @pytest.mark.parametrize("password", ["", "wrong password"])
 def test_every_admin_mutation_needs_confirmation(h: Harness, action: str, password: str) -> None:
     add_user(h, OLA)

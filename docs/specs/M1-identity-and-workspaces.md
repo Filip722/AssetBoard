@@ -282,6 +282,9 @@ workspace, without affecting any other workspace or external sign-in method.
   a pending key, never an enabled factor.
 - Ten independent 128-bit recovery codes are shown once in the successful enrollment response.
   Store only SHA-256 hashes; each code can be consumed once, including concurrent attempts.
+- A user can regenerate recovery codes after confirming their password and a current TOTP or
+  unused recovery code. Invalidate every previous code atomically, show the new set once, and
+  audit the action without code data.
 - Enabled TOTP is checked with the password at `/login` and `/login/local`, in one form; no
   session is issued until both factors pass. Invalid codes get the generic sign-in failure.
   Password-confirmed linking by email (`/login/link`) also needs the factor to prevent a bypass.
@@ -297,6 +300,10 @@ workspace, without affecting any other workspace or external sign-in method.
 - Disabling requires the password through `web.confirm.run_confirmed`. Enabling and disabling
   revoke other password sessions; the current password session is marked verified on enrollment
   and unverified on disable. Disabling can require re-enrollment to access a protected workspace.
+- An instance administrator can reset another user's enabled factor after confirming their own
+  account. Remove the factor and recovery codes, revoke all target sessions, and audit the reset
+  without secrets. The user can sign in with their password and re-enroll; workspace enforcement
+  remains in place until then. Administrators use their own account security page for self-service.
 - Encrypt shared secrets using a purpose-separated key derived from the existing persistent
   instance secret. Do not reveal an enabled secret again or log secrets/codes. Audit enable and
   disable without secret data. Preserve the instance secret with backups; see ADR-0017.

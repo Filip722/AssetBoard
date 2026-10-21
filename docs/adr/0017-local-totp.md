@@ -37,13 +37,17 @@ workspace's access policy. External identity providers remain responsible for th
   remain available; unrelated workspaces and OIDC/proxy sessions are unaffected.
 - Enabling and password-confirmed disabling revoke other password sessions. The current local
   session records whether the second factor was verified. Audit these changes without secrets.
+- Regenerating recovery codes requires the current password and TOTP or an unused recovery code;
+  old codes are invalidated and the replacement set is shown once. An instance administrator can
+  reset another user's factor after confirming their own account; this removes the factor and all
+  recovery codes, revokes every target session, and is audited without secret data.
 
 ## Consequences
 
 Backups must preserve the persistent instance secret as well as the database. Replacing it
-makes authenticator secrets unreadable and authenticator sign-in fails closed; recovery codes remain usable. Changing passwords does not
-clear MFA. Recovery-code regeneration and an administrator MFA-reset UI/CLI are not included;
-users replace an authenticator by signing in with a recovery code, disabling and enrolling again.
+makes authenticator secrets unreadable and authenticator sign-in fails closed; recovery codes
+remain usable. Changing passwords does not clear MFA. There is no CLI MFA reset: users who lose
+all recovery methods need an instance administrator to reset the factor through the Users page.
 
 New direct dependencies are PyOTP (MIT, the spec's maintained TOTP implementation), Segno
 (BSD-3-Clause, a maintained pure-Python QR encoder with no dependencies), and cryptography

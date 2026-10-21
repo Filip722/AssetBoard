@@ -36,6 +36,12 @@ class TotpRepository:
             TotpRecoveryCode(user_id=self.user_id, code_hash=value) for value in hashes
         )
 
+    def replace_recovery_codes(self, hashes: list[str]) -> None:
+        self.session.execute(
+            delete(TotpRecoveryCode).where(TotpRecoveryCode.user_id == self.user_id)
+        )
+        self.add_recovery_codes(hashes)
+
     def consume_recovery_code(self, code_hash: str) -> bool:
         code = self.session.scalar(
             select(TotpRecoveryCode)
