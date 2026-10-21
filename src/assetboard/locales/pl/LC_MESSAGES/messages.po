@@ -1521,9 +1521,6 @@ msgstr "Przycisk trybu ciemnego zmienia motyw tylko na jednym urządzeniu."
 msgid "Use the saved theme on this device"
 msgstr "Użyj zapisanego motywu na tym urządzeniu"
 
-msgid "Two-factor authentication"
-msgstr "Uwierzytelnianie dwuskładnikowe"
-
 msgid "Password and devices"
 msgstr "Hasło i urządzenia"
 
@@ -1532,6 +1529,9 @@ msgstr "Zmień hasło albo wyloguj inne urządzenia."
 
 msgid "This account has no password. You can still sign out other devices."
 msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
+
+msgid "Two-factor authentication"
+msgstr "Uwierzytelnianie dwuskładnikowe"
 
 msgid "Sign-in methods"
 msgstr "Metody logowania"

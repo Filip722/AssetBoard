@@ -1435,9 +1435,6 @@ msgstr ""
 msgid "Use the saved theme on this device"
 msgstr ""
 
-msgid "Two-factor authentication"
-msgstr ""
-
 msgid "Password and devices"
 msgstr ""
 
@@ -1445,6 +1442,9 @@ msgid "Change your password or sign out other devices."
 msgstr ""
 
 msgid "This account has no password. You can still sign out other devices."
+msgstr ""
+
+msgid "Two-factor authentication"
 msgstr ""
 
 msgid "Sign-in methods"
