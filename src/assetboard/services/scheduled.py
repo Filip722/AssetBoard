@@ -282,6 +282,7 @@ def change_state(
             raise ValueError("archived_item")
         workspace = CurrentWorkspaceRepository(session, ctx).get()
         rows = ScheduledOccurrenceRepository(session, ctx)
+        audit_action = f"scheduled.{action}"
         if action == ItemAction.RESUME:
             repository.update(item.id, paused_at=None)
             _generate(session, ctx, ctx.clock, item, settings)
@@ -290,6 +291,8 @@ def change_state(
             if action == ItemAction.DELETE and not rows.for_item(item.id):
                 repository.delete(item.id)
             else:
+                if action == ItemAction.DELETE:
+                    audit_action = "scheduled.archive"
                 repository.update(
                     item.id,
                     **{
@@ -300,7 +303,7 @@ def change_state(
                 )
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
-            action=f"scheduled.{action}",
+            action=audit_action,
             entity_type="scheduled_item",
             entity_id=str(item_id),
             ts=ctx.clock.now(),

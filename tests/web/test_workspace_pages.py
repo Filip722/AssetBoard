@@ -72,11 +72,18 @@ def test_switch_refuses_foreign_workspace_with_404(owner: OwnerApp, target: str)
 # Pages without a Context render base.html without the workspace parts
 
 
-WORKSPACE_PARTS = ("data-workspace-switcher", "data-current-workspace", "data-owner-link")
+WORKSPACE_PARTS = (
+    "data-workspace-switcher",
+    "data-current-workspace",
+    "data-owner-link",
+    "data-recurring-link",
+)
 
 
 def test_home_shows_owner_links_only_to_owners(owner: OwnerApp) -> None:
-    assert "data-owner-link" in owner.client.get("/").text
+    page = owner.client.get("/").text
+    assert "data-owner-link" in page
+    assert "data-recurring-link" in page
     owner.set_admin_role("viewer")
     assert "data-owner-link" not in owner.client.get("/").text
 

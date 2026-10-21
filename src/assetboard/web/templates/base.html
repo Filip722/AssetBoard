@@ -33,7 +33,7 @@
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'month_current') }}" data-month-link{% if is_month_page %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'transactions') }}" data-transactions-link{% if request.url.path.endswith('/transactions') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %}><span aria-hidden="true">▦</span>{{ _("Categories") }}</a>{% endif %}
-        <a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}"><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>
+        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}" data-recurring-link><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>{% endif %}
         <a class="nav-link" href="#net-worth"><span aria-hidden="true">◇</span>{{ _("Net worth") }}</a>
         <a class="nav-link" href="#investments"><span aria-hidden="true">↗</span>{{ _("Investments") }}</a>
         <a class="nav-link" href="#loans"><span aria-hidden="true">▤</span>{{ _("Loans") }}</a>

@@ -123,6 +123,12 @@ def test_pause_resume_archive_and_delete_history(team):
     scheduled.change_state(team.factory, ctx, item, ItemAction.DELETE, settings)
     assert scheduled.list_items(team.factory, ctx)[0].archived
     assert len(rows(team, item)) == 2
+    with team.factory() as session:
+        actions = set(
+            session.scalars(select(AuditEvent.action).where(AuditEvent.entity_id == str(item)))
+        )
+        assert "scheduled.archive" in actions
+        assert "scheduled.delete" not in actions
     with pytest.raises(ValueError):
         scheduled.change_state(team.factory, ctx, item, ItemAction.RESUME, settings)
     empty = scheduled.save_item(team.factory, ctx, data(team), settings)
@@ -132,6 +138,11 @@ def test_pause_resume_archive_and_delete_history(team):
     scheduled.change_state(team.factory, ctx, fresh, ItemAction.DELETE, settings)
     with pytest.raises(NotFound):
         scheduled.get_item(team.factory, ctx, fresh)
+    with team.factory() as session:
+        actions = set(
+            session.scalars(select(AuditEvent.action).where(AuditEvent.entity_id == str(fresh)))
+        )
+        assert "scheduled.delete" in actions
 
 
 def test_roles_validation_and_tenant_isolation(team):
